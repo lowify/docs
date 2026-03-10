@@ -65,7 +65,7 @@ Todos os eventos seguem a mesma estrutura base:
   "customer": {
     "name": "Cliente Exemplo",
     "email": "cliente@dominio.com",
-    "phone": "5511999999999"
+    "phone": "11999999999"
   },
   "tracking": {
     "click_id": 10,
