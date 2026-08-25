@@ -121,7 +121,8 @@ O dispatcher não deve depender de `sale_id` para correlacionar o callback.
 | `app/Application/UseCase/Sale/CreateSaleDeliveryUseCase.php` | Alterar somente se necessário | Continuar persistindo `sales_delivery`, agora chamado pelo consumidor genérico. |
 | `app/Domain/Sale/Repository/SaleRecoveryDispatchRepository.php` | Alterar | Buscar/atualizar dispatch por ID, com transição de status válida e sem retry automático. |
 | `app/Domain/Sale/Repository/SaleRecoveryDispatchEventRepository.php` | Novo | Inserir eventos idempotentes e listar timeline. |
-| `config/autoload/sale_recovery.php` | Alterar | Adicionar filas, feature flag global e limites da recuperação oficial. |
+| `config/autoload/sale_recovery.php` | Alterar | Adicionar filas e limites da recuperação oficial. A feature flag é resolvida pelo Account. |
+| `plans/sale-recovery/deploy/001_sale_recovery.sql` | Alterar | Evoluir `sale_recovery_dispatches` e criar a tabela de eventos pelo SQL manual. |
 
 ### `services-notification`
 

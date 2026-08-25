@@ -47,9 +47,7 @@ Payload do produtor no `PATCH /products/{product_id}`:
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
-| `migrations/<timestamp>_create_product_sale_recovery_rules.php` | Novo | Criar regra por produto e responsável (produtor ou afiliado). |
-| `migrations/<timestamp>_create_product_sale_recovery_rule_steps.php` | Novo | Criar até dois stages e seus atrasos. |
-| `migrations/<timestamp>_create_product_sale_recovery_rule_step_channels.php` | Novo | Criar os canais e-mail/WhatsApp de cada stage. |
+| `plans/sale-recovery/deploy/001_sale_recovery.sql` | Novo | SQL manual único que cria regra por produto/responsável, etapas e canais. |
 | `app/Model/ProductSaleRecoveryRule.php` | Novo | Modelo e relações da regra. |
 | `app/Model/ProductSaleRecoveryRuleStep.php` | Novo | Modelo e relações do stage. |
 | `app/Model/ProductSaleRecoveryRuleStepChannel.php` | Novo | Modelo do canal por stage. |

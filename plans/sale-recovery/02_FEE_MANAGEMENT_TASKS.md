@@ -36,15 +36,21 @@ criar, atualizar ou remover um override.
 
 ## Responsabilidades por arquivo
 
+### `services-account`
+
+| Arquivo | Tipo | Responsabilidade |
+| --- | --- | --- |
+| `plans/sale-recovery/deploy/001_sale_recovery.sql` | Novo | Inserir o valor padrão em `system_vars`; o SQL é aplicado manualmente. |
+| `app/Model/UserSystemVar.php` | Novo, se ainda não houver modelo | Mapear `user_system_vars`. |
+| `app/Domain/SystemVar/Repository/UserSystemVarRepository.php` | Novo | Buscar override e aplicar upsert/delete do override. |
+| `app/Application/Service/SaleRecoveryFeeResolver.php` | Novo | Resolver taxa efetiva: override do usuário, depois valor padrão global. Não decidir cobrança nesta fase. |
+| API/serviço de variáveis de usuário | Alterar | Expor leitura/escrita do override para o Commerce e administração. |
+
 ### `services-commerce-v2`
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
-| `migrations/<timestamp>_seed_sale_recovery_unit_price.php` | Novo | Criar o valor inicial de `system_vars.sale_recovery_unit_price`, caso ainda não exista. |
-| `app/Model/UserSystemVar.php` | Novo, se ainda não houver modelo | Mapear `user_system_vars`. |
-| `app/Domain/SystemVar/Repository/UserSystemVarRepository.php` | Novo | Buscar override e aplicar upsert/delete do override. |
-| `app/Application/Service/SaleRecoveryFeeResolver.php` | Novo | Resolver taxa efetiva: override do usuário, depois valor padrão global. Não decidir cobrança nesta fase. |
-| Casos de uso de `form-data` e recovery de afiliado | Alterar | Retornar a taxa efetiva apenas como campo informativo no payload de configuração. |
+| Casos de uso de `form-data` e recovery de afiliado | Alterar | Consultar o resolvedor de Account e retornar a taxa efetiva apenas como campo informativo no payload de configuração. |
 
 ### `dashboard-seller` — administração
 

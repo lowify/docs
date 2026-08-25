@@ -44,7 +44,8 @@ A carteira já calcula disponibilidade como `total - blocked`, mas hoje só soma
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
-| Migration de `extract_types` | Nova | Adicionar um tipo de extrato para o débito de recuperação de venda, por exemplo `sale_recovery`. |
+| `plans/sale-recovery/deploy/001_sale_recovery.sql` | Alterar | Criar `sale_recovery_balance_holds` pelo deploy SQL manual. |
+| `extract_types` no deploy SQL | Alterar | Adicionar o tipo de extrato para o débito de recuperação de venda, por exemplo `sale_recovery`, com o próximo ID livre do banco Wallet. |
 | `app/Domain/Extract/Enum/ExtractOperation.php` | Alterar | Adicionar a operação de débito aprovado de recovery. |
 | `app/Application/UseCase/Extract/CreateExtractOperationUseCase.php` | Alterar | Construir o lançamento negativo do novo tipo, idempotente por dispatch. |
 | `sale_recovery_balance_holds` (migration/model/repository) | Novo | Persistir reserva por dispatch: responsável, valor, status `blocked|approved|refused`, datas e referência. Não usar somente `extract`, pois o extrato não representa o bloqueio temporário. |
@@ -64,16 +65,15 @@ A carteira já calcula disponibilidade como `total - blocked`, mas hoje só soma
 | Componente inline de saldo informado pelo time | Alterar | Refletir a nova parcela `recovery` no total bloqueado/disponível. O caminho exato deve ser confirmado antes da implementação. |
 | Extrato/listagem de movimentações | Alterar | Exibir o novo tipo de débito de recuperação com referência à venda/dispatch. |
 
-## Checkout Transparente — item de fatura
+## Checkout Transparente API — item de fatura
 
-O serviço de billing já tem o consumidor interno `billing.items.create` e a tabela `billing_items`, mas não há rota HTTP para inserir um item externo. A feature precisa expor uma integração interna idempotente para isso.
+O CT API precisa expor uma integração interna idempotente para inserir o item de fatura. Diferentemente de Commerce, Account e Wallet, essa alteração deve ser entregue por migration no próprio repositório.
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
-| `services-checkout-transparent-billing/app/Domain/Billing/Enum/BillingItemType.php` | Alterar | Adicionar o tipo `sale_recovery`. |
-| Request/UseCase/Controller de billing item | Novos | Criar endpoint interno autenticado para inserir item de fatura de recovery. Sugestão: `POST /billing/items`. |
-| `services-checkout-transparent-billing/config/routes.php` | Alterar | Registrar a rota interna. |
-| `BillingItemsQueueProcess` ou serviço comum de criação | Alterar | Reutilizar a mesma validação e idempotência por `source_type + source_id + type`. |
+| `services-checkout-transparent/services-checkout-transparent-api/migrations/<timestamp>_add_sale_recovery_billing_item.php` | Novo | Migration do CT API para suportar o tipo `sale_recovery` e a chave de idempotência necessária. |
+| Request/UseCase/Controller do CT API | Novos | Criar endpoint interno autenticado para inserir item de fatura de recovery. Sugestão: `POST /billing/items`. |
+| Rotas e serviço de criação de itens do CT API | Alterar | Reutilizar validação e idempotência por `source_type + source_id + type`. |
 | `services-commerce-v2` cliente de Billing | Novo | Ao receber sucesso do envio de dispatch transparente, criar item `sale_recovery` com `source_type = sale_recovery_dispatch` e `source_id = dispatch_id`. |
 
 O item não é criado antes do resultado do envio. Não há reserva de saldo neste caminho: ele compõe a fatura do Checkout Transparente.
