@@ -89,6 +89,15 @@ Payload do produtor no `PATCH /products/{product_id}`:
 | `api/products_list.php` | Alterar | Após obter os produtos, chamar summaries em lote e injetar o resumo no HTML/JSON retornado. |
 | Serviço cliente do Commerce V2 (novo ou existente) | Novo/alterar | Fazer o `POST /products/sale-recovery/summaries` para todos os IDs da página. |
 
+### `edge-gateway` e `edge-public-api`
+
+| Serviço | Responsabilidade |
+| --- | --- |
+| `edge-gateway` | Expor ao Dashboard as rotas de configuração e summaries, encaminhando-as ao Public API autenticado. |
+| `edge-public-api` | Validar o contexto público do usuário e encaminhar as rotas ao Commerce V2. Não duplicar a regra de produtor/afiliado. |
+
+Os clientes do Dashboard devem chamar Gateway/Public API, e não o Commerce V2 diretamente.
+
 ## Regras que backend e frontend devem aplicar
 
 - A regra é individual por produto.

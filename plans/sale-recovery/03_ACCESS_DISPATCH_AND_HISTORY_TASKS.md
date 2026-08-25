@@ -123,6 +123,7 @@ O dispatcher não deve depender de `sale_id` para correlacionar o callback.
 | `app/Domain/Sale/Repository/SaleRecoveryDispatchEventRepository.php` | Novo | Inserir eventos idempotentes e listar timeline. |
 | `config/autoload/sale_recovery.php` | Alterar | Adicionar filas e limites da recuperação oficial. A feature flag é resolvida pelo Account. |
 | `plans/sale-recovery/deploy/001_sale_recovery.sql` | Alterar | Evoluir `sale_recovery_dispatches` e criar a tabela de eventos pelo SQL manual. |
+| Cliente/porta de Account | Novo ou alterar | Consultar o estado efetivo de `sale_recovery_feature_enabled` do responsável; não consultar tabela de usuário nem persistir cópia local. |
 
 ### `services-notification`
 
@@ -139,15 +140,34 @@ O dispatcher não deve depender de `sale_id` para correlacionar o callback.
 > sinal explícito na mensagem de recovery ou tratamento dedicado com máximo de
 > uma tentativa; simplesmente não reenfileirar o dispatch não basta.
 
+### `services-account` — estado do usuário e feature flag
+
+Account é a fonte de verdade para dados do usuário e para a liberação da recuperação. A resolução deve receber o `user_id` e retornar o valor efetivo, com override do usuário e fallback global.
+
+| Arquivo/camada | Tipo | Responsabilidade |
+| --- | --- | --- |
+| `plans/sale-recovery/deploy/001_sale_recovery.sql` | Alterar | Inserir o padrão global desligado em `system_vars`. |
+| Modelo/repositório de variáveis do usuário | Novo ou alterar | Ler e gravar `user_system_vars.sale_recovery_feature_enabled`. |
+| Caso de uso de resolução de feature | Novo | Retornar a flag efetiva para um `user_id`: override, depois padrão global. |
+| Endpoint/contrato interno de Account | Novo ou alterar | Expor consulta do estado efetivo a Commerce e Dashboard, com autenticação de serviço. |
+| Endpoint administrativo de Account | Novo ou alterar | Permitir que somente admin 1/2 crie, altere ou remova o override. |
+
 ### `dashboard-seller` — restrições/feature flag
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
 | `includes/user_functions.php` | Alterar | Criar permissão específica de gestão de recovery, exclusiva para permissões 1 e 2. |
-| `actions/admin/user/restrictions.php` | Alterar ou nova ação dedicada | Gravar o override de ativação em `user_system_vars`, sem adicionar coluna em `tbl_usuarios`. |
+| `actions/admin/user/restrictions.php` | Alterar ou nova ação dedicada | Chamar, via Gateway e Public API, o endpoint administrativo do Account para gravar o override; não acessar `user_system_vars` nem adicionar coluna em `tbl_usuarios`. |
 | `views/dashboard/admin/seller_overview/_components/restrictions_modal.php` | Alterar | Adicionar toggle “Permitir recuperação de venda”. |
 | `views/dashboard/admin/users/_components/modal_restrictions.php` | Alterar | Adicionar o mesmo toggle na lista administrativa de usuários. |
 | `api/admin/users/list.php` | Alterar | Passar o estado efetivo da nova restrição ao modal. |
+
+### `edge-gateway` e `edge-public-api`
+
+| Serviço | Responsabilidade |
+| --- | --- |
+| `edge-gateway` | Expor a consulta e a alteração administrativa da feature flag ao Dashboard. |
+| `edge-public-api` | Validar sessão/permissão administrativa e encaminhar a operação ao Account. |
 
 Chaves sugeridas:
 
@@ -156,10 +176,10 @@ system_vars.sale_recovery_feature_enabled = 0
 user_system_vars.sale_recovery_feature_enabled = 0 | 1
 ```
 
-O resolvedor usa override do usuário e fallback global. Sem override e com
-padrão `0`, ninguém tem acesso. A autorização deve ser verificada no backend ao
-ler/salvar a regra e novamente antes de criar/enviar dispatch. Para venda de
-afiliado, verificar o afiliado responsável; para venda própria, verificar o
+O resolvedor do Account usa override do usuário e fallback global. Sem override
+e com padrão `0`, ninguém tem acesso. Commerce deve consultar esse resolvedor
+ao ler/salvar a regra e novamente antes de criar/enviar dispatch. Para venda de
+afiliado, consultar o estado do afiliado responsável; para venda própria, o do
 produtor.
 
 ### `dashboard-seller` — histórico de venda

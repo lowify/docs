@@ -29,10 +29,12 @@ Criar uma página para acompanhar recuperações por WhatsApp oficial e e-mail.
 | Use case/repository de status em `services-commerce-v2` | Novo | Consultar dispatches + último evento, aplicar filtros, paginação e visibilidade. |
 | `GET /sale-recovery/status` | Nova | Retornar cards e lista paginada ao usuário autenticado. |
 | `dashboard-seller/sale_recovery_status.php` | Novo | Nova página de status de RDC. |
-| `dashboard-seller/api/sale-recovery/status.php` | Novo | Proxy autenticado para o Commerce. |
+| `dashboard-seller/api/sale-recovery/status.php` | Novo | Chamar o Gateway autenticado; não acessar Commerce diretamente. |
 | `dashboard-seller/sidebar.php` | Alterar | Adicionar acesso condicionado à feature flag efetiva. |
 | Componentes de tabela e filtros | Novos | Renderizar cards, lista e estados dos canais oficiais. |
 | Consulta de detalhes de venda | Alterar | Fornecer timeline com o filtro de visibilidade do seller e visão completa para admin. |
+| `edge-gateway` | Alterar | Expor a consulta de status ao Dashboard. |
+| `edge-public-api` | Alterar | Validar contexto do usuário e encaminhar a consulta ao Commerce V2. |
 
 ## Observabilidade e suporte
 

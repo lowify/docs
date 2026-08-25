@@ -31,7 +31,7 @@ Os documentos abaixo são ordenados por dependência. Uma fase só deve avançar
 | Corrida com pagamento | Se a venda for paga depois da validação e durante o envio, a mensagem permanece enviada. |
 | Contato ausente | Registrar `skipped`; não enviar nem cobrar. |
 | Consentimento | Controle interno de opt-in/opt-out. |
-| Rollout | Desligada por padrão. Admins 1 e 2 controlam o override por usuário em Restrições. |
+| Rollout | Desligada por padrão. Account é a fonte de verdade do estado efetivo por usuário; admins 1 e 2 controlam o override em Restrições. |
 
 ## Configuração e registros
 
@@ -72,6 +72,7 @@ Estados esperados do dispatch: `scheduled`, `processing`, `queued`, `sent_to_pro
 
 - A taxa é única por recuperação e igual para e-mail e WhatsApp.
 - A chave é `sale_recovery_unit_price`, com valor padrão em `system_vars` e override em `user_system_vars`.
+- Os dados e as variáveis efetivas do usuário, inclusive `sale_recovery_feature_enabled`, pertencem ao Account. Commerce não replica nem persiste esse estado.
 - O valor efetivamente movimentado pertence ao serviço financeiro; não deve ser copiado para `sale_recovery_dispatches`.
 - Checkout Lowify sem split: reservar saldo antes de iniciar o envio. Sucesso gera débito no extrato e encerra a reserva; falha/recusa libera a reserva; ausência de retorno a mantém bloqueada.
 - Checkout Transparente: após sucesso do envio, criar item `sale_recovery` na fatura. Não há reserva de saldo nesse caminho.
@@ -81,7 +82,7 @@ Estados esperados do dispatch: `scheduled`, `processing`, `queued`, `sent_to_pro
 ```text
 Venda pending criada
   → localizar item principal e responsável (produtor ou afiliado)
-  → validar feature flag e regra do produto
+  → consultar Account para validar a feature flag efetiva e localizar a regra do produto
   → criar dispatches por etapa/canal
   → scheduler entrega o dispatch vencido
   → worker revalida pending, janela, contato, template e acesso
@@ -94,6 +95,16 @@ Venda pending criada
 ```
 
 O novo resultado de notificação deve usar a fila genérica `sales:notification:results`, com `context` (`sale_delivery|sale_recovery`), `subject_id`, canal, referência concreta da mensagem, status e erro. O consumidor do Commerce encaminha `sale_delivery` ao fluxo existente e `sale_recovery` ao registro de eventos do RDC.
+
+## Acesso do Dashboard aos serviços
+
+Toda chamada do `dashboard-seller` para a feature segue este caminho:
+
+```text
+dashboard-seller → edge-gateway → edge-public-api → serviço responsável
+```
+
+O Dashboard não chama `services-commerce-v2`, `services-account` nem `services-wallet` diretamente. `edge-public-api` aplica o contrato público/autorização e encaminha para o serviço dono do dado; `edge-gateway` apenas expõe a rota ao Dashboard. Comunicação interna entre serviços pode usar o contrato autenticado próprio.
 
 ## Reaproveitamentos e limites
 

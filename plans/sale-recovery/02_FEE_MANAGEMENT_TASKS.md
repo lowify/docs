@@ -43,14 +43,14 @@ criar, atualizar ou remover um override.
 | `plans/sale-recovery/deploy/001_sale_recovery.sql` | Novo | Inserir o valor padrão em `system_vars`; o SQL é aplicado manualmente. |
 | `app/Model/UserSystemVar.php` | Novo, se ainda não houver modelo | Mapear `user_system_vars`. |
 | `app/Domain/SystemVar/Repository/UserSystemVarRepository.php` | Novo | Buscar override e aplicar upsert/delete do override. |
-| `app/Application/Service/SaleRecoveryFeeResolver.php` | Novo | Resolver taxa efetiva: override do usuário, depois valor padrão global. Não decidir cobrança nesta fase. |
+| `app/Application/Service/SaleRecoveryFeeResolver.php` | Novo | Resolver taxa efetiva: override do usuário, depois valor padrão global. Account é a fonte de verdade; não decidir cobrança nesta fase. |
 | API/serviço de variáveis de usuário | Alterar | Expor leitura/escrita do override para o Commerce e administração. |
 
 ### `services-commerce-v2`
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
-| Casos de uso de `form-data` e recovery de afiliado | Alterar | Consultar o resolvedor de Account e retornar a taxa efetiva apenas como campo informativo no payload de configuração. |
+| Casos de uso de `form-data` e recovery de afiliado | Alterar | Consultar o resolvedor de Account e retornar a taxa efetiva apenas como campo informativo no payload de configuração; não manter dados de usuário localmente. |
 
 ### `dashboard-seller` — administração
 
@@ -63,13 +63,20 @@ criar, atualizar ou remover um override.
 | Ação/página administrativa de taxa padrão | Novo ou alterar | Validar admin 1/2 e gravar em `system_vars`. |
 | `includes/helpers.php` | Sem mudança funcional esperada | Reutilizar `getCustomVar`; só alterar se for necessário centralizar validação/formatação. |
 
+### `edge-gateway` e `edge-public-api`
+
+| Serviço | Responsabilidade |
+| --- | --- |
+| `edge-gateway` | Expor ao Dashboard as operações administrativas de taxa e a consulta da taxa efetiva. |
+| `edge-public-api` | Autenticar/autorizar o usuário externo e encaminhar ao Account; não acessar `system_vars` ou `user_system_vars` diretamente. |
+
 ### `dashboard-seller` — gestão de produto
 
 | Arquivo | Tipo | Responsabilidade |
 | --- | --- | --- |
 | `product_form.php` | Alterar | Mostrar a taxa efetiva do produtor como valor somente leitura, perto da configuração de recovery. |
 | `affiliate_product_detail.php` | Alterar | Mostrar a taxa efetiva do afiliado como valor somente leitura. |
-| Cliente dos endpoints de configuração | Alterar | Consumir o valor efetivo retornado pelo Commerce; não calcular valor no browser. |
+| Cliente dos endpoints de configuração | Alterar | Consumir, via Gateway/Public API, o valor efetivo retornado pelo Commerce; não calcular valor no browser. |
 
 ## Contratos sugeridos
 
