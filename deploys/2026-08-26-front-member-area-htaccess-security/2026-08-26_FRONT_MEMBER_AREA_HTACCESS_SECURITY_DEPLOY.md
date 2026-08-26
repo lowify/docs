@@ -8,9 +8,9 @@ A medida corrige a exposição direta de `/.env`. As URLs sem extensão continua
 
 ## Componente alterado
 
-| Componente | Arquivo |
-|---|---|
-| `front-member-area` | `.htaccess` |
+| Componente | Branch | Commit |
+|---|---|---|
+| `front-member-area` | `main` | `260d7b7` |
 
 Não há migration, alteração de schema ou nova variável de ambiente.
 
@@ -20,44 +20,18 @@ Não há migration, alteração de schema ou nova variável de ambiente.
 /opt/lowify/front/front-member-area/
 ```
 
-## .htaccess final
+## Alterações incluídas
 
-```apache
-RewriteEngine On
-DirectoryIndex index.php
+- O `.htaccess` bloqueia acesso direto a arquivos iniciados por ponto, inclusive `/.env`.
+- Diretórios internos (`vendor`, `docker`, `includes`, `config`, `scripts`, `tools`, `tests`, `storage` e `logs`) retornam acesso proibido quando requisitados externamente.
+- Arquivos de projeto e configuração, como `composer.json`, `Dockerfile`, arquivos Compose, PHPStan e `phinx.php`, também são bloqueados.
+- As regras existentes de URL sem extensão e de redirecionamento de requisições `GET` com `.php` foram preservadas.
 
-# Block sensitive project files and private directories from direct access.
-
-RewriteRule (^|/)\. - [F,L]
-RewriteRule ^(vendor|docker|includes|config|scripts|tools|tests|storage|logs)(/|$) - [F,L]
-RewriteRule ^(composer\.(json|lock)|Dockerfile|docker-compose\..*\.ya?ml|README\.md|phpstan\.neon.*|phinx\.php)$ - [F,L]
-
-RewriteCond %{REQUEST_METHOD} !POST
-RewriteCond %{THE_REQUEST} \s/+(.+?)\.php(?:[?\s]|$) [NC]
-RewriteCond %{HTTP:X-Forwarded-Proto} =https [OR]
-RewriteCond %{HTTPS} =on
-RewriteRule ^(.+?)\.php$ https://%{HTTP_HOST}/$1 [R=301,L]
-
-RewriteCond %{REQUEST_METHOD} !POST
-RewriteCond %{THE_REQUEST} \s/+(.+?)\.php(?:[?\s]|$) [NC]
-RewriteRule ^(.+?)\.php$ /$1 [R=301,L]
-
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^(.+?)/?$ $1.php [L]
-
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-```
+O conteúdo atualizado do `.htaccess` é obtido diretamente da branch `main` do repositório; este documento não replica o arquivo.
 
 ## Pré-requisitos
 
-1. Fazer backup do `.htaccess` atual:
-
-   ```bash
-   cp --backup=numbered .htaccess .htaccess.before-security
-   ```
-
+1. Confirmar que o clone de produção não possui alterações locais que possam impedir a atualização da branch `main`.
 2. Confirmar que `mod_rewrite` está habilitado no Apache:
 
    ```bash
@@ -67,16 +41,21 @@ RewriteRule ^ - [L]
 ## Ações concluídas
 
 1. Os segredos que poderiam ter sido expostos antes da correção foram rotacionados. O bloqueio de acesso não invalida credenciais já divulgadas, portanto esta rotação fez parte da resposta ao incidente.
+2. As regras descritas neste documento foram publicadas na branch `main` do repositório `front-member-area` no commit `260d7b7`. A reconstrução do container e a validação em produção continuam pendentes.
 
 ## Sequência de deploy
 
-1. Atualizar o `.htaccess` com as regras de bloqueio para:
+1. No diretório de produção, atualizar o código publicado na `main`:
 
-   - arquivos iniciados por ponto, usando `(^|/)\.`;
-   - diretórios `vendor`, `docker`, `includes`, `config`, `scripts`, `tools`, `tests`, `storage` e `logs`;
-   - arquivos de projeto como `composer.json`, `composer.lock`, `Dockerfile`, arquivos Compose, `README.md`, arquivos PHPStan e `phinx.php`.
+   ```bash
+   cd /opt/lowify/front/front-member-area
+   git status --short
+   git switch main
+   git pull --ff-only origin main
+   git log -1 --oneline
+   ```
 
-   > O ponto da regra de dotfiles deve ser escapado (`\.`). Um ponto sem escape é curinga e bloquearia URLs válidas.
+   O último commit deve ser `260d7b7 fix: protect member area sensitive files`.
 
 2. Reconstruir e recriar o container:
 
