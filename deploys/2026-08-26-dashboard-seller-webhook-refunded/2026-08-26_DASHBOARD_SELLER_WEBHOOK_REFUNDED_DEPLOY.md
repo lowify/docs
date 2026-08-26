@@ -32,43 +32,21 @@ Não há migration, alteração de dados ou nova variável de ambiente nesta ent
 
    ```bash
    cd /opt/lowify/front/dashboard-seller
-   git status --short
-   git switch main
    git pull --ff-only origin main
-   git log -1 --oneline
    ```
 
-   O último commit deve ser `b9bd57e feat: add refunded webhook event`.
-
-2. Recriar o container web para carregar a revisão atualizada:
-
-   ```bash
-   docker compose up -d --build front-dashboard-seller
-   ```
-
-3. Confirmar que o container voltou a ficar saudável:
-
-   ```bash
-   docker compose ps front-dashboard-seller
-   ```
 
 ## Validação pós-deploy
 
 1. Acessar **Integrações → Webhooks** com uma conta seller que tenha produto ativo.
 2. Confirmar que o seletor de evento oferece **Venda Reembolsada**.
-3. Cadastrar um endpoint HTTPS de teste, selecionando pelo menos um produto, e concluir a validação da senha financeira.
-4. Confirmar que o webhook aparece na listagem com o status **Reembolsada**.
-5. Executar um reembolso aprovado de uma venda de teste vinculada ao produto e confirmar o recebimento de um POST com `event: "sale.refunded"` no endpoint cadastrado.
+3. Opcionalmente, cadastrar um endpoint HTTPS de teste, selecionando pelo menos um produto, e concluir a validação da senha financeira.
+4. Opcionalmente, confirmar que o webhook aparece na listagem com o status **Reembolsada**.
+5. Opcionalmente, executar um reembolso aprovado de uma venda de teste vinculada ao produto e confirmar o recebimento de um POST com `event: "sale.refunded"` no endpoint cadastrado.
 
-> A solicitação de reembolso pendente não deve disparar o evento. O disparo ocorre após a aprovação do reembolso.
+> As etapas 3 a 5 podem ser conferidas posteriormente pelos logs. A solicitação de reembolso pendente não deve disparar o evento; o disparo ocorre após a aprovação.
 
 ## Rollback
 
 1. Retornar o `dashboard-seller` para a revisão anterior ao commit `b9bd57e`.
-2. Recriar o container:
-
-   ```bash
-   docker compose up -d --build front-dashboard-seller
-   ```
-
-3. Os registros `product_webhooks` já criados com `event_type = 'sale.refunded'` permanecem no banco; removê-los somente se a reversão também exigir a retirada dessas configurações.
+2. Os registros `product_webhooks` já criados com `event_type = 'sale.refunded'` permanecem no banco; removê-los somente se a reversão também exigir a retirada dessas configurações.
