@@ -115,9 +115,11 @@ Levantamento concluído em 2026-08-26. Foram inspecionados os usos de `GatewayJw
 
 **Aceite:** access/refresh token de colaborador é rotacionado, contém o contexto correto e deixa de renovar após inativação/remoção; login e refresh de usuário continuam compatíveis.
 
-## T04 — Public API: fallback do login e contexto do ator
+## T04 — Public API: fallback do login e contexto do ator ✅
 
 **Dependências:** T03.
+
+**Implementado em 2026-08-26:** o endpoint de login do `edge-public-api` injeta `type=user` quando ausente e recusa tipos fora da allowlist antes de encaminhar ao Auth. Foi criado `ActorContextResolver`, que preserva o fallback de JWT legado e, para colaborador, exige `sub`, `collaborator_id`, `seller_id` e `permissions` estruturados. O resolvedor nunca usa `sub` como seller de colaborador. Testes unitários: 3 testes/6 assertions.
 
 **Arquivos prováveis:**
 
@@ -135,9 +137,11 @@ Levantamento concluído em 2026-08-26. Foram inspecionados os usos de `GatewayJw
 
 **Aceite:** login sem `type` continua funcionando como user; JWT atual de usuário continua funcionando; JWT de colaborador resolve actor e seller sem ambiguidade.
 
-## T05 — Public API: guard reutilizável de feature
+## T05 — Public API: guard reutilizável de feature 🚧
 
 **Dependências:** T01 e T04.
+
+**Em andamento (2026-08-26):** criado o alias `collaborator.feature` e o middleware reutilizável no `edge-public-api`. Ele resolve o contexto do ator, mantém usuário normal no fluxo atual, valida a permission key para colaborador e anexa `actor_context` à request. A negação dinâmica retorna somente o envelope curto; a de navegação retorna a primeira rota permitida. Testes unitários do resolvedor e middleware: 7 testes/14 assertions. A associação às rotas e o seller scope nos controllers permanecem em T07.
 
 **Arquivos prováveis:**
 
@@ -160,9 +164,11 @@ Levantamento concluído em 2026-08-26. Foram inspecionados os usos de `GatewayJw
 
 **Aceite:** colaborador autorizado usa somente o seller do token; colaborador sem permission key recebe 403 no formato correto; owner/admin preserva o comportamento anterior.
 
-## T06 — Dashboard: login JWT sem remover o fluxo local
+## T06 — Dashboard: login JWT sem remover o fluxo local 🚧
 
 **Dependências:** T03 e T04.
+
+**Em andamento (2026-08-26):** `GatewayJwtClient::login()` passou a aceitar `type` (padrão `user`) e o login de colaborador envia `type=collaborator`. A senha deixa de ser verificada no Dashboard: Auth/Account são a autoridade da credencial; após a resposta tipada, o Dashboard confere a identidade retornada contra o vínculo local e preserva a sessão/token legado. O cliente passa a gerar internamente `X-Dashboard-Request-Type` e o Gateway preserva `error_code`/`redirect_to`; navegações consomem `feature_permission_denied` com redirect, enquanto chamadas sob `/api/` mantêm a resposta estruturada. O `edge-gateway` já encaminha o payload e todos os headers necessários ao `edge-public-api` (incluindo `X-Dashboard-Request-Type`, `Authorization` e `Cookie`), portanto não exigiu alteração nesta etapa. `php -l` passou nos três arquivos alterados. A validação integrada depende da aplicação do guard nas rotas em T07.
 
 **Arquivos prováveis:**
 
