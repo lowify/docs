@@ -75,6 +75,24 @@ O login normal do owner de teste também foi validado no Auth, seguido de refres
 
 Isso confirma o fallback do fluxo já existente para usuários durante a primeira etapa da migration.
 
+## Atualização de Dashboard/Public API
+
+Em 2026-08-26, a etapa de proxy e login pelo Dashboard foi publicada para teste:
+
+| Componente | Branch | Commit | Publicação |
+|---|---|---|---|
+| `edge-public-api` | `feat/jwt-colaborador` | `0a49839` | worktree isolado e rebuild do container `edge-public-api` |
+| `dashboard-seller` | `feat/jwt-colaborador` | `25d8c8e` | pull no checkout montado, sem rebuild |
+
+O checkout original do Public API continha arquivos locais e outra branch, portanto foi preservado. O container foi reconstruído com o compose do worktree isolado, reutilizando o mesmo projeto Docker e alias de rede.
+
+Após a recriação do Public API, foram feitos POSTs reais contra `https://dashboard.statuslive.site`:
+
+- `login_colaborador_process.php` para o colaborador de teste retornou `302` para o Dashboard;
+- `login_process.php` para o owner de teste retornou `302` para o Dashboard.
+
+Os cookies temporários usados na validação foram removidos ao final e tokens não foram registrados.
+
 ## Pendências para a próxima etapa
 
 1. Executar login real de colaborador com credenciais de teste e conferir os claims do JWT.
