@@ -172,7 +172,13 @@ Levantamento concluído em 2026-08-26. Foram inspecionados os usos de `GatewayJw
 
 **Ajuste identificado no teste integrado (2026-08-27):** a whitelist local avaliava apenas o basename do script e, por isso, negava endpoints AJAX antes da chamada ou resposta esperada. O caminho raiz também continha `includes/..`, enquanto o PHP informa o arquivo já normalizado; o cálculo foi corrigido com `realpath`. A regra agora usa o caminho relativo para endpoints sob `api/`, mapeia `api/dashboard/sales/list.php` para `sales` e a listagem de produtos para `products`. As páginas, processadores, uploads e endpoints atuais de adicionar, consultar detalhes e editar produto usam `products_edit`; páginas continuam usando o basename e todas as demais rotas locais permanecem deny-by-default.
 
-**Sessão de colaborador:** os avisos superiores do owner não são resolvidos para colaborador. Isso oculta avisos de cadastro pendente e de fatura do Checkout Transparente, cujas ações não pertencem ao colaborador; o aviso permanece inalterado para o owner.
+**Sessão de colaborador:** os avisos superiores do owner não são resolvidos para colaborador, inclusive pelo fallback do `header.php`. Isso oculta avisos de cadastro pendente e de fatura do Checkout Transparente, cujas ações não pertencem ao colaborador; o aviso permanece inalterado para o owner.
+
+**Reenviar acesso de venda:** `_resend_access_email.php` é uma ação local já oferecida na listagem de vendas. Ela usa a permission key `sales`, valida `sales.id_usuario` contra o seller da sessão antes de enfileirar a reentrega e não aceita um `order_id` de outro seller.
+
+**Saldo:** a tela de saldo permanece acessível pela key `balance`, mas o card e o botão de solicitar saque são ocultos para colaborador. Solicitação de saque é uma ação exclusiva do owner neste MVP.
+
+**Resumo do dashboard:** `api/dashboard_overview.php` usa a key `dashboard` e é marcado como AJAX. Assim, o colaborador autorizado recebe o resumo; uma negação retorna JSON em vez de redirecionar para `/index` e causar a chamada inválida para `/api/index`.
 
 **Arquivos prováveis:**
 
