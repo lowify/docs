@@ -155,10 +155,6 @@ INSERT INTO `system_vars` (`var_key`, `var_value`)
 VALUES
     ('sale_notifications_feature_enabled', '0'),
     ('sale_delivery_whatsapp_enabled', '0'),
-    ('sale_delivery_whatsapp_status_timeout_seconds', '180'),
-    ('sale_delivery_whatsapp_hold_timeout_seconds', '600'),
-    ('sale_delivery_email_provider_primary', 'sendgrid'),
-    ('sale_delivery_email_provider_secondary', 'mailtrap'),
     ('sale_delivery_whatsapp_unit_price', '0.00'),
     ('sale_recovery_unit_price', '0.00')
 ON DUPLICATE KEY UPDATE `var_value` = `var_value`;

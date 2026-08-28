@@ -25,7 +25,8 @@ Evoluir `SaleDeliveryResultQueueService` para publicar em `sales:notification:re
 | `EmailSenderService` | Aceitar contexto/correlação de entrega e RDC; publicar envio/falha sem preço. |
 | `WhatsappMetaSenderService` | Receber `sales_delivery.id` ou dispatch nos params; publicar resultado sem aplicar fallback próprio. |
 | `WhatsappMetaDeliveryStatusQueueProcess` | Publicar callback genérico pelo subject; não reenviar secondary em confirmação tardia. |
-| `WhatsappMetaDeliveryEmailService` | Substituir constantes SendGrid/Mailtrap por providers `primary`/`secondary` recebidos do fluxo. |
+| `WhatsappMetaDeliveryEmailService` | Receber o modo `primary`/`secondary` do Commerce e resolvê-lo pela env. |
+| `config/autoload/sale_delivery.php` ou config equivalente | Mapear `SALE_DELIVERY_EMAIL_PROVIDER_PRIMARY` e `SALE_DELIVERY_EMAIL_PROVIDER_SECONDARY` para provedores configurados no Notification. |
 | Processos de e-mail | Publicar resultado sem duplicar e-mail de timeout. |
 | Migrations/templates | Criar Twig RDC, templates Meta e ajustar schema de correlation se necessário. |
 | Alerta de créditos | Consumir pedido idempotente da Wallet e enviar e-mail + WhatsApp ao owner. |
@@ -35,7 +36,7 @@ Evoluir `SaleDeliveryResultQueueService` para publicar em `sales:notification:re
 - Notification não consulta Wallet, preço ou saldo.
 - Admin gratuito é definido por Commerce; Notification apenas envia os canais solicitados.
 - Reenvio admin não possui fallback automático.
-- Para entrega automática/seller/colaborador, Commerce escolhe primary/secondary pelo status Meta.
+- Para entrega automática/seller/colaborador, Commerce escolhe primary/secondary pelo status Meta; Notification apenas mapeia o modo pela env e envia.
 - RDC continua sem retry/fallback automático.
 
 ## Testes

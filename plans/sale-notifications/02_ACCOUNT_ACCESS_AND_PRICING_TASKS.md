@@ -8,10 +8,6 @@ No banco do Account, inserir em `system_vars`:
 | --- | --- |
 | `sale_notifications_feature_enabled` | `0` |
 | `sale_delivery_whatsapp_enabled` | `0` |
-| `sale_delivery_whatsapp_status_timeout_seconds` | `180` |
-| `sale_delivery_whatsapp_hold_timeout_seconds` | `600` |
-| `sale_delivery_email_provider_primary` | `sendgrid` |
-| `sale_delivery_email_provider_secondary` | `mailtrap` |
 | `sale_delivery_whatsapp_unit_price` | valor comercial |
 | `sale_recovery_unit_price` | valor comercial |
 

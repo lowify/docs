@@ -41,7 +41,8 @@ Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenv
 
 - Criar client autenticado/retry seguro para hold, release e consume; referência sempre é `sales_delivery.id` ou `sale_recovery_dispatches.id`.
 - Não repetir envio em caso de erro de Wallet ou falta de crédito.
-- Delivery: status timeout 180s e hold timeout 600s são lidos do Account ao criar a tentativa e gravados como deadlines, sem recalcular tentativa antiga.
+- Delivery: `status_timeout_seconds` (180) e `hold_timeout_seconds` (600) pertencem a `config/autoload/sale_delivery.php`; Commerce os grava como deadlines sem recalcular tentativa antiga.
+- Commerce escolhe `primary|secondary` no payload de e-mail; não envia o nome do provedor como regra de negócio.
 - Meta tardia após hold liberado: consume tardio; saldo pode ficar negativo.
 
 ## Rotas necessárias

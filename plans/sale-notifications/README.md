@@ -59,7 +59,7 @@ Venda paga
 
 Quando WhatsApp está desligado, não há telefone, não há crédito ou o enqueue falha, o e-mail segue pelo provider primary. Não há envio WhatsApp nesses casos.
 
-`primary` e `secondary` são configurações do fluxo `sale_delivery`, inicialmente SendGrid e Mailtrap, respectivamente; os nomes dos provedores não pertencem à regra de negócio.
+Commerce escolhe o modo semântico `primary` ou `secondary` conforme a regra de negócio. Notification mapeia esse modo para o provedor real por env, inicialmente SendGrid e Mailtrap; os nomes dos provedores não pertencem à regra de negócio nem ao Account.
 
 ## RDC
 
