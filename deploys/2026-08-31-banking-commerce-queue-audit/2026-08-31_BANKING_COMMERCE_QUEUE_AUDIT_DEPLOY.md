@@ -47,20 +47,27 @@ Não há migration, DDL ou DML neste deploy. A alteração passa a utilizar a ta
    git status --porcelain=v1
    ```
 
-2. Atualizar a branch de deploy até o `HEAD` publicado:
+2. Atualizar as referências remotas e confirmar a existência da branch de deploy:
+
+   ```bash
+   git fetch origin --prune
+   git show-ref --verify --quiet refs/remotes/origin/fix/banking-commerce-queue-audit
+   ```
+
+3. Atualizar a branch de deploy até o `HEAD` publicado:
 
    ```bash
    git switch fix/banking-commerce-queue-audit
    git pull --ff-only origin fix/banking-commerce-queue-audit
    ```
 
-3. Reconstruir e subir o serviço e seus workers:
+4. Reconstruir e subir o serviço e seus workers:
 
    ```bash
    docker compose up -d --build
    ```
 
-4. Confirmar que o app e o worker de assinaturas estão ativos:
+5. Confirmar que o app e o worker de assinaturas estão ativos:
 
    ```bash
    docker compose ps
