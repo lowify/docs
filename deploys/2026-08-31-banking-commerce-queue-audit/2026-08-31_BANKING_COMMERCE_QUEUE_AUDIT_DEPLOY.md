@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Disponibilizar no `main` do `services-banking` os ajustes de cobrança PIX Automático e a auditoria persistente do encaminhamento para o Commerce.
+Disponibilizar na branch `fix/banking-commerce-queue-audit` do `services-banking` os ajustes de cobrança PIX Automático e a auditoria persistente do encaminhamento para o Commerce.
 
 O objetivo é observar o fluxo em operação por um período prolongado e identificar, com evidência persistida, se o gargalo anterior entre Banking e Commerce foi resolvido. Este plano não inclui testes de compatibilidade, alterações no Commerce nem ações de limpeza de filas.
 
@@ -10,7 +10,7 @@ O objetivo é observar o fluxo em operação por um período prolongado e identi
 
 | Componente | Branch | Commits incluídos |
 |---|---|---|
-| `services-banking` | `main` | `aa3f148`, `eb0d63f`, `a329536` |
+| `services-banking` | `fix/banking-commerce-queue-audit` | `aa3f148`, `eb0d63f`, `a329536` |
 
 ## Alterações incluídas
 
@@ -30,7 +30,7 @@ Os registros armazenam a mensagem completa, incluindo correlação, parcela, E2E
 
 ## Pré-requisitos
 
-1. A `main` do `services-banking` deve conter os commits `aa3f148`, `eb0d63f` e `a329536`.
+1. A branch `fix/banking-commerce-queue-audit` do `services-banking` deve conter os commits `aa3f148`, `eb0d63f` e `a329536`.
 2. A tabela `services-banking.ordinary_logs` deve estar disponível no ambiente.
 3. O app e o worker `subscriptions-queue-worker` devem estar configurados para iniciar após a atualização.
 
@@ -47,11 +47,11 @@ Não há migration, DDL ou DML neste deploy. A alteração passa a utilizar a ta
    git status --porcelain=v1
    ```
 
-2. Atualizar a branch `main` até o `HEAD` publicado:
+2. Atualizar a branch de deploy até o `HEAD` publicado:
 
    ```bash
-   git switch main
-   git pull --ff-only origin main
+   git switch fix/banking-commerce-queue-audit
+   git pull --ff-only origin fix/banking-commerce-queue-audit
    ```
 
 3. Reconstruir e subir o serviço e seus workers:
