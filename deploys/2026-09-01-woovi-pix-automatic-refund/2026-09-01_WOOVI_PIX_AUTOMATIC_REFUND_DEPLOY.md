@@ -25,9 +25,8 @@ O fluxo identifica a cobrança como assinatura a partir da relação entre a cor
 ## Pré-requisitos
 
 1. A branch de deploy deve conter os quatro commits listados acima, com `221e6ce` no `HEAD`.
-2. As configurações de credenciais e App ID de `woovi` e `woovi_2` devem existir no ambiente. Não alterar ou expor valores de variáveis no procedimento.
-3. A venda de teste deve corresponder a uma cobrança PIX Automático paga, com E2E persistido em `subscriptions_charge`.
-4. O container Nginx do compose deve ser recriado junto com o app. Ele pode manter o IP antigo do PHP-FPM se somente o app for recriado, causando `502 Bad Gateway`.
+2. A venda de teste deve corresponder a uma cobrança PIX Automático paga, com E2E persistido em `subscriptions_charge`.
+3. O container Nginx do compose deve ser recriado junto com o app. Ele pode manter o IP antigo do PHP-FPM se somente o app for recriado, causando `502 Bad Gateway`.
 
 ## Banco de dados e filas
 
