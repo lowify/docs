@@ -8,11 +8,11 @@ O fluxo identifica a cobrança como assinatura a partir da relação entre a cor
 
 ## Componentes e referências
 
-| Componente | Branch | Commits incluídos | Ação neste deploy |
-|---|---|---|---|
-| `services-banking` | `fix/banking-commerce-queue-audit` | `aa3f148`, `eb0d63f`, `a329536`, `221e6ce` | Atualizar e recriar app e Nginx |
-| `dashboard-seller` | — | — | Sem alteração |
-| `edge-gateway`, `edge-public-api`, `services-commerce-v2` | — | — | Sem alteração |
+| Componente | Branch |
+|---|---|
+| `services-banking` | `fix/banking-commerce-queue-audit` |
+| `dashboard-seller` | — |
+| `edge-gateway`, `edge-public-api`, `services-commerce-v2` | — |
 
 ## Alterações incluídas
 
