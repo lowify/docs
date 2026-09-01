@@ -36,10 +36,10 @@ Os registros existentes de `refunds_charge` e as mensagens já pendentes devem s
 
 ## Sequência de disponibilização
 
-1. Obter o diretório de trabalho do compose a partir do container atual e confirmar que não há alterações locais:
+1. Acessar o diretório do serviço e confirmar que não há alterações locais:
 
    ```bash
-   cd "$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' services-banking-services-banking-1)"
+   cd /opt/lowify/services/services-banking/
    git status --porcelain=v1
    ```
 
@@ -84,14 +84,13 @@ Os registros existentes de `refunds_charge` e as mensagens já pendentes devem s
 
 ## Rollback
 
-Não há rollback de banco ou filas.
-
-Se houver instabilidade confirmada e for necessário voltar somente este ajuste, reverta o commit `221e6ce` na branch de deploy e recrie app e Nginx juntos:
+Não há rollback de banco ou filas. Se houver instabilidade confirmada, voltar o serviço para a branch `main` e recriar app e Nginx juntos:
 
 ```bash
-git switch fix/banking-commerce-queue-audit
-git revert --no-edit 221e6ce
+cd /opt/lowify/services/services-banking/
+git switch main
+git pull --ff-only origin main
 docker compose up -d --build --force-recreate services-banking-app services-banking
 ```
 
-Esse rollback restaura o uso anterior do endpoint de charge para PIX Automático, que não é o endpoint indicado pela Woovi. Portanto, deve ser uma medida temporária e deliberada, com os reembolsos PIX Automático suspensos até a correção.
+Esse rollback restaura o comportamento da `main`. Os reembolsos PIX Automático devem permanecer suspensos até a correção ser disponibilizada novamente.
