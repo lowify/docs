@@ -165,6 +165,18 @@ ON DUPLICATE KEY UPDATE `var_value` = `var_value`;
 -- services-wallet
 -- ============================================================================
 
+-- Pré-validação obrigatória: o tipo 35 foi reservado para esta feature.
+-- Não prossiga se o ID 35 já tiver outra descrição.
+SELECT `id`, `description`
+FROM `extract_types`
+WHERE `id` = 35
+ORDER BY `id`;
+
+-- O tipo é usado pelo débito do saldo normal na compra de pacote de créditos.
+-- O INSERT deve falhar, em vez de sobrescrever, se houver conflito de ID.
+INSERT INTO `extract_types` (`id`, `description`)
+VALUES (35, 'Compra de créditos de comunicação');
+
 CREATE TABLE `communication_credit_packages` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(100) NOT NULL,
@@ -190,22 +202,28 @@ CREATE TABLE `communication_credit_balances` (
 
 CREATE TABLE `communication_credit_purchases` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `uuid` CHAR(36) NOT NULL,
     `owner_user_id` BIGINT UNSIGNED NOT NULL,
     `communication_credit_package_id` BIGINT UNSIGNED NOT NULL,
     `amount_snapshot` DECIMAL(12,2) NOT NULL,
     `bonus_snapshot` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     `payment_method` ENUM('pix', 'wallet_balance') NOT NULL,
     `payment_reference_id` BIGINT UNSIGNED NULL DEFAULT NULL,
-    `status` ENUM('pending', 'paid', 'failed', 'expired', 'canceled') NOT NULL DEFAULT 'pending',
+    `status` ENUM('creating', 'pending', 'paid', 'failed', 'expired', 'canceled') NOT NULL DEFAULT 'creating',
     `idempotency_key` VARCHAR(100) NOT NULL,
+    `payment_data` JSON NULL DEFAULT NULL,
+    `error_code` VARCHAR(100) NULL DEFAULT NULL,
+    `expires_at` DATETIME NOT NULL,
     `pending_package_id` BIGINT UNSIGNED
-        AS (CASE WHEN `status` = 'pending' THEN `communication_credit_package_id` ELSE NULL END) STORED,
+        AS (CASE WHEN `status` IN ('creating', 'pending') THEN `communication_credit_package_id` ELSE NULL END) STORED,
     `created_at` DATETIME NOT NULL,
     `paid_at` DATETIME NULL DEFAULT NULL,
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_communication_credit_purchase_uuid` (`uuid`),
     UNIQUE KEY `uk_communication_credit_purchase_idempotency` (`idempotency_key`),
     UNIQUE KEY `uk_communication_credit_purchase_open_package` (`owner_user_id`, `pending_package_id`),
     KEY `idx_communication_credit_purchase_owner_status` (`owner_user_id`, `status`, `created_at`, `id`),
+    KEY `idx_communication_credit_purchase_expiration` (`status`, `expires_at`, `id`),
     KEY `idx_communication_credit_purchase_payment_reference` (`payment_method`, `payment_reference_id`),
     CONSTRAINT `fk_communication_credit_purchase_package`
         FOREIGN KEY (`communication_credit_package_id`) REFERENCES `communication_credit_packages` (`id`)
@@ -238,6 +256,23 @@ CREATE TABLE `communication_credit_alerts` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_communication_credit_alert_owner_type` (`owner_user_id`, `alert_type`),
     KEY `idx_communication_credit_alert_cooldown` (`cooldown_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `communication_credit_outbox` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `event_uuid` CHAR(36) NOT NULL,
+    `event_type` VARCHAR(100) NOT NULL,
+    `payload` JSON NOT NULL,
+    `status` ENUM('pending', 'processing', 'published') NOT NULL DEFAULT 'pending',
+    `attempts` INT UNSIGNED NOT NULL DEFAULT 0,
+    `available_at` DATETIME NOT NULL,
+    `published_at` DATETIME NULL DEFAULT NULL,
+    `last_error` VARCHAR(255) NULL DEFAULT NULL,
+    `created_at` DATETIME NOT NULL,
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_communication_credit_outbox_event_uuid` (`event_uuid`),
+    KEY `idx_communication_credit_outbox_pending` (`status`, `available_at`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
