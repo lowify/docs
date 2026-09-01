@@ -1,14 +1,5 @@
 # Deploy — reembolso de PIX Automático Woovi
 
-## Estrutura
-
-```text
-docs/
-└── deploys/
-    └── 2026-09-01-woovi-pix-automatic-refund/
-        └── 2026-09-01_WOOVI_PIX_AUTOMATIC_REFUND_DEPLOY.md
-```
-
 ## Objetivo
 
 Disponibilizar o ajuste do `services-banking` para que reembolsos de cobranças pagas por PIX Automático, dos providers `woovi` e `woovi_2`, sejam solicitados na API correta da Woovi.
