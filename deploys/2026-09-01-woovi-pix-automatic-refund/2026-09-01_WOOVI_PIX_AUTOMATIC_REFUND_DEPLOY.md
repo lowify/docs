@@ -11,8 +11,6 @@ O fluxo identifica a cobrança como assinatura a partir da relação entre a cor
 | Componente | Branch |
 |---|---|
 | `services-banking` | `fix/banking-commerce-queue-audit` |
-| `dashboard-seller` | — |
-| `edge-gateway`, `edge-public-api`, `services-commerce-v2` | — |
 
 ## Alterações incluídas
 
