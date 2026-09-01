@@ -22,8 +22,6 @@ O fluxo identifica a cobrança como assinatura a partir da relação entre a cor
   - `value`: valor em centavos;
   - `comment`: quando informado.
 
-`refund_mode` é uma marca interna do Banking; não precisa ser enviada pelo dashboard, Gateway ou Commerce.
-
 ## Pré-requisitos
 
 1. A branch de deploy deve conter os quatro commits listados acima, com `221e6ce` no `HEAD`.
