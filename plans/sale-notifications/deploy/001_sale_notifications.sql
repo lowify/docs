@@ -135,7 +135,7 @@ ALTER TABLE `sales_delivery`
     ADD COLUMN `hold_timeout_at` DATETIME NULL DEFAULT NULL AFTER `status_timeout_at`,
     MODIFY COLUMN `reference_id` INT UNSIGNED NULL DEFAULT NULL,
     MODIFY COLUMN `status`
-        ENUM('pending', 'sent_to_provider', 'timed_out', 'fail', 'success', 'read', 'skipped', 'canceled')
+        ENUM('pending', 'sent_to_provider', 'sent_pending', 'timed_out', 'fail', 'success', 'read', 'delivered', 'skipped', 'canceled')
         NULL DEFAULT NULL,
     ADD KEY `idx_sales_delivery_attempt` (`sale_delivery_attempt_id`),
     ADD KEY `idx_sales_delivery_owner_status` (`owner_user_id`, `status`, `id`),
@@ -150,6 +150,65 @@ ALTER TABLE `sales_delivery`
 -- ============================================================================
 -- services-account
 -- ============================================================================
+
+-- `system_vars` já existe no banco legado. `user_system_vars` pode não existir
+-- em instalações antigas; este DDL também documenta o contrato utilizado pelo
+-- Account para overrides por usuário.
+CREATE TABLE IF NOT EXISTS `user_system_vars` (
+    `user_id` BIGINT UNSIGNED NOT NULL,
+    `var_key` VARCHAR(100) NOT NULL,
+    `var_value` VARCHAR(255) NULL DEFAULT NULL,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`user_id`, `var_key`),
+    KEY `idx_user_system_vars_key` (`var_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Pré-checagem: esta consulta deve retornar zero linhas. Caso contrário, tratar
+-- as duplicidades antes de criar a unicidade usada pelo upsert do Account.
+SELECT `user_id`, `var_key`, COUNT(*) AS `duplicate_count`
+FROM `user_system_vars`
+GROUP BY `user_id`, `var_key`
+HAVING COUNT(*) > 1;
+
+-- Para uma tabela já existente, garantir a coluna de auditoria e a unicidade
+-- de forma idempotente. Executar somente após a pré-checagem de duplicidades.
+SET @account_schema := DATABASE();
+SET @add_user_system_vars_updated_at := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE `user_system_vars` ADD COLUMN `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'SELECT 1'
+    )
+    FROM information_schema.columns
+    WHERE table_schema = @account_schema
+      AND table_name = 'user_system_vars'
+      AND column_name = 'updated_at'
+);
+PREPARE account_statement FROM @add_user_system_vars_updated_at;
+EXECUTE account_statement;
+DEALLOCATE PREPARE account_statement;
+
+SET @add_user_system_vars_unique := (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM (
+                SELECT `index_name`, GROUP_CONCAT(`column_name` ORDER BY `seq_in_index`) AS `columns`
+                FROM information_schema.statistics
+                WHERE table_schema = @account_schema
+                  AND table_name = 'user_system_vars'
+                  AND non_unique = 0
+                GROUP BY `index_name`
+                HAVING `columns` = 'user_id,var_key'
+            ) AS `unique_indexes`
+        ),
+        'SELECT 1',
+        'ALTER TABLE `user_system_vars` ADD UNIQUE KEY `uk_user_system_vars_user_key` (`user_id`, `var_key`)'
+    )
+);
+PREPARE account_statement FROM @add_user_system_vars_unique;
+EXECUTE account_statement;
+DEALLOCATE PREPARE account_statement;
 
 INSERT INTO `system_vars` (`var_key`, `var_value`)
 VALUES
