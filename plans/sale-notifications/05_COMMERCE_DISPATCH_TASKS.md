@@ -45,6 +45,14 @@ Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenv
 - Commerce escolhe `primary|secondary` no payload de e-mail; não envia o nome do provedor como regra de negócio.
 - Meta tardia após hold liberado: consume tardio; saldo pode ficar negativo.
 
+## Resultado de Notifications
+
+- Manter uma única fila Redis: `sales:delivery:actions`.
+- O consumer do Commerce preserva temporariamente o payload legado (`sale_id`, `type`, `reference_id`, `status`, `error`) apenas para mensagens já pendentes na fila.
+- As novas mensagens usam `event_type = notification_outcome`, com `reference_type` (`sale_delivery|sale_recovery_dispatch`), referência comercial, venda, canal, ID da mensagem no Notifications, status e erro.
+- Notifications publica o novo envelope na mesma fila quando receber `params.notification_outcome`; esse bloco é removido antes da chamada à Meta.
+- O Commerce é o único dono da transição comercial e do crédito: resultado WhatsApp `delivered|read` consome, `fail` libera; timeout continua liberando o hold. RDC segue a mesma regra usando `sale_recovery_dispatches.id`.
+
 ## Rotas necessárias
 
 | Rota de domínio | Responsabilidade |
