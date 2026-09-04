@@ -2,14 +2,13 @@
 
 ## Fase 0 — inventário e decisões
 
-1. Medir volume, idade e payloads pendentes em `commerce:subscriptions:actions` sem remover mensagens.
-2. Confirmar Redis compartilhado, tabelas/índices do Commerce V2 e a origem da compensação financeira de vendas PIX Automático.
-3. Aprovar o envelope, as filas de retry/DLQ e a regra de deduplicação.
+1. Localizar a estrutura de parcelas já existente no banco/repositórios do Commerce V2 e confirmar suas chaves e índices para reutilização.
+2. Aprovar o envelope, as filas de retry/DLQ e a regra de deduplicação.
 4. Criar a branch de trabalho no `services-commerce-v2` somente depois de este plano ser aprovado. O repositório `docs` permanece em `main`.
 
 ## Fase 1 — capacidade no Commerce V2, sem produção de eventos novos
 
-1. Criar migration aditiva, modelo/repositório e DTOs para parcelas/deduplicação necessários.
+1. Reutilizar a estrutura de parcelas existente e criar/adaptar modelo, repositório e DTOs de deduplicação necessários; criar migration aditiva apenas se os índices/garantias forem insuficientes.
 2. Implementar casos de uso de status e de cobrança paga, incluindo cálculo de validade para `WEEKLY`, `MONTHLY`, `SEMIANNUALLY` e `ANNUALLY`.
 3. Implementar criação/localização idempotente de venda recorrente, com transação determinística derivada do E2E apenas após validar colisões.
 4. Implementar o `SubscriptionActionsProcess`, a configuração e logs com `event_id`, fila, `correlation_id`, parcela, E2E e `sale_id`; nunca registrar payloads sensíveis completos.
@@ -23,12 +22,9 @@
 4. Habilitar o processo do Commerce V2 e executar um caso sintético de ponta a ponta em homologação.
 5. Alterar o Banking para publicar exclusivamente a nova fila. Não fazer dual-write por padrão: duas compensações em bancos distintos criariam risco de duplicidade financeira. Se dual-write for inevitável para observação, ele deve ser shadow-only, sem efeitos no consumidor secundário.
 
-## Fase 3 — drenagem e encerramento do legado
+## Fluxo legado
 
-1. Manter o worker do Commerce legado ativo para consumir apenas o estoque anterior em `commerce:subscriptions:actions`.
-2. Monitorar tamanho, idade da última mensagem, erros e efeitos das duas filas de forma separada.
-3. Quando a fila legada permanecer vazia pelo período aprovado e não houver produtor ativo, desabilitar seu worker em mudança posterior e documentar a retirada.
-4. Não apagar filas nem mensagens durante o rollout sem autorização operacional explícita.
+O worker e a fila legados permanecem fora do escopo. O corte no Banking impede novas publicações em `commerce:subscriptions:actions`, mas esta entrega não inventaria mensagens existentes, não executa drain, não monitora o legado como critério de aceite e não agenda sua retirada.
 
 ## Rollback
 

@@ -45,11 +45,11 @@ SubscriptionActionsProcess
        -> ativação, financeiro, entrega, integrações, notificações e contadores
 ```
 
-A aprovação não deve reimplementar efeitos já tratados em `ProcessPaidSaleEventUseCase`. O novo caso de uso prepara a venda correta e então invoca esse fluxo. A implementação precisa checar a semântica de venda de checkout transparente antes de disparar transferências.
+A aprovação não deve reimplementar efeitos já tratados em `ProcessPaidSaleEventUseCase`. O novo caso de uso prepara a venda correta e então invoca integralmente esse fluxo, inclusive para recorrências. A implementação precisa checar a semântica de venda de checkout transparente antes de disparar transferências.
 
 ## Idempotência e consistência
 
-1. Criar migration aditiva para a tabela de parcelas (ou adaptar a estrutura equivalente confirmada), com chave única ao menos em `(subscription_id, installment_number)` e, se aplicável, em `end_to_end_id`.
+1. Localizar e reutilizar a estrutura de parcelas já existente; criar migration aditiva somente se faltarem chaves únicas em `(subscription_id, installment_number)` ou, quando aplicável, em `end_to_end_id`.
 2. Persistir uma chave de deduplicação de evento, ou garantir que as chaves únicas e a busca de venda recorrente por transação determinística cubram reentrega do mesmo evento.
 3. Executar em uma transação de banco a parcela, a validade e a criação/associação da venda recorrente. Não marcar uma mensagem como concluída antes desses efeitos.
 4. `ProcessPaidSaleEventUseCase` já tolera venda paga na ativação; ainda assim, as filas que ele dispara devem ser auditadas para garantir que a reentrega não duplique financeiro, entrega, integrações ou notificações.

@@ -41,7 +41,7 @@ Não há endpoint público novo neste fluxo de compensação; a integração rel
 - A primeira cobrança paga registra parcela e aciona aprovação da venda original.
 - Cobranças posteriores atualizam `valid_until`, clonam uma venda com identificador derivado do E2E e acionam a aprovação dela.
 - O publicador Banking evita reenfileirar cobrança `paid` quando não houve mudança de status nem de E2E, mas o consumidor legado não demonstra uma estratégia transacional completa de deduplicação para todos os efeitos posteriores.
-- `services-commerce-v2` possui `subscriptions` e `sales.subscription_id`, mas não foi confirmada nele uma estrutura de parcelas equivalente à do Commerce legado.
+- A estrutura de parcelas para o fluxo V2 existe em outro componente do banco e deverá ser localizada/reutilizada na implementação.
 
 ## Operação e validação
 
@@ -52,7 +52,7 @@ Antes de mudar o fluxo, validar Redis compartilhado, formato das mensagens, idem
 ## Limitações e pendências
 
 - A cadeia atual cruza quatro componentes e duas filas; falhas intermediárias podem deixar compensação incompleta.
-- A fila `commerce:subscriptions:actions` deverá permanecer em drain durante a migração, mas não receber novas publicações após o corte.
+- Após o corte, a fila `commerce:subscriptions:actions` não deve receber novas publicações. Seu estoque e sua desativação ficam fora do escopo desta migração.
 - A fila/contrato/processo alvo e a estratégia de retry/DLQ estão propostos no [plano de migração](../../plans/pix-automatic-commerce-v2/README.md), sujeitos à aprovação.
 
 ## Referências

@@ -26,6 +26,10 @@ Planejamento iniciado em 2026-09-04. Nenhuma alteração de código, migration, 
 | Compensação | O processo chama casos de uso/repositórios do Commerce V2 para registrar a parcela, ativar a primeira venda, clonar/aprovar recorrências, atualizar validade e disparar os efeitos de venda paga já centralizados no serviço. |
 | Dashboard Seller | Não publicar `commerce:sales:actions` nem depender de `dashboard-seller/scripts/queues/commerce_sales_actions_worker.php` para esse caminho novo. |
 | Idempotência | A identidade de processamento é a assinatura + número da parcela, com `end_to_end_id` como identificador de pagamento. A persistência deve impedir parcela/venda/efeitos duplicados em reentregas. |
+| Redis | Banking e Commerce V2 usam a mesma instância lógica de Redis no ambiente de destino. |
+| Parcelas | O banco do Commerce V2 já possui estrutura de parcelas em outro componente; a implementação deve localizá-la e reutilizá-la. |
+| Financeiro recorrente | Usar integralmente `ProcessPaidSaleEventUseCase` após preparar a venda correspondente. |
+| Legado | O fluxo legado fica fora do escopo: não inventariar, drenar, desativar ou remover a fila/worker existentes nesta entrega. |
 
 ## Fluxo alvo
 
@@ -41,7 +45,7 @@ Woovi/provedor
 
 ## Fora do escopo desta entrega
 
-- Migrar dados históricos entre os bancos ou reprocessar automaticamente todas as mensagens antigas.
-- Desativar ou remover o worker/fila do Commerce legado antes de comprovada a drenagem.
+- Migrar dados históricos entre os bancos ou reprocessar automaticamente mensagens antigas.
+- Inventariar, drenar, desativar ou remover o worker/fila do Commerce legado.
 - Alterar criação de assinatura no checkout, contrato público de checkout ou o provedor PIX Automático além do necessário para trocar a publicação da fila.
 - Remover o `dashboard-seller` de fluxos não relacionados a assinaturas PIX Automático.

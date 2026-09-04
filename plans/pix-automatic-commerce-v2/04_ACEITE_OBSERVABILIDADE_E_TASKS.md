@@ -11,7 +11,7 @@
 | Mesmo pagamento com E2E corrigido | A regra aprovada de correção é aplicada sem criar segunda parcela/venda. |
 | Evento inválido | Não altera dados; registra falha estruturada e segue a política de descarte/DLQ. |
 | Falha transitória | Mensagem pode ser rastreada e reprocessada sem perda nem duplicidade. |
-| Transição | Depois do corte, o Banking não aumenta `commerce:subscriptions:actions`; mensagens prévias continuam processáveis pelo legado até a drenagem. |
+| Transição | Depois do corte, o Banking não aumenta `commerce:subscriptions:actions`. O tratamento de mensagens prévias é fora de escopo. |
 | Isolamento do Dashboard | Nenhum evento novo deste fluxo é publicado em `commerce:sales:actions` e o worker do Dashboard não é requisito de sucesso. |
 
 ## Observabilidade mínima
@@ -30,7 +30,7 @@
 5. Implementar publicador Banking, contrato compartilhado por testes de payload e auditoria.
 6. Preparar documentação de deploy e teste de compatibilidade de homologação antes de qualquer alteração em VPS.
 7. Executar homologação com dados sintéticos, acompanhando produtor, nova fila, compensação V2 e ausência de dependência do Dashboard.
-8. Fazer o corte, observar, drenar a fila legada e planejar sua desativação em mudança separada.
+8. Fazer o corte e observar somente o novo produtor, a nova fila e o consumidor do Commerce V2.
 
 ## Referências de descoberta
 

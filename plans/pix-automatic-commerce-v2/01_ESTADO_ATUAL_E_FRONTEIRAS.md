@@ -21,7 +21,7 @@ O fluxo mistura o estado originado no Banking, o banco do Commerce legado, uma f
 | Primeira parcela | Registra parcela, vincula E2E quando ausente e aprova a venda original |
 | Parcela recorrente | Atualiza validade, clona venda com ID determinístico a partir do E2E e aprova a venda clonada |
 
-O consumidor legado não deve receber novas mensagens depois do corte. Ele permanece ativo somente até a fila estar vazia e a retenção operacional definida ter expirado.
+O consumidor legado não deve receber novas mensagens depois do corte. Seu estoque, operação e eventual desativação ficam fora do escopo desta entrega e não bloqueiam a adoção do novo fluxo.
 
 ## Fronteiras e dependências
 
@@ -29,12 +29,14 @@ O consumidor legado não deve receber novas mensagens depois do corte. Ele perma
 | --- | --- |
 | `services-banking` | Persistir o estado vindo do provedor e publicar evento compatível para a fila V2. Não compensar vendas. |
 | `services-commerce-v2` | Consumir, validar/idempotir e compensar assinatura, venda e efeitos de venda paga. |
-| `services-commerce` | Somente consumir/drainar a fila legada durante a transição. |
+| `services-commerce` | Permanece inalterado; seu worker e a fila legada não fazem parte desta entrega. |
 | `dashboard-seller` | Fora do novo caminho; seu worker de `commerce:sales:actions` não recebe eventos novos de assinatura. |
 
-## Lacunas a resolver antes do código
+## Decisões confirmadas antes do código
 
-- Confirmar que Banking e Commerce V2 usam a mesma instância lógica de Redis no ambiente de destino; a fila não pode ser criada em um Redis isolado do produtor.
-- Confirmar se o banco do Commerce V2 já tem uma tabela de parcelas em outro componente. A árvore atual contém `subscriptions` e `sales`, mas não uma migration/model de `subscriptions_installments`.
-- Confirmar qual regra financeira deve ser aplicada a uma venda recorrente: reutilizar integralmente `ProcessPaidSaleEventUseCase` ou introduzir uma variação explícita para PIX Automático.
-- Inventariar mensagens pendentes da fila legada e definir o critério temporal de encerramento do drain.
+## Decisões confirmadas
+
+- Banking e Commerce V2 usam a mesma instância lógica de Redis no ambiente de destino.
+- A estrutura de parcelas já existe em outro componente do banco do Commerce V2 e deverá ser localizada/reutilizada na implementação.
+- A venda recorrente deve usar integralmente `ProcessPaidSaleEventUseCase` após ser preparada pelo fluxo de assinaturas.
+- O fluxo legado fica de lado: não haverá inventário, drain, desativação ou remoção nesta entrega.
