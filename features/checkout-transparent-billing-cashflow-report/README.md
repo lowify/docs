@@ -8,6 +8,8 @@
 
 Exibir no Relatório Cashflow mensal as entradas já pagas de faturas do Checkout Transparente. O relatório deve permitir aos administradores de permissões `1` e `2` identificar quanto entrou em cada caixa/provedor e por método de pagamento.
 
+O Cash In legado não deve incluir vendas cuja coluna `sales.gateway` seja `checkout_transparent`. Essas entradas passam a aparecer exclusivamente na nova aba **Cash In CT**.
+
 Ficam fora do escopo a criação de cobranças, a confirmação de pagamentos e a alteração do provider usado para gerar Pix ou cartão.
 
 ## Regra de apuração
@@ -28,6 +30,14 @@ O provedor do pagamento é lido de `billing_payments.metadata_json.providerIdent
 
 O valor da entrada será o `billing_charges.amount_total` associado a cada `billing_payment`. A resposta também deve incluir os pagamentos individuais para auditoria e os agrupamentos usados pela tela.
 
+Para cada combinação de adquirente/provedor e método, o relatório calcula:
+
+- **valor recebido / taxas recebidas**: soma de `billing_charges.amount_total` das contas pagas;
+- **taxas cobradas**: custo unitário do adquirente multiplicado pela quantidade de pagamentos quitados;
+- **lucro líquido**: taxas recebidas menos taxas cobradas.
+
+O método `balance` não possui taxa de adquirente: `taxas_cobradas = 0`. Para Pix e cartão, o custo é definido pelo mesmo mapa mensal já empregado no Cashflow (`cashflowReportGatewayUnitCost`), incluindo Woovi, Woovi 2 e os demais provedores que possuírem custo configurado. O custo incide por conta paga, não pelo valor da fatura.
+
 ## Fluxo planejado
 
 ```text
@@ -42,6 +52,8 @@ Administrador (permissão 1 ou 2)
 ```
 
 O Cashflow atual consulta diretamente o banco principal para Cash In (`sales`) e Cash Out (`tbl_saques`). A nova etapa é necessária porque o Billing do Checkout Transparente usa banco isolado.
+
+Na consulta legada de Cash In, o filtro passa a excluir também `LOWER(TRIM(gateway)) = 'checkout_transparent'`, preservando a separação entre o Cash In comum e o Cash In CT.
 
 ## Contrato planejado
 
@@ -100,9 +112,11 @@ Resposta esperada:
 | `services-checkout-transparent-api` | Cliente HTTP para a rota interna do Billing, caso de uso/controller e rota administrativa externa. |
 | `edge-public-api` | Proxy administrativo com autorização limitada a permissões `1` e `2`. |
 | `edge-gateway` | Rota de encaminhamento para o Public API. |
-| `dashboard-seller` | Novo método em `CheckoutTransparentAdminService`; etapa e aba “Checkout Transparente” no Cashflow. |
+| `dashboard-seller` | Novo método em `CheckoutTransparentAdminService`; exclusão de `checkout_transparent` do Cash In legado; etapa e aba “Cash In CT” no Cashflow. |
 
 No Dashboard, o endpoint local já existente `api/admin/cashflow_report/step.php` será estendido com a etapa `checkout_transparent_billing`. Ele continua responsável somente por montar o HTML da tabela e por orquestrar a chamada autenticada ao Gateway através de `CheckoutTransparentAdminService`.
+
+A tela passará a ter três abas: **Cash In**, **Cash In CT** e **Cash Out**. A tabela de Cash In CT deve mostrar adquirente, método, contas pagas, valor recebido, taxas cobradas e lucro líquido. `internal_balance` deve ser exibido como **Saldo**; os demais valores identificam o banco/adquirente retornado em `providerIdentifier`.
 
 ## Dados e limitações conhecidas
 
@@ -112,12 +126,14 @@ Também há mais de um `billing_payment` pago associado à mesma `billing_charge
 
 ## Validação planejada
 
-1. Testar consulta mensal com pagamentos Pix, cartão, saldo e nenhum pagamento.
-2. Confirmar que `paid_at` no limite inferior entra e no limite superior não entra.
-3. Confirmar agrupamento de `providerIdentifier`, `internal_balance` e `unknown`.
-4. Confirmar 401/403 para JWT sem permissões 1 ou 2 no Public API.
-5. Confirmar que a nova etapa não altera os resultados existentes de Cash In e Cash Out.
-6. Após implementação, executar o teste integrado em homologação somente com aprovação explícita.
+1. Confirmar que vendas com `sales.gateway = checkout_transparent` não aparecem no Cash In legado.
+2. Testar consulta mensal com pagamentos Pix, cartão, saldo e nenhum pagamento.
+3. Confirmar que `paid_at` no limite inferior entra e no limite superior não entra.
+4. Confirmar agrupamento de `providerIdentifier`, `internal_balance` e `unknown`.
+5. Confirmar custo por conta paga para Woovi, Woovi 2 e provedores configurados; confirmar custo zero para Saldo.
+6. Confirmar 401/403 para JWT sem permissões 1 ou 2 no Public API.
+7. Confirmar que a nova etapa não altera os resultados existentes de Cash Out.
+8. Após implementação, executar o teste integrado em homologação somente com aprovação explícita.
 
 ## Referências
 
