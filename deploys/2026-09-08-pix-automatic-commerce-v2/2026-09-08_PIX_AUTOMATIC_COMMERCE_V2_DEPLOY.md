@@ -77,9 +77,13 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
 
 ## Validação pós-deploy
 
-1. Em uma assinatura PIX Automático de teste previamente aprovada para produção, realize uma cobrança de valor controlado. Confirme no produto/área de vendas que a primeira venda passa a paga e que a entrega ou acesso esperado é liberado uma única vez. Se não ocorrer, suspenda novas cobranças de teste e acione a operação.
-2. Realize uma cobrança recorrente de teste. Confirme que aparece apenas uma nova venda/parcela e que a vigência da assinatura avançou. Se houver duplicidade, interrompa o corte e não tente compensar apagando vendas ou parcelas.
-3. Como conferência técnica complementar, a equipe técnica pode observar os logs do Banking e do Commerce V2 para o identificador de correlação e confirmar que o evento foi processado. Não consumir, limpar, mover ou reenfileirar mensagens Redis durante a validação.
+1. Escolher uma das alternativas:
+
+   - reenviar manualmente o webhook de um recebimento PIX Automático que não tenha sido processado; ou
+   - realizar uma nova venda PIX Automático.
+
+2. Confirmar na área de vendas que a cobrança foi processada, a venda está paga e a entrega ou o acesso esperado foi liberado uma única vez. Se não ocorrer, acionar a operação e não reenviar a mensagem diretamente no Redis.
+3. Como conferência técnica complementar, a equipe técnica pode observar os logs do Banking e do Commerce V2 pelo identificador de correlação e confirmar que o evento foi processado. Não consumir, limpar, mover ou reenfileirar mensagens Redis durante a validação.
 
 ## Rollback
 
