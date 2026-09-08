@@ -1,0 +1,145 @@
+# Deploy — migração de assinaturas PIX Automático para Commerce V2
+
+## Objetivo
+
+Transferir o processamento assíncrono de cobranças PIX Automático confirmadas do Commerce legado para o `services-commerce-v2`.
+
+Após o corte, o `services-banking` publica eventos de assinatura na lista Redis `sales:subscriptions:actions`. O novo processo `commerce_subscription_actions_queue` do Commerce V2 registra a parcela, atualiza a assinatura e usa o fluxo interno de venda paga para a venda original ou recorrente. Não há rota pública, JWT ou alteração de checkout nesta entrega.
+
+Ficam fora do escopo: migrar dados históricos, drenar ou remover `commerce:subscriptions:actions`, alterar o worker do `services-commerce` ou o `dashboard-seller`, e reprocessar mensagens já existentes.
+
+## Componentes e referências
+
+| Componente | Branch de deploy | Commit obrigatório |
+| --- | --- | --- |
+| `services-commerce-v2` | `feat/pix-automatic-commerce-v2` | `bb50aa0` — `feat: process pix automatic subscription actions` |
+| `services-banking` | `feat/pix-automatic-commerce-v2` | `3f9f549` — `feat: publish pix automatic events to commerce v2` |
+
+As referências acima são locais no momento da preparação deste documento: nenhuma contém uma branch remota `origin/feat/pix-automatic-commerce-v2`. Não iniciar o deploy antes de publicar as duas referências remotas, conferir que seus `HEAD`s correspondem aos commits da tabela e obter aprovação para os riscos listados abaixo.
+
+## Alterações incluídas
+
+```text
+Provedor PIX Automático
+  -> services-banking: SubscriptionActionProcessor
+  -> Redis: sales:subscriptions:actions
+  -> services-commerce-v2: commerce_subscription_actions_queue
+  -> assinatura, subscriptions_installments e venda
+  -> ProcessPaidSaleEventUseCase e seus efeitos internos
+```
+
+- O Banking deixa de publicar novas ações na fila legada `commerce:subscriptions:actions` para as mudanças de status e cobranças pagas desta branch.
+- O novo contrato possui um evento por mensagem, com `event_id`, `event`, `occurred_at` e dados de correlação. Os eventos implementados são `subscription.status.updated` e `subscription.charge.paid`.
+- Para `subscription.charge.paid`, o payload contém `correlation_id`, `installment_number`, `end_to_end_id` e `paid_at` em ISO 8601.
+- O Commerce V2 registra `SubscriptionActionsProcess` como processo Hyperf. Para cobrança paga, cria a parcela identificada por assinatura + número de parcela, atualiza `valid_until`, associa/cria a venda correspondente e chama `ProcessPaidSaleEventUseCase`.
+- A fila usa Redis compartilhado entre Banking e Commerce V2. O processo é configurado por `SUBSCRIPTION_ACTIONS_PROCESS_ENABLED`, `SUBSCRIPTION_ACTIONS_QUEUE` e `SUBSCRIPTION_ACTIONS_TIMEOUT_SECONDS`.
+
+## Pré-requisitos e decisão de liberação
+
+1. Publicar ambas as branches em `origin` e confirmar que elas apontam exatamente para `bb50aa0` e `3f9f549`. Uma branch que tenha avançado exige revisão deste documento antes do deploy.
+2. Confirmar que Banking e Commerce V2 usam a mesma instância lógica de Redis e que `sales:subscriptions:actions` não é usada por outro produtor ou consumidor.
+3. No `services-commerce-v2`, confirmar no `.env` de destino, sem expor valores de outros segredos:
+
+   ```text
+   SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=true
+   SUBSCRIPTION_ACTIONS_QUEUE=sales:subscriptions:actions
+   SUBSCRIPTION_ACTIONS_TIMEOUT_SECONDS=5
+   ```
+
+4. Confirmar que a tabela `subscriptions_installments` já existe no banco usado pelo Commerce V2 e possui uma garantia de unicidade para `(subscription_id, installment_number)`. Esta branch não contém migration.
+5. Escolher expressamente se o risco de perda de mensagem é aceitável. O processo usa `BLPOP`: se ocorrer exceção depois de retirar a mensagem, ele apenas registra erro e não possui retry, DLQ nem confirmação. Não liberar para produção enquanto não houver responsável operacional e procedimento aprovado para esse cenário.
+6. Ter uma assinatura PIX Automático sintética disponível em homologação para validar primeira parcela e recorrência antes do corte de produção. O corte não deve ocorrer se essa validação não tiver sido aprovada.
+7. Confirmar que as revisões anteriores de Banking e Commerce V2 estão registradas para rollback. Não pressupor que `main` seja a revisão atualmente em produção.
+
+## Banco de dados
+
+Não há migration, DDL ou DML nesta entrega.
+
+Antes de subir os containers, executar apenas uma consulta de leitura no banco do Commerce V2 para confirmar a estrutura existente; adaptar o nome do schema à configuração do ambiente:
+
+```sql
+SELECT column_name, column_key
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name = 'subscriptions_installments'
+ORDER BY ordinal_position;
+```
+
+Se a tabela, a chave composta ou as colunas `subscription_id`, `installment_number`, `payment_at` e `end_to_end_id` não existirem, interromper o deploy. A criação ou correção de schema exige migration/plano separado; não executar DDL manualmente neste procedimento.
+
+## Sequência de deploy
+
+Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Banking. Assim, nenhum evento novo é encaminhado para o caminho V2 antes de o processo estar disponível.
+
+1. No diretório oficial de produção do `services-commerce-v2` (`/opt/lowify/services/service-commerce-v2`), confirmar a árvore limpa e a referência remota:
+
+   ```bash
+   cd /opt/lowify/services/service-commerce-v2
+   git status --porcelain=v1
+   git fetch origin --prune
+   git show-ref --verify --quiet refs/remotes/origin/feat/pix-automatic-commerce-v2
+   git switch feat/pix-automatic-commerce-v2
+   git pull --ff-only origin feat/pix-automatic-commerce-v2
+   git rev-parse HEAD
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+   O último comando deve retornar `bb50aa0f0861d4333cd693eb879e79a140ecc5ac`. Se retornar outro SHA, não continuar: a branch não corresponde à revisão documentada. Confirmar no log que o processo Hyperf iniciou e que não há falha de configuração:
+
+   ```bash
+   docker compose logs --tail=200 service-commerce-v2
+   ```
+
+2. Confirmar, sem inserir nem consumir mensagens, que o novo processo está ativo e configurado para a fila correta. O nome esperado nos logs é `commerce_subscription_actions_queue`. Se o processo estiver desabilitado, o nome da fila estiver vazio ou for diferente de `sales:subscriptions:actions`, interromper antes de atualizar o Banking.
+
+3. No diretório oficial de produção do `services-banking` (`/opt/lowify/services/services-banking`), confirmar a árvore limpa e atualizar a referência:
+
+   ```bash
+   cd /opt/lowify/services/services-banking
+   git status --porcelain=v1
+   git fetch origin --prune
+   git show-ref --verify --quiet refs/remotes/origin/feat/pix-automatic-commerce-v2
+   git switch feat/pix-automatic-commerce-v2
+   git pull --ff-only origin feat/pix-automatic-commerce-v2
+   git rev-parse HEAD
+   docker compose up -d --build
+   docker compose ps
+   docker compose logs --tail=200 services-banking-subscriptions-queue-worker
+   ```
+
+   O último comando deve retornar `3f9f5496c374cb23aac6b702cd2604e414b9b1fa`. Se retornar outro SHA, não continuar: a branch não corresponde à revisão documentada.
+
+4. Registrar os SHAs efetivamente publicados. Se a atualização do Banking falhar, não gerar manualmente eventos na fila nova e não alterar a fila legada. Restaurar somente conforme o plano de rollback abaixo, depois de avaliar se algum evento novo foi publicado.
+
+## Testes de compatibilidade em homologação
+
+Executar antes da produção, no `services-commerce-v2` e `services-banking` atualizados com as mesmas referências desta entrega. O executor é o processo Hyperf `commerce_subscription_actions_queue`; o worker Banking é `services-banking-subscriptions-queue-worker`.
+
+Pré-condições: Redis compartilhado, `SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=true`, tabela confirmada e uma assinatura/venda inteiramente sintética. Não usar dados, E2E, correlação, seller ou comprador de produção. Anotar os identificadores sintéticos para auditoria e limpeza controlada.
+
+1. Criar uma assinatura PIX Automático de teste pelo checkout V2 e conservar o `correlation_id` e a venda inicial.
+2. Confirmar uma primeira cobrança de teste pelo caminho suportado pelo provedor/Banking. Não inserir JSON diretamente no Redis.
+3. Confirmar que o Banking publicou `subscription.charge.paid` em `sales:subscriptions:actions` e que o Commerce V2 registrou uma parcela, vinculou o E2E à venda inicial quando necessário e deixou a venda como paga.
+4. Confirmar que os efeitos visíveis de venda paga (por exemplo, entrega e integração aplicáveis ao produto de teste) ocorreram uma única vez.
+5. Confirmar uma cobrança recorrente sintética com E2E distinto. Conferir uma única parcela adicional, avanço de `valid_until`, uma única venda recorrente e os efeitos de venda paga uma única vez.
+6. Repetir a confirmação do mesmo pagamento somente se o ambiente suportar reentrega segura. O resultado deve ser ausência de parcela e venda duplicadas.
+7. Conferir tecnicamente os logs dos dois serviços por `event_id`, `correlation_id` e E2E. Como o processo não possui retry/DLQ, qualquer erro de processamento é reprovação do teste e exige decisão/ajuste antes do corte.
+
+Limpeza: remover ou reverter exclusivamente os dados sintéticos anotados, segundo procedimento aprovado para o ambiente. Não apagar listas Redis, registros de outras assinaturas nem dados operacionais para "limpar" o teste.
+
+## Validação pós-deploy
+
+1. Em uma assinatura PIX Automático de teste previamente aprovada para produção, realize uma cobrança de valor controlado. Confirme no produto/área de vendas que a primeira venda passa a paga e que a entrega ou acesso esperado é liberado uma única vez. Se não ocorrer, suspenda novas cobranças de teste e acione a operação.
+2. Realize uma cobrança recorrente de teste. Confirme que aparece apenas uma nova venda/parcela e que a vigência da assinatura avançou. Se houver duplicidade, interrompa o corte e não tente compensar apagando vendas ou parcelas.
+3. Como conferência técnica complementar, a equipe técnica pode observar os logs do Banking e do Commerce V2 para o identificador de correlação e confirmar que o evento foi processado. Não consumir, limpar, mover ou reenfileirar mensagens Redis durante a validação.
+
+## Rollback
+
+1. Antes de reverter o Banking, identificar se algum evento no novo formato foi publicado ou processado. Uma mesma cobrança não pode ser encaminhada aos caminhos V2 e legado sem análise, pois pode duplicar parcela, venda e efeitos financeiros.
+2. Se o Commerce V2 falhar antes de qualquer evento V2 ser publicado, retornar o Commerce V2 à revisão anterior registrada, reconstruir o container e manter o Banking na revisão anterior.
+3. Se o Banking já publicou eventos V2, preservar `sales:subscriptions:actions` e os logs. Não limpar, drenar, reenfileirar manualmente nem apagar registros de parcela/venda. Registrar correlação, E2E e estado de cada caso para decisão de reprocessamento idempotente.
+4. Só retornar o Banking ao produtor legado depois de confirmar que nenhum evento V2 pendente ou processado será compensado também no Commerce legado. Essa decisão exige aprovação operacional explícita.
+5. Reverter os repositórios à revisão anterior conhecida e aprovada, em ordem segura: Banking (interrompe novas publicações V2), depois Commerce V2. Não executar rollback de banco: não há DDL desta entrega e dados criados durante o processamento são evidência operacional.
+
+O worker e a fila do Commerce legado permanecem preservados e fora deste rollback. Não usar `git reset --hard`, `push --force` nem exclusão de chaves Redis.
