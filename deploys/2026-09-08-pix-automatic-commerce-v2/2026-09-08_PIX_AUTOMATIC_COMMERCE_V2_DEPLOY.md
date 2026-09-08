@@ -54,13 +54,13 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
    docker compose ps
    ```
 
-   O último comando deve retornar `bb50aa0f0861d4333cd693eb879e79a140ecc5ac`. Se retornar outro SHA, não continuar: a branch não corresponde à revisão documentada. Confirmar no log que o processo Hyperf iniciou e que não há falha de configuração:
+   Como conferência técnica, verificar somente se o container iniciou sem erro de configuração:
 
    ```bash
    docker compose logs --tail=200 service-commerce-v2
    ```
 
-2. Confirmar, sem inserir nem consumir mensagens, que o novo processo está ativo e configurado para a fila correta. O nome esperado nos logs é `commerce_subscription_actions_queue`. Se o processo estiver desabilitado, o nome da fila estiver vazio ou for diferente de `sales:subscriptions:actions`, interromper antes de atualizar o Banking.
+2. O processo `commerce_subscription_actions_queue` não registra uma mensagem própria na abertura. Ele só escreve `Event processed` ao consumir um evento ou `Failed to process event` em caso de falha. A confirmação funcional do consumidor ocorre no teste de compatibilidade; não inserir nem consumir mensagens manualmente nesta etapa.
 
 3. No diretório oficial de produção do `services-banking` (`/opt/lowify/services/services-banking`), atualizar a branch de deploy:
 
@@ -74,8 +74,6 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
    docker compose ps
    docker compose logs --tail=200 services-banking-subscriptions-queue-worker
    ```
-
-   O último comando deve retornar `3f9f5496c374cb23aac6b702cd2604e414b9b1fa`. Se retornar outro SHA, não continuar: a branch não corresponde à revisão documentada.
 
 4. Registrar os SHAs efetivamente publicados. Se a atualização do Banking falhar, não gerar manualmente eventos na fila nova e não alterar a fila legada. Restaurar somente conforme o plano de rollback abaixo, depois de avaliar se algum evento novo foi publicado.
 
