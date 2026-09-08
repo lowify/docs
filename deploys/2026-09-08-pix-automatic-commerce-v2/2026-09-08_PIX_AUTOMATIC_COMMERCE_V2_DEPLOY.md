@@ -75,22 +75,6 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
    docker compose logs --tail=200 services-banking-subscriptions-queue-worker
    ```
 
-## Testes de compatibilidade em homologação
-
-Executar antes da produção, no `services-commerce-v2` e `services-banking` atualizados com as mesmas referências desta entrega. O executor é o processo Hyperf `commerce_subscription_actions_queue`; o worker Banking é `services-banking-subscriptions-queue-worker`.
-
-Pré-condições: Redis compartilhado, `SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=true`, tabela confirmada e uma assinatura/venda inteiramente sintética. Não usar dados, E2E, correlação, seller ou comprador de produção. Anotar os identificadores sintéticos para auditoria e limpeza controlada.
-
-1. Criar uma assinatura PIX Automático de teste pelo checkout V2 e conservar o `correlation_id` e a venda inicial.
-2. Confirmar uma primeira cobrança de teste pelo caminho suportado pelo provedor/Banking. Não inserir JSON diretamente no Redis.
-3. Confirmar que o Banking publicou `subscription.charge.paid` em `sales:subscriptions:actions` e que o Commerce V2 registrou uma parcela, vinculou o E2E à venda inicial quando necessário e deixou a venda como paga.
-4. Confirmar que os efeitos visíveis de venda paga (por exemplo, entrega e integração aplicáveis ao produto de teste) ocorreram uma única vez.
-5. Confirmar uma cobrança recorrente sintética com E2E distinto. Conferir uma única parcela adicional, avanço de `valid_until`, uma única venda recorrente e os efeitos de venda paga uma única vez.
-6. Repetir a confirmação do mesmo pagamento somente se o ambiente suportar reentrega segura. O resultado deve ser ausência de parcela e venda duplicadas.
-7. Conferir tecnicamente os logs dos dois serviços por `event_id`, `correlation_id` e E2E. Como o processo não possui retry/DLQ, qualquer erro de processamento é reprovação do teste e exige decisão/ajuste antes do corte.
-
-Limpeza: remover ou reverter exclusivamente os dados sintéticos anotados, segundo procedimento aprovado para o ambiente. Não apagar listas Redis, registros de outras assinaturas nem dados operacionais para "limpar" o teste.
-
 ## Validação pós-deploy
 
 1. Em uma assinatura PIX Automático de teste previamente aprovada para produção, realize uma cobrança de valor controlado. Confirme no produto/área de vendas que a primeira venda passa a paga e que a entrega ou acesso esperado é liberado uma única vez. Se não ocorrer, suspenda novas cobranças de teste e acione a operação.
