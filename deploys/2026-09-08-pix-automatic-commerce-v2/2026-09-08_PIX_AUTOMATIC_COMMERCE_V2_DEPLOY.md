@@ -42,13 +42,11 @@ Não há migration, DDL ou DML nesta entrega.
 
 Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Banking. Assim, nenhum evento novo é encaminhado para o caminho V2 antes de o processo estar disponível.
 
-1. No diretório oficial de produção do `services-commerce-v2` (`/opt/lowify/services/service-commerce-v2`), confirmar a árvore limpa e a referência remota:
+1. No diretório oficial de produção do `services-commerce-v2` (`/opt/lowify/services/service-commerce-v2`), atualizar a branch de deploy:
 
    ```bash
    cd /opt/lowify/services/service-commerce-v2
-   git status --porcelain=v1
    git fetch origin --prune
-   git show-ref --verify --quiet refs/remotes/origin/feat/pix-automatic-commerce-v2
    git switch feat/pix-automatic-commerce-v2
    git pull --ff-only origin feat/pix-automatic-commerce-v2
    git rev-parse HEAD
@@ -64,13 +62,11 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
 
 2. Confirmar, sem inserir nem consumir mensagens, que o novo processo está ativo e configurado para a fila correta. O nome esperado nos logs é `commerce_subscription_actions_queue`. Se o processo estiver desabilitado, o nome da fila estiver vazio ou for diferente de `sales:subscriptions:actions`, interromper antes de atualizar o Banking.
 
-3. No diretório oficial de produção do `services-banking` (`/opt/lowify/services/services-banking`), confirmar a árvore limpa e atualizar a referência:
+3. No diretório oficial de produção do `services-banking` (`/opt/lowify/services/services-banking`), atualizar a branch de deploy:
 
    ```bash
    cd /opt/lowify/services/services-banking
-   git status --porcelain=v1
    git fetch origin --prune
-   git show-ref --verify --quiet refs/remotes/origin/feat/pix-automatic-commerce-v2
    git switch feat/pix-automatic-commerce-v2
    git pull --ff-only origin feat/pix-automatic-commerce-v2
    git rev-parse HEAD
