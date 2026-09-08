@@ -91,7 +91,11 @@ ALTER TABLE `sale_recovery_dispatches`
     ADD COLUMN `owner_user_id` BIGINT UNSIGNED NULL DEFAULT NULL AFTER `user_id`,
     ADD COLUMN `affiliate_id` BIGINT UNSIGNED NULL DEFAULT NULL AFTER `owner_user_id`,
     ADD COLUMN `channel` ENUM('email', 'whatsapp') NULL DEFAULT NULL AFTER `stage`,
-    ADD COLUMN `skip_reason` VARCHAR(100) NULL DEFAULT NULL AFTER `status`;
+    ADD COLUMN `skip_reason` VARCHAR(100) NULL DEFAULT NULL AFTER `status`,
+    ADD COLUMN `funding_source` ENUM('communication_credit', 'seller_balance', 'none') NOT NULL DEFAULT 'none' AFTER `skip_reason`,
+    ADD COLUMN `funding_status` ENUM('not_required', 'held', 'consumed', 'released', 'insufficient') NOT NULL DEFAULT 'not_required' AFTER `funding_source`,
+    ADD COLUMN `funding_reference_id` VARCHAR(100) NULL DEFAULT NULL AFTER `funding_status`,
+    ADD COLUMN `unit_price` DECIMAL(12,2) NULL DEFAULT NULL AFTER `funding_reference_id`;
 
 UPDATE `sale_recovery_dispatches`
 SET `owner_user_id` = `user_id`
@@ -105,7 +109,8 @@ ALTER TABLE `sale_recovery_dispatches`
         NOT NULL DEFAULT 'scheduled',
     DROP INDEX `uk_sale_recovery_sale_stage`,
     ADD UNIQUE KEY `uk_sale_recovery_sale_stage_channel` (`sale_id`, `stage`, `channel`),
-    ADD KEY `idx_sale_recovery_owner_status_schedule` (`owner_user_id`, `status`, `scheduled_for`, `id`);
+    ADD KEY `idx_sale_recovery_owner_status_schedule` (`owner_user_id`, `status`, `scheduled_for`, `id`),
+    ADD KEY `idx_sale_recovery_funding_status` (`funding_status`, `id`);
 
 CREATE TABLE `sale_recovery_dispatch_events` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -133,6 +138,10 @@ ALTER TABLE `sales_delivery`
     ADD COLUMN `is_late_delivery` TINYINT(1) NOT NULL DEFAULT 0 AFTER `error`,
     ADD COLUMN `status_timeout_at` DATETIME NULL DEFAULT NULL AFTER `is_late_delivery`,
     ADD COLUMN `hold_timeout_at` DATETIME NULL DEFAULT NULL AFTER `status_timeout_at`,
+    ADD COLUMN `funding_source` ENUM('communication_credit', 'seller_balance', 'none') NOT NULL DEFAULT 'none' AFTER `hold_timeout_at`,
+    ADD COLUMN `funding_status` ENUM('not_required', 'held', 'consumed', 'released', 'insufficient') NOT NULL DEFAULT 'not_required' AFTER `funding_source`,
+    ADD COLUMN `funding_reference_id` VARCHAR(100) NULL DEFAULT NULL AFTER `funding_status`,
+    ADD COLUMN `unit_price` DECIMAL(12,2) NULL DEFAULT NULL AFTER `funding_reference_id`,
     MODIFY COLUMN `reference_id` INT UNSIGNED NULL DEFAULT NULL,
     MODIFY COLUMN `status`
         ENUM('pending', 'sent_to_provider', 'sent_pending', 'timed_out', 'fail', 'success', 'read', 'delivered', 'skipped', 'canceled')
@@ -140,7 +149,8 @@ ALTER TABLE `sales_delivery`
     ADD KEY `idx_sales_delivery_attempt` (`sale_delivery_attempt_id`),
     ADD KEY `idx_sales_delivery_owner_status` (`owner_user_id`, `status`, `id`),
     ADD KEY `idx_sales_delivery_status_timeout` (`status`, `status_timeout_at`, `id`),
-    ADD KEY `idx_sales_delivery_hold_timeout` (`status`, `hold_timeout_at`, `id`);
+    ADD KEY `idx_sales_delivery_hold_timeout` (`status`, `hold_timeout_at`, `id`),
+    ADD KEY `idx_sales_delivery_funding_status` (`funding_status`, `id`);
 
 -- Os fluxos novos usam sale_delivery_attempt_id + type como identidade. Antes
 -- de adicionar a unicidade, migrar/arquivar reenvios históricos que conflitem.
@@ -217,6 +227,38 @@ VALUES
     ('sale_delivery_whatsapp_unit_price', '0.00'),
     ('sale_recovery_unit_price', '0.00')
 ON DUPLICATE KEY UPDATE `var_value` = `var_value`;
+
+-- `sale_notifications_allow_seller_balance` não é uma configuração global.
+-- O Account a lê exclusivamente de `user_system_vars`; sem registro, o default
+-- efetivo é `true`. Não inserir uma linha global para essa chave.
+
+-- ============================================================================
+-- services-wallet
+-- ============================================================================
+
+-- Reserva de saldo normal para uma comunicação. O saldo continua sendo
+-- calculado pelo extrato; esta tabela apenas entra no bloqueio de disponível.
+CREATE TABLE `seller_balance_holds` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `owner_user_id` BIGINT UNSIGNED NOT NULL,
+    `source_type` ENUM('sale_delivery', 'sale_recovery_dispatch') NOT NULL,
+    `source_id` BIGINT UNSIGNED NOT NULL,
+    `amount` DECIMAL(12,2) NOT NULL,
+    `status` ENUM('held', 'consumed', 'released') NOT NULL DEFAULT 'held',
+    `expires_at` DATETIME NULL DEFAULT NULL,
+    `consumed_extract_id` BIGINT UNSIGNED NULL DEFAULT NULL,
+    `created_at` DATETIME NOT NULL,
+    `updated_at` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_seller_balance_hold_source` (`source_type`, `source_id`),
+    KEY `idx_seller_balance_hold_owner_status` (`owner_user_id`, `status`, `expires_at`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Reservar o tipo 36 no catálogo de extract_types para o débito de comunicação
+-- pago com saldo normal. Validar antes que o ID não esteja ocupado.
+INSERT INTO `extract_types` (`id`, `description`)
+VALUES (36, 'Comunicação de venda')
+ON DUPLICATE KEY UPDATE `description` = `description`;
 
 -- Overrides por usuário ficam em user_system_vars e são administrados via Account.
 

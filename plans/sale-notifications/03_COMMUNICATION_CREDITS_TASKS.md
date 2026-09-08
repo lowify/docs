@@ -2,12 +2,13 @@
 
 ## Objetivo e fronteiras
 
-O `services-wallet` é a fonte de verdade dos créditos monetários usados por comunicações pagas: entrega por WhatsApp e recuperação de venda (RDC). Ele não decide se a comunicação deve ser enviada, nem seleciona canal, template ou provedor; essas decisões pertencem ao Commerce e ao Notification.
+O `services-wallet` é a fonte de verdade dos créditos monetários e dos bloqueios de saldo disponível usados por comunicações pagas: entrega por WhatsApp e recuperação de venda (RDC). Ele não decide se a comunicação deve ser enviada, nem seleciona canal, template ou provedor; essas decisões pertencem ao Commerce e ao Notification.
 
 - O saldo é único por `owner_user_id`, compartilhado entre entrega e RDC.
 - Créditos podem ficar negativos somente em uma confirmação tardia de envio, depois de um bloqueio já ter expirado.
 - Antes de enviar uma comunicação paga, o Commerce solicita um bloqueio. Sem crédito disponível, não há envio do canal pago.
 - Toda alteração de saldo deve ter lançamento imutável e idempotente.
+- Para uma comunicação, Wallet recebe uma única fonte já escolhida pelo Commerce: `communication_credit` ou `seller_balance`. Wallet não escolhe fonte, não mistura valores e não consulta checkout/Account.
 
 ## Ordem de implementação
 
@@ -136,7 +137,39 @@ Responsável: `services-wallet`.
 - [ ] Documentar payloads e códigos de retorno para Commerce, Banking, `edge-public-api` e Dashboard implementarem sem depender da estrutura interna das tabelas.
 - [ ] Expor operações administrativas de pacote exclusivamente para administradores com permissão `1` ou `2`: listar todos, criar, editar e ativar/desativar.
 
-### 3.10 — Testes e critérios de aceite
+### 3.10 — Hold de saldo disponível do seller
+
+Responsável: `services-wallet`.
+
+- [ ] Criar uma abstração de hold de saldo normal, reutilizando o mecanismo de extrato/balance já existente em vez de duplicar saldo em tabelas de comunicação.
+- [ ] Expor `hold`, `release` e `consume` idempotentes para `seller_balance`, com `owner_user_id`, `source_type`, `source_id`, `amount` e `expires_at`.
+- [ ] A chave de idempotência deve ser `source_type + source_id`; uma operação repetida não pode bloquear, liberar ou debitar duas vezes.
+- [ ] `hold` recusa saldo disponível insuficiente; `consume` de confirmação tardia pode permitir saldo negativo, conforme a política já definida para comunicação.
+- [ ] O processo de expiração deve liberar holds vencidos pelo mesmo caso de uso idempotente.
+- [ ] Os contratos devem devolver uma referência de hold opaca, para ser persistida pelo Commerce em `funding_reference_id`.
+
+### 3.11 — Contrato unificado de funding
+
+Responsável: `services-wallet` e consumidor `services-commerce-v2`.
+
+Entrada comum:
+
+```json
+{
+  "owner_user_id": 123,
+  "source_type": "sale_delivery",
+  "source_id": 456,
+  "amount": "0.50",
+  "expires_at": "2026-09-08T12:10:00-03:00"
+}
+```
+
+- Créditos usam as rotas `communication-credits`; saldo normal usa o novo contrato de hold de seller balance.
+- A resposta de hold deve conter `funding_source` e `funding_reference_id`.
+- `consume` é chamado em `sent_to_provider` para e-mail e WhatsApp.
+- `release` é chamado somente quando o provider falhar antes de `sent_to_provider` ou quando expirar o hold.
+
+### 3.12 — Testes e critérios de aceite
 
 Responsável: `services-wallet`.
 
@@ -148,6 +181,8 @@ Responsável: `services-wallet`.
 - [ ] Cobrir liberar, consumir, expirar, confirmação tardia e saldo negativo exclusivamente no caso tardio.
 - [ ] Cobrir idempotência por origem/operação e consistência entre `balance`, `blocked_amount` e razão.
 - [ ] Cobrir cooldown de alerta e falha de publicação do aviso.
+- [ ] Cobrir hold de saldo normal, saldo insuficiente, release, consume, expiração e confirmação tardia.
+- [ ] Cobrir que uma mesma origem usa exatamente uma fonte e não permite hold parcial entre crédito e saldo.
 - [ ] Executar suite do `services-wallet`, análise estática e formatter definidos pelo repositório.
 
 ## Dependências e pendências externas

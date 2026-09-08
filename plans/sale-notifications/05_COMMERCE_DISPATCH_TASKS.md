@@ -5,8 +5,8 @@
 | Estrutura | Alteração técnica |
 | --- | --- |
 | `sale_delivery_attempts` | Criar pai da entrega/reenvio: `sale_id`, `owner_user_id`, `is_resend`, `author_type`, `author_user_id`, `chargeable`, `idempotency_key`, timestamps. |
-| `sales_delivery` | Adicionar `sale_delivery_attempt_id`, `owner_user_id`, `is_late_delivery`, `status_timeout_at` e `hold_timeout_at`; tornar `reference_id` anulável antes do sender; ampliar enum de status. |
-| `sale_recovery_dispatches` | Manter evolução planejada: produto, regra, owner, afiliação, canal, skip reason e unicidade venda/etapa/canal. |
+| `sales_delivery` | Adicionar `sale_delivery_attempt_id`, `owner_user_id`, `is_late_delivery`, `status_timeout_at`, `hold_timeout_at`, `funding_source`, `funding_status`, `funding_reference_id` e `unit_price`; tornar `reference_id` anulável antes do sender; ampliar enum de status. |
+| `sale_recovery_dispatches` | Manter evolução planejada: produto, regra, owner, afiliação, canal, skip reason, funding e unicidade venda/etapa/canal. |
 | `sale_recovery_dispatch_events` | Criar timeline append-only, referência de provider, reason e metadata. |
 
 Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenvios históricos. Nenhuma linha atual deve ser sobrescrita.
@@ -18,7 +18,7 @@ Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenv
 | `ProcessPaidSaleEventDeliveryUseCase` | Resolver produto principal, owner, regra de delivery e preço no Account; criar tentativa e linhas de canal antes do enqueue. |
 | `SaleDeliveryPayloadBuilder` / `SaleDeliveryModeResolver` | Preservar payload/template atual, adicionando IDs de tentativa/entrega na correlação. |
 | Novo `CreateSaleDeliveryAttemptUseCase` | Criar tentativa idempotente inicial/reenvio e determinar `chargeable`. |
-| Novo `ExecuteSaleDeliveryChannelUseCase` | Solicitar hold Wallet, criar mensagem Meta/e-mail e atualizar estado. |
+| Novo `ExecuteSaleDeliveryChannelUseCase` | Resolver uma fonte: crédito primeiro; saldo apenas se checkout não for transparente e Account autorizar. Criar mensagem Meta/e-mail e atualizar estado. |
 | Novo processo de timeout | Usar `status_timeout_at` e `hold_timeout_at` congelados na criação; aos 3 min enviar primary e aos 10 min liberar hold, sempre de forma idempotente. |
 | `SaleDeliveryRepository` | Buscar por ID, atualizar status/transições e listar por venda/tentativa; não usar só type/reference. |
 
@@ -33,17 +33,20 @@ Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenv
 | Ponto atual | Pendência |
 | --- | --- |
 | `ProcessPendingSaleEventSaleRecoveryUseCase` | Trocar regra global por produto principal + owner e criar dispatch por etapa/canal. |
-| `ExecuteSaleRecoveryDispatchUseCase` | Revalidar pending/janela/contato/flag, pedir hold Wallet e enviar canal oficial. |
+| `ExecuteSaleRecoveryDispatchUseCase` | Revalidar pending/janela/contato/flag, resolver funding para e-mail ou WhatsApp e enviar canal oficial. |
 | Scheduler/fila de recovery | Preservar locking/idempotência; cancelar/skip sem crédito ou elegibilidade. |
 | `RegisterSaleRecoveryEventUseCase` | Aplicar callback, registrar evento e consumir/liberar créditos. |
 
 ## Cliente Wallet e tempos
 
-- Criar client autenticado/retry seguro para hold, release e consume; referência sempre é `sales_delivery.id` ou `sale_recovery_dispatches.id`.
-- Não repetir envio em caso de erro de Wallet ou falta de crédito.
+- Criar client autenticado/retry seguro para hold, release e consume de `communication_credit` e `seller_balance`; referência sempre é `sales_delivery.id` ou `sale_recovery_dispatches.id`.
+- Commerce tenta crédito primeiro. Se indisponível, só tenta saldo quando a venda não é Checkout Transparente e `sale_notifications_allow_seller_balance` estiver ativo para o owner. Não há funding parcial.
+- Persistir em cada envio `funding_source` (`communication_credit|seller_balance|none`), `funding_status` (`not_required|held|consumed|released|insufficient`), `funding_reference_id` e `unit_price` antes de publicar o sender.
+- Não repetir envio em caso de erro de Wallet ou indisponibilidade das duas fontes.
 - Delivery: `status_timeout_seconds` (180) e `hold_timeout_seconds` (600) pertencem a `config/autoload/sale_delivery.php`; Commerce os grava como deadlines sem recalcular tentativa antiga.
 - Commerce escolhe `primary|secondary` no payload de e-mail; não envia o nome do provedor como regra de negócio.
-- Meta tardia após hold liberado: consume tardio; saldo pode ficar negativo.
+- `sent_to_provider` é a confirmação financeira de e-mail e WhatsApp. `delivered`/`read` são eventos operacionais, sem novo efeito financeiro.
+- Confirmação tardia após hold liberado: consume tardio na fonte persistida; saldo/crédito pode ficar negativo.
 
 ## Resultado de Notifications
 
@@ -51,7 +54,7 @@ Antes de criar a unicidade `(sale_delivery_attempt_id, type)`, inventariar reenv
 - O consumer do Commerce preserva temporariamente o payload legado (`sale_id`, `type`, `reference_id`, `status`, `error`) apenas para mensagens já pendentes na fila.
 - As novas mensagens usam `event_type = notification_outcome`, com `reference_type` (`sale_delivery|sale_recovery_dispatch`), referência comercial, venda, canal, ID da mensagem no Notifications, status e erro.
 - Notifications publica o novo envelope na mesma fila quando receber `params.notification_outcome`; esse bloco é removido antes da chamada à Meta.
-- O Commerce é o único dono da transição comercial e do crédito: resultado WhatsApp `delivered|read` consome, `fail` libera; timeout continua liberando o hold. RDC segue a mesma regra usando `sale_recovery_dispatches.id`.
+- O Commerce é o único dono da transição comercial e do funding: `sent_to_provider` consome, `fail` libera e timeout continua liberando o hold. RDC segue a mesma regra usando `sale_recovery_dispatches.id`.
 
 ## Rotas necessárias
 

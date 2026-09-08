@@ -4,7 +4,7 @@
 
 Unificar as comunicações oficiais de venda em dois fluxos: entrega pós-compra e recuperação de venda pendente (RDC). Ambos usam WhatsApp Meta e e-mail transacional, configuração por produto/afiliação e créditos monetários pré-pagos administrados pela Wallet.
 
-Evolution será descontinuado. Checkout Lowify e Checkout Transparente seguem as mesmas regras de créditos; o meio de pagamento da venda não altera o custo da comunicação.
+Evolution será descontinuado. Toda comunicação paga prioriza créditos de comunicação. Fora do Checkout Transparente, o saldo disponível do seller pode ser usado como fallback quando a conta o autorizar; no Checkout Transparente, a única fonte permitida são créditos de comunicação.
 
 ## Ordem de desenvolvimento
 
@@ -15,6 +15,7 @@ Evolution será descontinuado. Checkout Lowify e Checkout Transparente seguem as
 5. [Commerce: tentativas e dispatch](05_COMMERCE_DISPATCH_TASKS.md)
 6. [Notification: envio e callbacks](06_NOTIFICATION_CALLBACKS_TASKS.md)
 7. [Edges, Dashboard e operação](07_OPERATIONS_AND_DASHBOARD_TASKS.md)
+8. [Auditoria de implementação e pendências](09_IMPLEMENTATION_AUDIT_AND_REMAINING_TASKS.md)
 
 ## Responsabilidade e acesso
 
@@ -32,13 +33,15 @@ Account é a fonte de verdade das variáveis e feature flags do usuário. O Dash
 dashboard-seller → edge-gateway → edge-public-api → serviço responsável
 ```
 
-## Créditos de comunicação
+## Fontes de cobrança
 
 - Há uma carteira monetária única por `owner_user_id`, compartilhada por RDC e entrega pós-compra.
 - O custo efetivo é configurável por usuário, com padrão global e override em Account.
-- Antes de um envio cobrável, a Wallet bloqueia o valor. Sem crédito disponível, o canal pago não é enviado.
-- Após confirmação do provedor, a Wallet consome o crédito bloqueado. Em falha, libera o bloqueio.
-- O bloqueio de WhatsApp de entrega dura até 10 minutos, configurável. Após liberar, uma confirmação Meta tardia ainda consome créditos; a carteira pode ficar negativa.
+- Antes de um envio cobrável, Commerce tenta bloquear o valor na Wallet com a prioridade `communication_credit` → `seller_balance`.
+- `seller_balance` somente é elegível fora do Checkout Transparente e se `sale_notifications_allow_seller_balance` estiver efetivo para o owner.
+- Cada envio possui no máximo uma fonte e um bloqueio. Não é permitido bloquear parcialmente crédito e saldo na mesma comunicação.
+- `sent_to_provider` confirma a cobrança para e-mail e WhatsApp: a Wallet consome o bloqueio. Falha antes desse evento ou expiração libera o bloqueio.
+- O bloqueio de entrega dura até 10 minutos, configurável. Após liberar, uma confirmação tardia ainda consome a fonte originalmente selecionada; saldo/crédito pode ficar negativo.
 - Recargas são pacotes PIX: valor pago, crédito base e crédito bônus. Banking V2 identifica a cobrança de recarga e solicita o crédito à Wallet após confirmação.
 - Falta de crédito gera aviso por e-mail e WhatsApp ao responsável, com cooldown de 12 horas por usuário.
 
@@ -49,15 +52,15 @@ O produto ou a afiliação pode ativar “enviar entrega por WhatsApp”. A regr
 ```text
 Venda paga
   → resolve regra do produtor/afiliado e owner_user_id
-  → se WhatsApp ativo e houver crédito: cria tentativa e bloqueia crédito
+  → se WhatsApp ativo: cria tentativa e tenta bloquear crédito; fora do transparente pode usar saldo como fallback
   → envia WhatsApp Meta
-  → confirmação Meta até 3 min: consome crédito e envia e-mail pelo provider secondary
-  → falha Meta: libera crédito e envia e-mail pelo provider primary
+  → sent_to_provider: consome a fonte bloqueada e envia e-mail pelo provider secondary
+  → falha Meta: libera o bloqueio e envia e-mail pelo provider primary
   → sem retorno em 3 min: envia primary, marca timeout e mantém bloqueio até 10 min
-  → confirmação tardia: consome crédito, marca tardia e não envia secondary
+  → confirmação tardia: consome a fonte originalmente escolhida, marca tardia e não envia secondary
 ```
 
-Quando WhatsApp está desligado, não há telefone, não há crédito ou o enqueue falha, o e-mail segue pelo provider primary. Não há envio WhatsApp nesses casos.
+Quando WhatsApp está desligado, não há telefone, não há fonte disponível/autorizada ou o enqueue falha, o e-mail segue pelo provider primary. Não há envio WhatsApp nesses casos.
 
 Commerce escolhe o modo semântico `primary` ou `secondary` conforme a regra de negócio. Notification mapeia esse modo para o provedor real por env, inicialmente SendGrid e Mailtrap; os nomes dos provedores não pertencem à regra de negócio nem ao Account.
 
@@ -66,7 +69,10 @@ Commerce escolhe o modo semântico `primary` ou `secondary` conforme a regra de 
 - Elegível apenas para vendas `pending`, até duas horas após criação.
 - Usa somente `tbl_sale_items.item_type = principal`.
 - Uma ou duas etapas; no mínimo 10 minutos entre elas; cada etapa pode usar e-mail, WhatsApp ou ambos.
-- Cada canal cria um dispatch cobrável e usa a mesma carteira de créditos.
+- Evolution não participa do RDC novo. Os únicos canais são WhatsApp Business Platform/Meta e e-mail transacional.
+- E-mail não é obrigatório em nenhuma etapa do RDC. Quando habilitado, e-mail e WhatsApp são cobrados pelo mesmo valor unitário efetivo.
+- O único e-mail obrigatório e gratuito é o da entrega pós-pagamento; essa regra não se aplica ao RDC.
+- Cada canal de RDC cria um dispatch cobrável e usa a mesma carteira de créditos.
 - Não há retry/fallback automático na primeira versão; contato ausente ou falta de crédito registra `skipped`.
 - Ambos os templates contêm `/rdc?cod={order}`.
 
@@ -74,17 +80,17 @@ Commerce escolhe o modo semântico `primary` ou `secondary` conforme a regra de 
 
 `sale_delivery_attempts` representa a operação de entrega (inicial ou reenvio): `sale_id`, `owner_user_id`, `is_resend`, autor, modo de cobrança e timestamps.
 
-`sales_delivery` representa cada canal concreto da tentativa e mantém a referência da mensagem no Notification. O `sales_delivery.id` é enviado no payload/correlation e retorna no callback; ele é também a referência idempotente da Wallet para WhatsApp.
+`sales_delivery` representa cada canal concreto da tentativa e mantém a referência da mensagem no Notification. Além da referência de provider, congela `funding_source`, `funding_status`, `funding_reference_id` e `unit_price`. O `sales_delivery.id` é enviado no payload/correlation e retorna no callback; ele é a referência idempotente da Wallet.
 
-`sale_recovery_dispatches` e `sale_recovery_dispatch_events` continuam sendo o registro do RDC, agora com débito/bloqueio na carteira de créditos em vez de extrato/fatura.
+`sale_recovery_dispatches` e `sale_recovery_dispatch_events` continuam sendo o registro do RDC, com as mesmas colunas de funding. O evento de `sent_to_provider` é a confirmação financeira para os dois canais.
 
 ## Inventário técnico de dados
 
 | Serviço | Tabela/estrutura nova ou alterada | Forma de deploy |
 | --- | --- | --- |
 | Commerce V2 | `product_sale_delivery_rules`, `sale_delivery_attempts`, evolução de `sales_delivery`, regras e eventos de RDC | SQL manual |
-| Account | chaves globais em `system_vars` e overrides em `user_system_vars` | SQL manual + casos de uso/API |
-| Wallet | `communication_credit_packages`, `communication_credit_entries`, `communication_credit_alerts` | SQL manual |
+| Account | chaves globais em `system_vars`, overrides em `user_system_vars` e preferência por usuário para uso de saldo | SQL manual + casos de uso/API |
+| Wallet | créditos de comunicação e holds de saldo disponível do seller | SQL manual |
 | Banking V2 | purpose `communication_credit_topup` em cobranças PIX existentes | confirmar migration/schema apenas se o purpose for enumerado |
 | Notification | correlação por `sales_delivery.id`/dispatch e fila genérica de resultados | migrations do serviço se o schema de mensagem exigir |
 

@@ -13,6 +13,8 @@ No banco do Account, inserir em `system_vars`:
 
 Usar `user_system_vars` para overrides de flag e preço. Não criar coluna em tabela de usuário e não replicar estado em Commerce.
 
+`sale_notifications_allow_seller_balance` é uma preferência **somente por usuário**: não existe em `system_vars`. Quando o usuário não possuir registro em `user_system_vars`, o Account deve responder `true`; o registro explícito permite desativar ou reativar o fallback para saldo.
+
 O SQL manual em `deploy/001_sale_notifications.sql` cria `user_system_vars` somente
 quando ausente e garante `updated_at` + unicidade por (`user_id`, `var_key`) em
 instalações legadas. A pré-checagem de duplicidade deve retornar vazia antes do
@@ -33,6 +35,7 @@ instalações legadas. A pré-checagem de duplicidade deve retornar vazia antes 
 
 - Commerce consulta Account antes de salvar regra, agendar RDC e iniciar entrega.
 - Wallet recebe `owner_user_id` e valor já resolvido; não consulta preço no Account.
+- `sale_notifications_allow_seller_balance` é resolvida pelo Account para o `owner_user_id`, a partir de `user_system_vars` com default `true`. Ela autoriza somente o fallback para saldo disponível fora do Checkout Transparente; não habilita esse fallback no transparente.
 - Dashboard acessa Account somente via Gateway/Public API.
 - A resposta de preço devolve global, override (ou `null`) e efetivo; o browser não calcula valor.
 
@@ -58,3 +61,4 @@ específico: chaves permitidas, defaults, validação e montagem de efetivo.
 - [x] Override de afiliado não altera o produtor e vice-versa.
 - [x] Feature desativada é exposta ao Commerce para bloquear operação e envio.
 - [x] Commerce não depende de conexão/tabela do Account.
+- [x] Preferência por usuário `sale_notifications_allow_seller_balance` é retornada no contrato efetivo. Sem override, o valor efetivo é `true`; ela não aparece no contrato global.

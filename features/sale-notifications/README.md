@@ -1,12 +1,12 @@
 # Feature — comunicações de venda
 
 > Status: em evolução
-> Última atualização: 2026-08-28
+> Última atualização: 2026-09-08
 > Confiança: parcialmente confirmada
 
 ## Objetivo
 
-Unificar a entrega pós-compra e a recuperação de venda pendente (RDC) sob uma carteira de créditos monetários de comunicação. A implementação ainda não foi iniciada; as regras de negócio abaixo foram confirmadas pelo produto.
+Unificar a entrega pós-compra e a recuperação de venda pendente (RDC) sob uma carteira de créditos monetários de comunicação. Há implementação parcial nas branches `feat/sale-notifications`; ela ainda requer correções funcionais, telas e testes antes da homologação.
 
 ## Fluxo principal planejado
 
@@ -31,16 +31,19 @@ Recarga PIX → Banking V2 → Wallet credita carteira
 
 ## Dados e filas
 
-O código atual já possui `sales_delivery`, callbacks Meta e fluxo de e-mail condicionado ao resultado do WhatsApp. O plano prevê `sale_delivery_attempts`, carteira de créditos e uma fila genérica de resultado para entrega e RDC. Esses novos dados e contratos ainda não existem no código.
+O código da feature já adiciona `sale_delivery_attempts`, regras de produto/afiliação, créditos de comunicação, recarga PIX, outcomes genéricos e callbacks Meta. A aplicação do SQL manual da Wallet e a validação integrada ainda não foram comprovadas.
 
 ## Limitações e pendências
 
 - Definir administração de pacotes, expiração de créditos e estorno PIX.
-- Implementar configuração por produto/afiliação, créditos e reenvios.
-- Evolution será descontinuado no novo fluxo.
+- Corrigir cobrança do e-mail de RDC: ele não é gratuito e precisa usar hold/release/consume.
+- Implementar reenvio administrativo com seleção de canais, telas de créditos/status/histórico e configuração por afiliação.
+- Cobrir contratos e fluxos assíncronos com testes.
+- Evolution está fora do novo RDC.
 
 ## Referências
 
 - [Plano de comunicações de venda](../../plans/sale-notifications/README.md)
+- [Auditoria de implementação e pendências](../../plans/sale-notifications/09_IMPLEMENTATION_AUDIT_AND_REMAINING_TASKS.md)
 - `services-commerce-v2/app/Application/UseCase/Sale/ProcessPaidSaleEventDeliveryUseCase.php`
 - `services-notification/app/Process/WhatsappMetaDeliveryStatusQueueProcess.php`
