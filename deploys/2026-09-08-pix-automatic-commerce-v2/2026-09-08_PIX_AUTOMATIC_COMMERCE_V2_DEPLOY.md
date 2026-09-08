@@ -34,23 +34,6 @@ Provedor PIX Automático
 - O Commerce V2 registra `SubscriptionActionsProcess` como processo Hyperf. Para cobrança paga, cria a parcela identificada por assinatura + número de parcela, atualiza `valid_until`, associa/cria a venda correspondente e chama `ProcessPaidSaleEventUseCase`.
 - A fila usa Redis compartilhado entre Banking e Commerce V2. O processo é configurado por `SUBSCRIPTION_ACTIONS_PROCESS_ENABLED`, `SUBSCRIPTION_ACTIONS_QUEUE` e `SUBSCRIPTION_ACTIONS_TIMEOUT_SECONDS`.
 
-## Pré-requisitos e decisão de liberação
-
-1. Publicar ambas as branches em `origin` e confirmar que elas apontam exatamente para `bb50aa0` e `3f9f549`. Uma branch que tenha avançado exige revisão deste documento antes do deploy.
-2. Confirmar que Banking e Commerce V2 usam a mesma instância lógica de Redis e que `sales:subscriptions:actions` não é usada por outro produtor ou consumidor.
-3. No `services-commerce-v2`, confirmar no `.env` de destino, sem expor valores de outros segredos:
-
-   ```text
-   SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=true
-   SUBSCRIPTION_ACTIONS_QUEUE=sales:subscriptions:actions
-   SUBSCRIPTION_ACTIONS_TIMEOUT_SECONDS=5
-   ```
-
-4. Confirmar que a tabela `subscriptions_installments` já existe no banco usado pelo Commerce V2 e possui uma garantia de unicidade para `(subscription_id, installment_number)`. Esta branch não contém migration.
-5. Escolher expressamente se o risco de perda de mensagem é aceitável. O processo usa `BLPOP`: se ocorrer exceção depois de retirar a mensagem, ele apenas registra erro e não possui retry, DLQ nem confirmação. Não liberar para produção enquanto não houver responsável operacional e procedimento aprovado para esse cenário.
-6. Ter uma assinatura PIX Automático sintética disponível em homologação para validar primeira parcela e recorrência antes do corte de produção. O corte não deve ocorrer se essa validação não tiver sido aprovada.
-7. Confirmar que as revisões anteriores de Banking e Commerce V2 estão registradas para rollback. Não pressupor que `main` seja a revisão atualmente em produção.
-
 ## Banco de dados
 
 Não há migration, DDL ou DML nesta entrega.
