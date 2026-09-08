@@ -75,8 +75,6 @@ Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Bankin
    docker compose logs --tail=200 services-banking-subscriptions-queue-worker
    ```
 
-4. Registrar os SHAs efetivamente publicados. Se a atualização do Banking falhar, não gerar manualmente eventos na fila nova e não alterar a fila legada. Restaurar somente conforme o plano de rollback abaixo, depois de avaliar se algum evento novo foi publicado.
-
 ## Testes de compatibilidade em homologação
 
 Executar antes da produção, no `services-commerce-v2` e `services-banking` atualizados com as mesmas referências desta entrega. O executor é o processo Hyperf `commerce_subscription_actions_queue`; o worker Banking é `services-banking-subscriptions-queue-worker`.
