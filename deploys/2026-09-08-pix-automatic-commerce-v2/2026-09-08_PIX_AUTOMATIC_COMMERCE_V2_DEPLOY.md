@@ -38,18 +38,6 @@ Provedor PIX Automático
 
 Não há migration, DDL ou DML nesta entrega.
 
-Antes de subir os containers, executar apenas uma consulta de leitura no banco do Commerce V2 para confirmar a estrutura existente; adaptar o nome do schema à configuração do ambiente:
-
-```sql
-SELECT column_name, column_key
-FROM information_schema.columns
-WHERE table_schema = DATABASE()
-  AND table_name = 'subscriptions_installments'
-ORDER BY ordinal_position;
-```
-
-Se a tabela, a chave composta ou as colunas `subscription_id`, `installment_number`, `payment_at` e `end_to_end_id` não existirem, interromper o deploy. A criação ou correção de schema exige migration/plano separado; não executar DDL manualmente neste procedimento.
-
 ## Sequência de deploy
 
 Publicar primeiro o consumidor do Commerce V2 e somente depois o produtor Banking. Assim, nenhum evento novo é encaminhado para o caminho V2 antes de o processo estar disponível.
