@@ -2,92 +2,80 @@
 
 ## Objetivo
 
-Permitir que administradores configurem, na visão administrativa de cada vendedor, um limite diário de saque específico ou a opção **Sem limite**. A configuração passa a ser aplicada tanto no aviso mostrado ao vendedor quanto na validação do pedido de saque.
+Permitir que administradores configurem, na visão administrativa de cada vendedor, um limite diário de saque específico ou a opção **Sem limite**. A configuração é aplicada tanto no aviso mostrado ao vendedor quanto na validação do pedido de saque.
 
-Quando não houver configuração individual, o comportamento anterior permanece: são usados os limites e as exceções definidos pelo sistema.
+O `dashboard-seller` é o único componente desta entrega. Ele lê e grava diretamente no banco `lowify`, na tabela `user_system_vars`, usando a chave `withdrawal_daily_limit`.
 
-## Componentes alterados
+Quando não houver configuração individual, o comportamento anterior permanece: são usados os limites e as exceções definidos em `includes/operations/withdrawal_limits.php`.
+
+## Componente alterado
 
 | Componente | Branch de deploy | Entrega |
 | --- | --- | --- |
-| `dashboard-seller` | `feat/seller-withdrawal-limits-config` | Interface administrativa, consulta e validação do limite no fluxo de saque. |
-| `services-commerce-v2` | `feat/seller-withdrawal-limits-config` | Seed dos limites iniciais por vendedor. |
-| `services-account` | `feat/seller-withdrawal-limits-config` | Proprietário da configuração: lê e grava `user_system_vars.withdrawal_daily_limit`. |
-| `edge-public-api` | `feat/seller-withdrawal-limits-config` | Expõe as rotas autenticadas e aplica as regras de acesso. |
-| `edge-gateway` | `feat/seller-withdrawal-limits-config` | Encaminha as rotas de limite de saque para a Public API. |
+| `dashboard-seller` | `feat/seller-withdrawal-limits-config` | Tela administrativa, persistência direta em `user_system_vars` e validação de saque. |
 
-As branches de código desta entrega partem da `main`; a branch do `dashboard-seller` também contém a atualização prévia com a `main` que já incluía a integração Cielo.
-
-Não há alteração de schema, nova variável de ambiente ou segredo. O seed de dados `20260824150000_seed_user_withdrawal_daily_limits.sql` deve ser executado no banco `lowify`.
+Não há migration, alteração de schema, nova variável de ambiente, serviço adicional ou rebuild de container nesta entrega.
 
 ## Comportamento incluído
 
-- Na página administrativa do vendedor, usuários com a permissão `admin_sellers_edit` passam a ter a ação **Limites de saque**.
+- Na página administrativa do vendedor, usuários com a permissão `admin_sellers_edit` têm a ação **Limites de saque**.
 - O modal permite selecionar **Limite customizado** e informar um valor diário positivo em reais, ou selecionar **Sem limite**.
-- O Dashboard não grava mais a tabela diretamente. Ele chama o Gateway, que encaminha para a Public API e, por fim, para o `services-account`.
-- O `services-account` é o proprietário da opção e a armazena por vendedor em `user_system_vars`, com a chave `withdrawal_daily_limit` e valor numérico ou `unlimited`.
-- As rotas são `GET` e `PUT /users/{user_id}/withdrawal-limit`. Na Public API, a leitura é permitida ao próprio vendedor ou a um administrador; a alteração é permitida somente a administrador.
-- Em cada solicitação de saque, a configuração individual é consultada antes dos limites legados. O limite diário é reservado no Redis; pedidos que ultrapassem o total do dia são recusados.
-- A opção `unlimited` remove o limite diário para aquele vendedor. A ausência de configuração individual preserva as regras, exceções e valores padrão existentes.
+- O Dashboard grava `withdrawal_daily_limit` diretamente em `user_system_vars`. Valores numéricos representam o teto diário; `unlimited` remove o teto diário.
+- Em cada solicitação de saque, essa configuração é consultada antes dos limites legados. O limite diário é reservado no Redis; pedidos que ultrapassem o total do dia são recusados.
+- A ausência de registro individual preserva as regras, exceções e valores padrão existentes.
 
 ## Pré-requisitos
 
-1. Confirmar que os clones de `dashboard-seller`, `services-account`, `edge-public-api` e `edge-gateway` não possuem alterações locais.
+1. Confirmar que o clone de produção do `dashboard-seller` não possui alterações locais.
 2. Confirmar acesso de um usuário administrador com a permissão `admin_sellers_edit`.
-3. Confirmar que o Redis usado pelo dashboard está saudável, pois ele mantém a reserva acumulada do limite diário.
+3. Confirmar que o Redis usado pelo Dashboard está saudável, pois ele mantém a reserva acumulada do limite diário.
 4. Registrar o commit anterior conhecido e aprovado antes da atualização, para eventual rollback.
-5. Confirmar que `migrations/20260824150000_seed_user_withdrawal_daily_limits.sql` está presente no clone de `services-commerce-v2`.
-6. Antes de executar o seed, comparar seus valores com `includes/operations/withdrawal_limits.php` do `dashboard-seller`. O SQL precisa refletir exatamente os usuários sem limite e os limites customizados não comentados nesse arquivo. Se houver divergência, corrigir o SQL antes de rodá-lo.
+5. Antes de executar o SQL abaixo, conferir os valores contra `includes/operations/withdrawal_limits.php` do `dashboard-seller`. Se os arrays de limites ou isenções forem alterados, atualizar o SQL antes de executá-lo.
+
+## SQL de configuração inicial
+
+Executar no banco `lowify` pelo procedimento aprovado. Este comando não substitui configurações individuais já existentes; ele só cria os registros ausentes.
+
+```sql
+INSERT INTO user_system_vars (user_id, var_key, var_value)
+SELECT source.user_id, 'withdrawal_daily_limit', source.var_value
+FROM (
+    SELECT 39 AS user_id, 'unlimited' AS var_value
+    UNION ALL SELECT 79, 'unlimited'
+    UNION ALL SELECT 814, 'unlimited'
+    UNION ALL SELECT 1336, 'unlimited'
+    UNION ALL SELECT 1100, 'unlimited'
+    UNION ALL SELECT 542, 'unlimited'
+    UNION ALL SELECT 14, '8000.00'
+    UNION ALL SELECT 2200, '6000.00'
+    UNION ALL SELECT 11509, '5000.00'
+    UNION ALL SELECT 99, '5000.00'
+    UNION ALL SELECT 1131, '8000.00'
+    UNION ALL SELECT 55, '30000.00'
+    UNION ALL SELECT 1818, '3000.00'
+    UNION ALL SELECT 164, '3000.00'
+    UNION ALL SELECT 299, '10000.00'
+    UNION ALL SELECT 10, '3000.00'
+    UNION ALL SELECT 284, '8000.00'
+    UNION ALL SELECT 8140, '15000.00'
+    UNION ALL SELECT 294, '10000.00'
+    UNION ALL SELECT 11694, '8000.00'
+    UNION ALL SELECT 1925, '12000.00'
+    UNION ALL SELECT 412, '8000.00'
+    UNION ALL SELECT 1779, '4000.00'
+) AS source
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM user_system_vars existing_config
+    WHERE existing_config.user_id = source.user_id
+      AND existing_config.var_key = 'withdrawal_daily_limit'
+);
+```
 
 ## Sequência de deploy
 
-1. Atualizar o `services-commerce-v2` e executar o seed de limites:
-
-   ```bash
-   cd /opt/lowify/services/service-commerce-v2
-   git status --porcelain=v1
-   git fetch origin --prune
-   git switch feat/seller-withdrawal-limits-config
-   git pull --ff-only origin feat/seller-withdrawal-limits-config
-   git rev-parse --short HEAD
-   ```
-
-   Conferir o conteúdo de `migrations/20260824150000_seed_user_withdrawal_daily_limits.sql` contra `includes/operations/withdrawal_limits.php` do `dashboard-seller` e, estando correto, executar esse arquivo no banco `lowify`, pelo procedimento de migrations aprovado para o ambiente. Ele insere os registros ausentes para a chave `withdrawal_daily_limit` e não substitui configurações já existentes.
-
-2. Atualizar e publicar o `services-account` antes dos edges. Aplicar o build/restart do container conforme o procedimento operacional do serviço:
-
-   ```bash
-   cd /opt/lowify/services/services-account
-   git status --porcelain=v1
-   git fetch origin --prune
-   git switch feat/seller-withdrawal-limits-config
-   git pull --ff-only origin feat/seller-withdrawal-limits-config
-   git rev-parse --short HEAD
-   ```
-
-3. Atualizar e publicar o `edge-public-api`, aplicando o build/restart do container conforme o procedimento operacional do edge:
-
-   ```bash
-   cd /opt/lowify/edge/edge-public-api
-   git status --porcelain=v1
-   git fetch origin --prune
-   git switch feat/seller-withdrawal-limits-config
-   git pull --ff-only origin feat/seller-withdrawal-limits-config
-   git rev-parse --short HEAD
-   ```
-
-4. Atualizar e publicar o `edge-gateway`, aplicando o build/restart do container conforme o procedimento operacional do edge:
-
-   ```bash
-   cd /opt/lowify/edge/edge-gateway
-   git status --porcelain=v1
-   git fetch origin --prune
-   git switch feat/seller-withdrawal-limits-config
-   git pull --ff-only origin feat/seller-withdrawal-limits-config
-   git rev-parse --short HEAD
-   ```
-
-5. Atualizar o `dashboard-seller` para a branch da entrega:
+1. Executar o SQL de configuração inicial acima, após conferir os valores com `includes/operations/withdrawal_limits.php`.
+2. Atualizar o `dashboard-seller` para a branch da entrega:
 
    ```bash
    cd /opt/lowify/front/dashboard-seller
@@ -98,24 +86,24 @@ Não há alteração de schema, nova variável de ambiente ou segredo. O seed de
    git rev-parse --short HEAD
    ```
 
-6. O dashboard não requer build de container neste procedimento. Se o ambiente usar cache de opcode, aplicar o procedimento operacional já aprovado para recarregá-lo após a atualização.
+3. O Dashboard não requer rebuild de container. Se o ambiente usar cache de opcode, aplicar o procedimento operacional aprovado para recarregá-lo após a atualização.
 
 ## Validação pós-deploy
 
-1. Após executar o seed, consultar `user_system_vars` para a chave `withdrawal_daily_limit` e comparar os valores inseridos com `includes/operations/withdrawal_limits.php`. Confirmar especialmente que os usuários sem limite têm `unlimited` e que os limites customizados ativos estão corretos.
+1. Consultar `user_system_vars` para a chave `withdrawal_daily_limit` e confirmar que os registros criados pelo SQL correspondem aos limites ativos em `includes/operations/withdrawal_limits.php`.
 2. Acessar a visão administrativa de um vendedor com um administrador que tenha `admin_sellers_edit`.
 3. Em **Gerenciar conta**, abrir **Limites de saque** e salvar um limite customizado de teste, por exemplo `R$ 100,00`.
-4. Confirmar que o modal exibe o valor salvo ao ser reaberto. Isso confirma o caminho Dashboard → Gateway → Public API → Account e a leitura do valor persistido.
+4. Reabrir o modal e confirmar que o valor salvo está visível.
 5. Confirmar que o vendedor vê o aviso com o novo teto diário nas páginas de saldo, contas e saques.
 6. Com uma conta de teste que tenha saldo e conta de saque válidos, solicitar valores que totalizem até o limite configurado. Confirmar que os pedidos são aceitos.
 7. Tentar um novo saque que faça o total diário exceder o limite. Resultado esperado: o pedido é recusado e não é criado um saque pendente.
 8. Alterar a configuração para **Sem limite**, repetir a tentativa acima e confirmar que a validação diária não bloqueia o pedido por valor acumulado.
 9. Para um vendedor sem registro em `user_system_vars.withdrawal_daily_limit`, confirmar que os limites e exceções legados continuam aplicados.
-10. Verificar os logs do Dashboard, Gateway, Public API, Account e Redis se algum pedido for recusado inesperadamente; não limpar chaves de limite diário durante a validação.
+10. Verificar os logs do PHP e do Redis se algum pedido for recusado inesperadamente; não limpar chaves de limite diário durante a validação.
 
 ## Rollback
 
-1. Retornar `dashboard-seller`, `edge-gateway`, `edge-public-api` e `services-account` aos commits anteriores conhecidos e aprovados, nessa ordem. Recarregar o opcode cache do dashboard, se aplicável.
-2. Não apagar os registros inseridos pelo seed sem um plano de dados aprovado: eles passam a representar a configuração individual vigente de cada vendedor.
+1. Retornar somente o `dashboard-seller` ao commit anterior conhecido e aprovado. Recarregar o opcode cache, se aplicável.
+2. Não apagar os registros de `user_system_vars` sem um plano de dados aprovado: eles representam a configuração individual vigente de cada vendedor.
 3. Não limpar manualmente as chaves Redis de reserva diária, exceto em incidente com procedimento operacional aprovado. Elas expiram naturalmente e a remoção pode permitir saques acima do teto já consumido no dia.
 4. Após o rollback, validar um saque de teste e confirmar que a regra anterior está sendo aplicada.
