@@ -51,9 +51,9 @@ O comando seleciona somente vendas com:
 
 - `status = paid`;
 - `payment_method = pix_automatic`;
-- `confirmed_at` dentro do intervalo informado.
+- `sale_timestamp` dentro do intervalo informado.
 
-Ele recalcula o valor líquido do seller com base nos itens, taxa do seller, order bump e comissão de afiliado. O reenvio produz o mesmo identificador de evento normal: `sale-approved:seller:<sale_id>`.
+Ele recalcula o valor líquido do seller com base nos itens, taxa do seller, order bump e comissão de afiliado. O lançamento no Wallet recebe a data de `sale_timestamp`, que representa o momento da cobrança e evita usar um `confirmed_at` histórico ou incorreto. O reenvio produz o mesmo identificador de evento normal: `sale-approved:seller:<sale_id>`.
 
 A constraint única já existente no banco do Wallet impede a duplicação do lançamento quando uma venda já possuir o crédito correspondente.
 
