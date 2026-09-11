@@ -10,7 +10,7 @@ A correção preserva o seller dono do produto no payload e mantém o ator auten
 
 | Componente | Branch de deploy | Entrega |
 | --- | --- | --- |
-| `edge-public-api` | `hotfix/admin-product-edit-commerce-v2` | Restringe a seleção de seller-alvo para edição administrativa às permissões 1 e 2. |
+| `edge-public-api` | `hotfix/admin-product-edit-commerce-v2` | Permite que as permissões 1, 2 e 4 selecionem o seller-alvo para edição administrativa. |
 | `dashboard-seller` | `hotfix/admin-product-edit-commerce-v2` | Preserva o seller dono do produto ao normalizar e encaminhar a edição ao Commerce V2. |
 
 O `services-commerce-v2` não possui alteração nesta entrega. Ele já busca e atualiza o produto por `id_produto + user_id`, preservando a propriedade do produto.
@@ -20,16 +20,15 @@ Não há migration, alteração de schema, variável de ambiente ou mudança de 
 ## Comportamento incluído
 
 ```text
-Admin (permissão 1 ou 2)
+Admin (permissão 1, 2 ou 4)
   -> Dashboard preserva user_id do seller dono
   -> Gateway / Public API valida o JWT
   -> Commerce V2 atualiza o produto do seller alvo
   -> change-log registra o admin autenticado como ator
 ```
 
-- Admins com permissões 1 e 2 podem editar produtos de sellers distintos.
+- Admins com permissões 1, 2 e 4 podem editar produtos de sellers distintos.
 - Sellers comuns e colaboradores continuam restritos ao seller resolvido pelo JWT e pelo contexto de colaborador; qualquer `user_id` enviado pelo navegador é ignorado.
-- A permissão 4 não pode editar produto de outro seller, em conformidade com a permissão de tela `admin_product_edit` do Dashboard.
 - O Commerce V2 não altera `id_usuario` durante a edição.
 - Após uma edição bem-sucedida, o Dashboard envia o diff para o endpoint de change-log. A Public API resolve o ator pelo JWT e o Commerce V2 grava o ator em `product_changes_log`.
 
@@ -67,13 +66,13 @@ O Dashboard não requer rebuild de container. Caso o ambiente use cache de opcod
 
 ## Validação pós-deploy
 
-1. Acessar o Dashboard com uma conta administrativa de permissão 1 ou 2.
+1. Acessar o Dashboard com uma conta administrativa de permissão 1, 2 ou 4.
 2. Abrir um produto que pertença a outro seller e alterar um campo não estrutural, como o título.
 3. Confirmar que a atualização é concluída e que `tbl_produtos.id_usuario` permanece associado ao seller original.
 4. Reabrir o produto e confirmar que o novo valor foi persistido.
 5. Consultar a timeline de alterações do produto e confirmar que o ator é o administrador que executou a edição.
 6. Com uma conta seller, tentar informar o `user_id` de outro seller em uma requisição de atualização. Confirmar que a alteração não ocorre.
-7. Com uma conta de permissão 4, tentar editar produto de outro seller. Resultado esperado: `product_not_found` ou negação de acesso, sem alteração do produto.
+7. Com uma conta de permissão 4, editar um produto de outro seller e confirmar que a atualização é concluída sem alterar `tbl_produtos.id_usuario`.
 
 ## Rollback
 
