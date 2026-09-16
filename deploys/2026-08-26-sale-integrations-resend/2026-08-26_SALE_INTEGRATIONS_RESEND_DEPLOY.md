@@ -88,10 +88,9 @@ Não há migration nesta entrega.
    git fetch origin --prune
    git switch feat/sale-integrations-resend
    git pull --ff-only origin feat/sale-integrations-resend
-   docker compose up -d --build
    ```
 
-   Se o dashboard usar o diretório do projeto montado como volume, o `git pull` já atualiza o código em execução; manter o build/restart para também atualizar os workers e evitar divergência entre processos.
+   O dashboard usa o diretório do projeto montado como volume; o `git pull` atualiza o código em execução. Não executar build ou restart de container nesta etapa.
 
 ## Validação pós-deploy
 
