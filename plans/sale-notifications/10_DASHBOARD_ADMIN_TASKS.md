@@ -1,5 +1,15 @@
 # Fase 10 — Dashboard Admin: comunicações de venda
 
+> **Documento de execução da Administração.** Este é o arquivo a ser usado pelo
+> responsável por esta fase. Ele cobre a interface no monólito
+> `dashboard-seller` **e** os proxies mínimos em Gateway/Public API necessários
+> para a tela operar. Account e Wallet já possuem os contratos internos
+> descritos abaixo e não devem ser redesenhados nesta fase.
+>
+> Para visão consolidada de riscos, SQL, homologação e tarefas fora da
+> Administração, consulte
+> [12_DETAILED_REMAINING_WORK_REVIEW.md](12_DETAILED_REMAINING_WORK_REVIEW.md).
+
 ## Objetivo
 
 Entregar na tela existente **“Configurações do admin”** toda a gestão

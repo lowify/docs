@@ -189,8 +189,9 @@ Criar a página de status de comunicações do seller, usando
 
 Ela deve listar somente registros cujo `owner_user_id` pertence ao seller
 autenticado — em venda afiliada, o produtor não vê a comunicação paga pelo
-afiliado. Exibir entrega e RDC com filtros por período, produto principal,
-canal, status e tipo (`delivery`/`recovery`).
+afiliado. Exibir entrega e RDC com filtros por período, canal, status e tipo
+(`delivery`/`recovery`). Não resolver produto principal nesta tela: a referência
+da venda (`order_id`) direciona para o detalhe da venda.
 
 Colunas mínimas: venda, produto principal, tipo/etapa, canal, status,
 agendamento/envio/confirmação, valor, fonte de funding e motivo de
