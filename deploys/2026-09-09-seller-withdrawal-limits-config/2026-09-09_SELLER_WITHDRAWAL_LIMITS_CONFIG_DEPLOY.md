@@ -25,10 +25,6 @@ Não há migration, alteração de schema, nova variável de ambiente, serviço 
 - Em cada solicitação de saque, essa configuração é consultada antes dos limites legados. O limite diário é reservado no Redis; pedidos que ultrapassem o total do dia são recusados.
 - A ausência de registro individual preserva as exceções e os valores customizados legados; os demais vendedores passam a usar o limite global.
 
-## Pré-requisitos
-
-1. Executar o SQL de configuração inicial abaixo no banco `lowify`, pelo procedimento aprovado.
-
 ## SQL de configuração inicial
 
 Executar no banco `lowify` pelo procedimento aprovado. O primeiro comando cria a configuração global apenas se ela não existir; o segundo não substitui configurações individuais já existentes, apenas cria os registros ausentes.
