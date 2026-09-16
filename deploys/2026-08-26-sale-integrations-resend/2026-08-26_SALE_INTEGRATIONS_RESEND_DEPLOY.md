@@ -35,47 +35,59 @@ Não há migration nesta entrega.
 
 ## Sequência de deploy
 
-1. Publicar `services-commerce-v2` na branch `feat/sale-integrations-resend`.
-2. No diretório do commerce-v2, atualizar o código e recriar o container:
+1. Atualizar e recriar o `services-commerce-v2`:
 
    ```bash
-   git pull --ff-only
+   cd /opt/lowify/services/service-commerce-v2
+   git status --porcelain=v1
+   git fetch origin --prune
+   git switch feat/sale-integrations-resend
+   git pull --ff-only origin feat/sale-integrations-resend
    docker compose up -d --build
    ```
 
-3. Confirmar que o serviço iniciou e está escutando normalmente:
+2. Confirmar que o serviço iniciou e está escutando normalmente:
 
    ```bash
    docker compose ps
    docker compose logs --tail=200 service-commerce-v2
    ```
 
-4. Publicar `edge-public-api` na mesma branch. Ele extrai o usuário/permissão do JWT e encaminha a seleção de integrações ao commerce-v2.
-5. Atualizar e recriar o public API:
+3. Atualizar e recriar o `edge-public-api`. Ele extrai o usuário/permissão do JWT e encaminha a seleção de integrações ao commerce-v2:
 
    ```bash
-   git pull --ff-only
+   cd /opt/lowify/edge/edge-public-api
+   git status --porcelain=v1
+   git fetch origin --prune
+   git switch feat/sale-integrations-resend
+   git pull --ff-only origin feat/sale-integrations-resend
    docker compose up -d --build
    ```
 
-6. Publicar `edge-gateway` na mesma branch. Ele expõe as rotas:
+4. Atualizar e recriar o `edge-gateway`. Ele expõe as rotas:
 
    ```text
    GET  /sales/{saleId}/integrations/overview
    POST /sales/{saleId}/integrations/resend
    ```
 
-7. Atualizar e recriar o gateway:
-
    ```bash
-   git pull --ff-only
+   cd /opt/lowify/edge/edge-gateway
+   git status --porcelain=v1
+   git fetch origin --prune
+   git switch feat/sale-integrations-resend
+   git pull --ff-only origin feat/sale-integrations-resend
    docker compose up -d --build
    ```
 
-8. Publicar `dashboard-seller` na mesma branch e atualizar o container:
+5. Atualizar o `dashboard-seller`:
 
    ```bash
-   git pull --ff-only
+   cd /opt/lowify/front/dashboard-seller
+   git status --porcelain=v1
+   git fetch origin --prune
+   git switch feat/sale-integrations-resend
+   git pull --ff-only origin feat/sale-integrations-resend
    docker compose up -d --build
    ```
 
