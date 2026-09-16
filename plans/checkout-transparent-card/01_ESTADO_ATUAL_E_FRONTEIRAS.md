@@ -4,18 +4,18 @@
 
 | Componente | Comportamento atual | Mudança necessária |
 | --- | --- | --- |
-| CT API | `ResolveCheckoutAvailabilityUseCase` mapeia somente `pix`. | Mapear `card` para Mercado Pago, Pagar.me e Efí e declarar campos obrigatórios por provedor. |
-| Edge Public API | Valida a disponibilidade, cria a venda no Commerce V2 e cria a `charge`; depois espera QR Code Pix. | Encaminhar dados de cartão tokenizados e substituir a espera de QR Code por resultado de cartão. |
-| Commerce V2 | Para `checkout_mode=transparent`, cria venda pendente e não chama Banking. Antes disso, porém, valida disponibilidade e onboarding do cartão normal. | Separar a regra de cartão transparente da regra de gateway padrão, Cielo e Pagar.me PSP da Lowify. Manter a exigência de produto e seller elegíveis. |
-| CT worker | Consome `gateway:instructions` com `payment.create` e `payment.status.check`; todos os clientes atuais criam Pix. | Criar o caminho `card` nos clientes elegíveis, preservando o envelope, correlação e consulta de status. |
-| Resultado CT | `payment.create.result` registra tentativa e deixa a charge em `processing`; somente status check pago chama `ConfirmChargePaymentUseCase`. | Tratar aprovação de cartão no retorno imediato, sem aguardar um ciclo Pix para confirmar a venda. |
-| Dashboard Seller | O cadastro de integração aceita somente as credenciais Pix atuais. | Adicionar campos e validação de cartão por provedor, sem expor segredos na tela ou no checkout. |
+| CT API | Seleciona integração por método habilitado/default e aceita `card_credit` com tentativa idempotente. | Reutilizar o contrato para Pagar.me e Efí, adicionando somente os campos específicos de cada gateway. |
+| Edge Public API | Mantém a criação da venda pendente e da charge; para cartão, a tentativa recebe apenas o token transitório. | Manter o contrato único ao adicionar novos tokenizadores. |
+| Commerce V2 | Para `checkout_mode=transparent`, cria venda pendente sem validar gateway padrão, Cielo, Pagar.me PSP ou onboarding do cartão normal. | Preservar elegibilidade de produto, seller e limite de parcelas em cada novo método. |
+| CT worker | Mercado Pago cria cartão por Orders, consulta o pedido e publica o resultado no envelope existente. | Implementar os adaptadores Pagar.me e Efí sem alterar o envelope ou a correlação. |
+| Resultado CT | Aprovação imediata de cartão confirma charge, venda e entrega no mesmo fluxo idempotente de confirmação. | Cobrir estados pendentes por polling/webhook conforme o provedor. |
+| Dashboard Seller | Mercado Pago configura a Public Key de cartão na edição da integração; o Access Token permanece privado. | Adicionar configurações públicas equivalentes para Pagar.me e Efí. |
 
 ## Provedores
 
 | Provedor | Evidência reutilizável | Fronteira da implementação |
 | --- | --- | --- |
-| Mercado Pago | Worker Pix usa `access_token`. | Cadastro precisa de `public_key`; front usa Mercado Pago.js. Validar Orders, recomendado para integração nova, e o contrato de webhook/status para cartão. |
+| Mercado Pago | Worker Pix usa `access_token`; cartão usa Public Key no front e Orders no worker. | Implementado e validado com aprovação e recusa. Polling continua como reconciliação; webhook de cartão permanece a validar no rollout. |
 | Pagar.me | Worker CT Pix já usa `/orders`; Banking V2 já monta `credit_card` com token, parcelas, endereço e 3DS. | O código do Banking usa credencial e split da Lowify como referência de payload, não como dependência do CT. Cadastro do seller precisa de tokenização pública e credencial de servidor. |
 | Efí | Front atual usa `payment-token-efi`; Banking V2 já cria cartão One Step com `payment_token`. | Credenciais CT atuais são Pix com certificado. Criar perfil de cartão com `payee_code` e validar a habilitação de Cobranças/cartão da conta do seller. |
 | Woovi | CT cria charge Pix com `AppID`. | Não há API de cartão direto no produto integrado. Não incluir. |
@@ -23,10 +23,18 @@
 
 ## Restrições que o plano resolve
 
-1. `charges.sale_id` e `charges.order_id` são únicos. Após uma recusa, recriar a venda ou a charge falha ou duplica o pedido; a nova tentativa deve reutilizar a charge existente.
-2. A `charge` não possui `payment_method`, bandeira ou parcelas. Esses dados precisam ser persistidos somente quando forem úteis para estado e exibição, nunca junto do token.
-3. `metadata_json` segue para Redis em `payment.create`. Token de cartão é transitório: o worker não pode registrá-lo em `charge_attempts`, `charge_status_checks`, auditorias ou logs de erro.
-4. O front atual registra o resultado bruto da tokenização no console. Esse log precisa sair no fluxo de cartão transparente.
+1. `charges.sale_id` e `charges.order_id` permanecem únicos. Após uma recusa, a nova tentativa reutiliza a charge existente e recebe nova chave de idempotência.
+2. `charges.method`, `charge_installments` e `charge_attempts` suportam cartão sem duplicar o modelo de parcelas que também atenderá Pix Automático.
+3. Configuração, habilitação/default e chaves ficam escopadas ao método da integração. `integrations.settings_json` e `integration_keys` permanecem como compatibilidade e origem do backfill Pix.
+4. `metadata_json` segue para Redis em `payment.create`. Token de cartão é transitório: o worker não o registra em `charge_attempts`, `charge_status_checks`, auditorias ou logs de erro. O resultado do gateway passa por sanitização antes de persistir.
+5. O Front Checkout não registra a resposta bruta de tokenização no console. A tela conserva somente token transitório, máscara e identificadores não sensíveis necessários à tentativa.
+
+## Padrões para os próximos adaptadores
+
+1. Separar `card_brand`, usado pela interface, de `payment_method_id`, usado pelo gateway. A primeira adaptação mostrou que ambos podem divergir, como `mastercard` na tela e `master` no Mercado Pago.
+2. Configurações públicas pertencem ao método de pagamento; credenciais privadas pertencem ao método ou são copiadas para ele somente no servidor quando houver reutilização autorizada da integração.
+3. O adaptador retorna estado normalizado, identificador da cobrança e identificador da transação. `GatewayResultQueueProcess` é o único ponto que persiste o resultado e confirma uma venda paga.
+4. Uma recusa deixa a charge apta a nova tentativa com nova chave de idempotência. O token de uma tentativa não pode ser reutilizado nem reaproveitado em persistência.
 
 ## Referências de descoberta
 
