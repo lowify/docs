@@ -27,12 +27,7 @@ Não há migration, alteração de schema, nova variável de ambiente, serviço 
 
 ## Pré-requisitos
 
-1. Confirmar que o clone de produção do `dashboard-seller` não possui alterações locais.
-2. Confirmar acesso de um usuário administrador com a permissão `admin_sellers_edit`.
-3. Confirmar que o Redis usado pelo Dashboard está saudável, pois ele mantém a reserva acumulada do limite diário.
-4. Registrar o commit anterior conhecido e aprovado antes da atualização, para eventual rollback.
-5. Definir e aprovar o valor inicial do limite global diário. O SQL abaixo usa `3000.00` como valor inicial, que corresponde ao fallback do código.
-6. Antes de executar o SQL abaixo, conferir os valores contra `includes/operations/withdrawal_limits.php` do `dashboard-seller`. Se os arrays de limites ou isenções forem alterados, atualizar o SQL antes de executá-lo.
+1. Executar o SQL de configuração inicial abaixo no banco `lowify`, pelo procedimento aprovado.
 
 ## SQL de configuração inicial
 
@@ -81,7 +76,7 @@ WHERE NOT EXISTS (
 
 ## Sequência de deploy
 
-1. Executar o SQL de configuração inicial acima, após aprovar o valor de `withdrawal_daily_limit_default` e conferir os valores individuais com `includes/operations/withdrawal_limits.php`.
+1. Executar o SQL de configuração inicial acima.
 2. Atualizar o `dashboard-seller` para a branch da entrega:
 
    ```bash
