@@ -62,7 +62,8 @@ O Pagar.me foi implementado no mesmo contrato de tentativa, sem reutilizar split
 1. A Public Key fica em `card_credit`; a `secret_key` privada é herdada da integração quando já existe.
 2. O navegador tokeniza o cartão diretamente; PAN e CVV não seguem para Commerce V2.
 3. O worker cria `POST /orders` com `credit_card.card_token`, parcelas, `auth_and_capture` e endereço de cobrança.
-4. O status é consultado em `GET /charges/{id}` pelo polling existente.
+4. Como a API pública não retorna condições de parcelamento por cartão e valor, a integração define máximo de parcelas e valor mínimo por parcela. O checkout filtra as opções e a API repete a validação antes de publicar a tentativa.
+5. O status é consultado em `GET /charges/{id}` pelo polling existente.
 
 O fluxo foi exercitado com mock HTTP isolado: aprovação imediata, recusa imediata e pendência posteriormente aprovada por polling.
 
