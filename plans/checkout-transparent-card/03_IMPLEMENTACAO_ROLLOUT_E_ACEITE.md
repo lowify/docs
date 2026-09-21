@@ -48,12 +48,31 @@ Public Key por método -> Mercado Pago.js tokeniza no navegador
 
 ## Próximos adaptadores
 
-Pagar.me e Efí devem reutilizar o endpoint de tentativa, o envelope de fila, a separação de configuração pública e credenciais privadas, e a confirmação centralizada. Cada adaptador adiciona apenas:
+Os próximos adaptadores devem reutilizar o endpoint de tentativa, o envelope de fila, a separação de configuração pública e credenciais privadas, e a confirmação centralizada. Cada adaptador adiciona apenas:
 
 1. Tokenizador e configuração pública próprios.
 2. Payload de criação e consulta de status do provedor.
 3. Mapeamento entre bandeira apresentada e identificador aceito pelo provedor, quando necessário.
 4. Casos de aprovação, pendência, recusa e reenvio idempotente.
+
+## Marco Pagar.me
+
+O Pagar.me foi implementado no mesmo contrato de tentativa, sem reutilizar split ou qualquer configuração do PSP da Lowify:
+
+1. A Public Key fica em `card_credit`; a `secret_key` privada é herdada da integração quando já existe.
+2. O navegador tokeniza o cartão diretamente; PAN e CVV não seguem para Commerce V2.
+3. O worker cria `POST /orders` com `credit_card.card_token`, parcelas, `auth_and_capture` e endereço de cobrança.
+4. O status é consultado em `GET /charges/{id}` pelo polling existente.
+
+O fluxo foi exercitado com mock HTTP isolado: aprovação imediata, recusa imediata e pendência posteriormente aprovada por polling.
+
+## Marco Efí
+
+1. O método `card_credit` recebe o Identificador de conta da Efí; Client ID, Client Secret e certificado permanecem privados na integração.
+2. O Front Checkout tokeniza no navegador com `payment-token-efi` e envia somente o token transitório à tentativa.
+3. O worker autentica a API Cobranças em `/v1/authorize` e cria a cobrança One Step em `/v1/charge/one-step`.
+4. A cobrança recebe nome, CPF, e-mail e telefone da pessoa pagadora. Endereço não é exigido por esse fluxo.
+5. A aprovação imediata foi confirmada ponta a ponta: charge, venda e entrega passaram para `paid` uma única vez.
 
 ## Rollout e rollback
 

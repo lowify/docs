@@ -15,10 +15,12 @@ O schema de credenciais e a API do Dashboard devem aceitar apenas os campos abai
 | Provedor | Dados do seller necessários |
 | --- | --- |
 | Mercado Pago | `access_token` e `public_key`. |
-| Pagar.me | credencial de servidor e chave/configuração pública de tokenização. |
+| Pagar.me | `secret_key` privada e `public_key` no método `card_credit`. |
 | Efí | perfil habilitado para cartão, `payee_code` e as credenciais exigidas pela API de cartão, validadas separadamente do perfil Pix. |
 
 No Mercado Pago, a integração OAuth já possui `access_token` privado. A configuração de `card_credit` recebe somente a `public_key`; ao habilitar o método, o servidor copia a credencial necessária para a chave cifrada do método. O Dashboard e a disponibilidade pública continuam recebendo apenas a `public_key`.
+
+No Pagar.me, `card_credit` também recebe somente a `public_key`; a `secret_key` já armazenada na integração é copiada para a chave cifrada do método. O token do cartão é criado no navegador e expira no provedor; o Edge encaminha apenas esse token para a tentativa, junto do endereço de cobrança necessário ao pedido.
 
 `GET /checkout/availability` deve continuar selecionando a integração no servidor. Para `card_credit`, ele retorna somente a configuração pública mínima de tokenização da integração selecionada; nunca retorna `access_token`, secret, certificado ou chave privada.
 
