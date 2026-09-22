@@ -22,17 +22,21 @@ Manter como estão: ct-webhook.
 Modo: incremental.
 ```
 
-Os participantes usam a branch declarada. Todo target oficial que não participar nem estiver declarado como “manter como está” usa `main`. Os itens ausentes da VPS e os repositórios não mapeados continuam fora da operação.
+Os participantes usam a branch declarada. Todo target oficial operável que não participar nem estiver declarado como “manter como está” usa `main`. Os itens ausentes da VPS, os repositórios não mapeados e os targets marcados no mapa com `default_action: hold` continuam fora da operação.
 
 ## Regras de execução
 
 1. Antes de alterar qualquer target, verificar somente os targets que receberão comandos: estado Git, branch atual e remoto `origin`.
-2. Um target declarado como “manter como está” não recebe pré-checagem, `fetch`, troca de branch, `pull` nem Docker. Mudanças locais e branch são preservadas e não bloqueiam os demais.
+2. Um target declarado como “manter como está”, ou marcado no mapa com `default_action: hold`, não recebe pré-checagem, `fetch`, troca de branch, `pull` nem Docker. Mudanças locais e branch são preservadas e não bloqueiam os demais.
 3. Para cada target operado, executar `git fetch origin --prune`, validar a branch remota, fazer `git switch <branch>` e `git pull --ff-only origin <branch>`.
 4. No modo **incremental** (padrão), executar `docker compose up --build -d` somente quando a branch ou o commit mudar. Portanto, voltar uma feature para `main` sempre exige rebuild; um target já no commit desejado não exige rebuild.
 5. No modo **completo**, solicitado explicitamente, executar `docker compose up --build -d` para todos os targets operados, mesmo se já estiverem no commit desejado.
 6. Se houver mudanças pendentes em um target que receberia comandos e ele não tiver instrução explícita para ser mantido, parar e pedir orientação. Nunca descartar, fazer stash, limpar ou resetar sem autorização.
 7. Em falha de atualização ou build, parar e informar o componente, a etapa, o resultado e quais componentes já foram processados. Não fazer rollback automático.
+
+## Infraestrutura protegida
+
+Infraestrutura, banco e Redis não devem receber comandos sem solicitação explícita. No mapa atual, `checkout-transparent-infra` protege a infraestrutura, banco e Redis do checkout transparente, e `data_layer` protege o banco e Redis compartilhados. Esses targets ficam em `default_action: hold`.
 
 ## Convivência na VPS compartilhada
 
