@@ -20,7 +20,8 @@ Ficam fora deste update alterações no checkout, no provedor de e-mail e em inf
 | edge-public-api | `edge-public-api` | `feat/checkout-email-direct-access` | `d7d01c0` | Encaminhamento ao Commerce e autorização JWT para gestão do histórico. |
 | front-member-area | `front-member-area` | `feat/checkout-email-direct-access` | `d0d5411` | Emite o evento de acesso após validar o acesso ao produto. |
 | dashboard-seller | `dashboard-seller` | `feat/checkout-email-direct-access` | `2d00b013` | Exibe a etapa Acesso web e seus detalhes. |
-| services-notification | `services-notification` | `feat/checkout-email-direct-access` | `45e994f` | Template e cadastro da correlação `sale_delivery_email_v3`. |
+| services-notification | `services-notification` | `feat/checkout-email-direct-access` | `375ba1f` | Template e cadastro da correlação `sale_delivery_email_v3`. |
+| front-checkout | `front-checkout` | `feat/checkout-email-direct-access` | branch já publicada | Redireciona o comprador pago do PIX/upsell para o acesso direto. |
 
 Todos os demais targets operáveis de `homologation-map.yaml` devem ser sincronizados em `main`. `data_layer` e `checkout-transparent-infra` permanecem como estão, pois o mapa os protege como infraestrutura. Itens ausentes ou não mapeados no mapa não participam da operação.
 
@@ -54,9 +55,14 @@ Todos os demais targets operáveis de `homologation-map.yaml` devem ser sincroni
 
 ### Commerce V2
 
-Aplicar, uma única vez, a migration:
+Aplicar, em ordem e somente as que ainda não constarem no controle de migrations:
 
 ```text
+migrations/20260901100000_create_sale_notification_product_rules.sql
+migrations/20260901150000_add_sale_notification_dispatch_schema.sql
+migrations/20260902100000_add_callback_statuses_to_sales_delivery.sql
+migrations/20260916120000_add_cookie_to_sales_access_sessions.sql
+migrations/20260921120000_add_access_link_sales_delivery_statuses.sql
 migrations/20260922120000_add_content_access_to_sales_delivery.sql
 ```
 
@@ -66,9 +72,12 @@ Validação: confirmar as colunas `product_id`, `access_source`, `access_session
 
 ### Notification
 
-Executar a migration do serviço:
+Executar, em ordem e somente as que ainda não constarem no controle de migrations:
 
 ```text
+migrations/2026_08_28_000056_seed_communication_credit_insufficient_email_template.php
+migrations/2026_09_02_000057_seed_sale_recovery_dispatch_email_template.php
+migrations/2026_09_02_000058_expand_whatsapp_meta_delivery_statuses.php
 migrations/2026_09_22_000053_seed_sale_delivery_email_v3_template.php
 ```
 
@@ -97,9 +106,9 @@ git -C <diretorio> pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C <diretorio> up -d --build
 ```
 
-Ordem: `services-commerce-v2`, `services-notification`, `edge-public-api`, `edge-gateway`, `front-member-area`, `dashboard-seller`.
+Ordem: `services-commerce-v2`, `services-notification`, `edge-public-api`, `edge-gateway`, `front-member-area`, `front-checkout`, `dashboard-seller`.
 
-Usar os diretórios do mapa oficial: `/root/opt/lowify/services/service-commerce-v2`, `/root/opt/lowify/services/services-notifications`, `/root/opt/lowify/edge/edge-public-api`, `/root/opt/lowify/edge/edge-gateway`, `/root/opt/lowify/front/front-member-area` e `/root/opt/lowify/front/dashboard-seller`.
+Usar os diretórios do mapa oficial: `/root/opt/lowify/services/service-commerce-v2`, `/root/opt/lowify/services/services-notifications`, `/root/opt/lowify/edge/edge-public-api`, `/root/opt/lowify/edge/edge-gateway`, `/root/opt/lowify/front/front-member-area`, `/root/opt/lowify/front/front-checkout` e `/root/opt/lowify/front/dashboard-seller`.
 
 3. Em cada target operável não participante, executar os mesmos comandos com `main` no lugar da branch da feature. Não executar comandos nos targets mantidos como estão ou marcados como `hold`.
 
@@ -129,7 +138,7 @@ O roteiro de validação acima é obrigatório antes de alinhar a feature com `m
 
 ## Rollback
 
-1. Reverter os seis componentes para o commit/branch anterior, em ordem inversa: Dashboard, Área de Membros, Gateway, Public API, Notification e Commerce.
+1. Reverter os sete componentes para o commit/branch anterior, em ordem inversa: Dashboard, Checkout, Área de Membros, Gateway, Public API, Notification e Commerce.
 2. A migration do Commerce adiciona colunas e índices; não removê-los durante um rollback operacional. O código anterior ignora os campos novos.
 3. A migration do Notification adiciona uma nova correlação/template; mantê-la, pois e-mails já criados podem referenciá-la.
 4. Não apagar registros `content_access`, links tokenizados, sessões ou e-mails já gerados.
