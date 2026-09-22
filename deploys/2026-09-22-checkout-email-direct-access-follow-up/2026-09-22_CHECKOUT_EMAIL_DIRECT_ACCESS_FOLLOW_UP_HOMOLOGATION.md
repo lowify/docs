@@ -60,55 +60,118 @@ Executar as migrations normalmente, usando a imagem já construída do serviço 
 
 Modo de rebuild: completo. Primeiro concluir o build de todos os containers; somente depois iniciar os containers em conjunto.
 
-1. Na VPS `root@217.216.87.77`, executar a pré-checagem em todos os targets operáveis antes de qualquer atualização:
+1. Antes de qualquer alteração, fazer a pré-checagem em cada target operável: `git status --porcelain=v1`, `git branch --show-current` e `git remote get-url origin`. Se qualquer target que será alterado tiver mudança local, parar toda a operação. Targets não participantes usam `main`; targets `hold` não recebem comando.
+
+2. Atualizar e construir o Commerce:
 
 ```bash
-git -C <diretorio> status --porcelain=v1
-git -C <diretorio> branch --show-current
-git -C <diretorio> remote get-url origin
+git -C /root/opt/lowify/services/service-commerce-v2 fetch origin --prune
+git -C /root/opt/lowify/services/service-commerce-v2 switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/services/service-commerce-v2 pull --ff-only origin feat/checkout-email-direct-access
+docker compose -C /root/opt/lowify/services/service-commerce-v2 build
 ```
 
-Se houver mudança local em qualquer target que será alterado, parar toda a operação e preservar o estado.
-
-2. Atualizar os participantes, em ordem de dependência, com `git fetch origin --prune`, `git switch feat/checkout-email-direct-access` e `git pull --ff-only origin feat/checkout-email-direct-access`. Atualizar cada target não participante para `main` com os mesmos comandos, substituindo a branch. Não executar comandos nos targets mantidos como estão ou marcados como `hold`.
-
-3. Com todos os repositórios já atualizados, executar primeiro o build de todos os participantes:
+3. Atualizar e construir o Notification:
 
 ```bash
-docker compose -C /root/opt/lowify/services/service-commerce-v2 build
+git -C /root/opt/lowify/services/services-notifications fetch origin --prune
+git -C /root/opt/lowify/services/services-notifications switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/services/services-notifications pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/services/services-notifications build
+```
+
+4. Atualizar e construir o Public API:
+
+```bash
+git -C /root/opt/lowify/edge/edge-public-api fetch origin --prune
+git -C /root/opt/lowify/edge/edge-public-api switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/edge/edge-public-api pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/edge/edge-public-api build
+```
+
+5. Atualizar e construir o Gateway:
+
+```bash
+git -C /root/opt/lowify/edge/edge-gateway fetch origin --prune
+git -C /root/opt/lowify/edge/edge-gateway switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/edge/edge-gateway pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/edge/edge-gateway build
+```
+
+6. Atualizar e construir a Área de Membros:
+
+```bash
+git -C /root/opt/lowify/front/front-member-area fetch origin --prune
+git -C /root/opt/lowify/front/front-member-area switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/front/front-member-area pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/front/front-member-area build
+```
+
+7. Atualizar e construir o Checkout:
+
+```bash
+git -C /root/opt/lowify/front/front-checkout fetch origin --prune
+git -C /root/opt/lowify/front/front-checkout switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/front/front-checkout pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/front/front-checkout build
+```
+
+8. Atualizar e construir o Dashboard:
+
+```bash
+git -C /root/opt/lowify/front/dashboard-seller fetch origin --prune
+git -C /root/opt/lowify/front/dashboard-seller switch feat/checkout-email-direct-access
+git -C /root/opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-email-direct-access
 docker compose -C /root/opt/lowify/front/dashboard-seller build
 ```
 
-Ordem: `services-commerce-v2`, `services-notification`, `edge-public-api`, `edge-gateway`, `front-member-area`, `front-checkout`, `dashboard-seller`.
-
-Usar os diretórios do mapa oficial: `/root/opt/lowify/services/service-commerce-v2`, `/root/opt/lowify/services/services-notifications`, `/root/opt/lowify/edge/edge-public-api`, `/root/opt/lowify/edge/edge-gateway`, `/root/opt/lowify/front/front-member-area`, `/root/opt/lowify/front/front-checkout` e `/root/opt/lowify/front/dashboard-seller`.
-
-Aplicar também o build aos targets não participantes que tiveram branch ou commit alterado para `main`.
-
-4. Antes do `up`, executar o SQL manual do Commerce e rodar as migrations do Notification com a imagem já construída:
+9. Só depois que todos os builds terminarem, executar manualmente [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) no banco Commerce. Em seguida rodar a migration do Notification com sua imagem já construída:
 
 ```bash
 docker compose -C /root/opt/lowify/services/services-notifications run --rm services-notifications php bin/hyperf.php migrate
 ```
 
-5. Somente após todos os builds e os ajustes de banco concluírem sem erro, iniciar os containers:
+10. Depois dos ajustes de banco concluírem sem erro, iniciar o Commerce:
 
 ```bash
 docker compose -C /root/opt/lowify/services/service-commerce-v2 up -d
-docker compose -C /root/opt/lowify/services/services-notifications up -d
-docker compose -C /root/opt/lowify/edge/edge-public-api up -d
-docker compose -C /root/opt/lowify/edge/edge-gateway up -d
-docker compose -C /root/opt/lowify/front/front-member-area up -d
-docker compose -C /root/opt/lowify/front/front-checkout up -d
-docker compose -C /root/opt/lowify/front/dashboard-seller up -d
 ```
 
-Iniciar também os targets não participantes que foram construídos para voltar a `main`.
+11. Iniciar o Notification:
+
+```bash
+docker compose -C /root/opt/lowify/services/services-notifications up -d
+```
+
+12. Iniciar o Public API:
+
+```bash
+docker compose -C /root/opt/lowify/edge/edge-public-api up -d
+```
+
+13. Iniciar o Gateway:
+
+```bash
+docker compose -C /root/opt/lowify/edge/edge-gateway up -d
+```
+
+14. Iniciar a Área de Membros:
+
+```bash
+docker compose -C /root/opt/lowify/front/front-member-area up -d
+```
+
+15. Iniciar o Checkout:
+
+```bash
+docker compose -C /root/opt/lowify/front/front-checkout up -d
+```
+
+16. Iniciar o Dashboard:
+
+```bash
+docker compose -C /root/opt/lowify/front/dashboard-seller up -d
+```
 
 ## Validação pós-deploy
 
