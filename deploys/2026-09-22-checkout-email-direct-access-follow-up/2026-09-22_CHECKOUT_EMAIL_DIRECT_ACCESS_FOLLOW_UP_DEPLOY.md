@@ -155,23 +155,7 @@ docker compose -C /opt/lowify/edge/edge-public-api up -d
 docker compose -C /opt/lowify/edge/edge-gateway up -d
 ```
 
-14. Iniciar a Área de Membros:
-
-```bash
-docker compose -C /opt/lowify/front/front-member-area up -d
-```
-
-15. Iniciar o Checkout:
-
-```bash
-docker compose -C /opt/lowify/front/front-checkout up -d
-```
-
-16. Iniciar o Dashboard:
-
-```bash
-docker compose -C /opt/lowify/front/dashboard-seller up -d
-```
+14. Não executar `up` para Área de Membros, Checkout ou Dashboard. Os três Composes montam o diretório do repositório em `/var/www/html`; depois do `git pull`, o código PHP/JS atualizado já é servido pelos containers em execução. Os builds desses componentes permanecem preparados, mas não precisam ser ativados neste deploy.
 
 ## Validação pós-deploy
 
