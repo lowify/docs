@@ -43,49 +43,22 @@ Todos os demais targets operáveis de `homologation-map.yaml` devem ser sincroni
 4. Para novo acesso, informa a senha temporária; para conta existente, orienta a usar o e-mail que recebeu a mensagem e a senha já cadastrada.
 5. A senha temporária é persistida com hash antes de ser enviada ao comprador.
 
-## Pré-requisitos
-
-1. Publicar as seis branches listadas na tabela para `origin` antes de operar a VPS. Esta documentação não autoriza push.
-2. Confirmar que os commits de referência, ou commits descendentes deles, estão nas branches remotas.
-3. Manter configurados os valores existentes de `APP_URL_MEMBERS`, `GATEWAY_SIGNATURE_SECRET` e as credenciais atuais de banco/Redis. Não registrar valores no documento nem alterá-los para este deploy.
-4. Para ativar a v3, manter `SALE_DELIVERY_EMAIL_CORRELATION_TYPE` vazio ou configurá-lo como `sale_delivery_email_v3`. Para o assunto padrão, manter `SALE_DELIVERY_EMAIL_TITLE` vazio ou usar `Acesso ao seu conteúdo`.
-5. Garantir uma venda de homologação paga, com e-mail controlado, para testar entrega por conteúdo e outra para Área de Membros. Não usar dados de compradores reais.
-
 ## Banco de dados
 
 ### Commerce V2
 
-Aplicar, em ordem e somente as que ainda não constarem no controle de migrations:
+O operador executa manualmente o SQL do Commerce; não executar migrations automáticas nesse serviço.
 
-```text
-migrations/20260901100000_create_sale_notification_product_rules.sql
-migrations/20260901150000_add_sale_notification_dispatch_schema.sql
-migrations/20260902100000_add_callback_statuses_to_sales_delivery.sql
-migrations/20260916120000_add_cookie_to_sales_access_sessions.sql
-migrations/20260921120000_add_access_link_sales_delivery_statuses.sql
-migrations/20260922120000_add_content_access_to_sales_delivery.sql
-```
-
-Precheck: confirmar que `sales_delivery` existe e que ainda não possui a coluna `access_session_hash`.
-
-Validação: confirmar as colunas `product_id`, `access_source`, `access_session_hash`, `accessed_at`, o tipo `content_access` e a chave única `uk_sales_delivery_content_access_session`.
+1. Rodar [DEPLOY.sql](sql/lowify/DEPLOY.sql) uma única vez, integralmente e em janela controlada.
+2. Rodar [VALIDATE.sql](sql/lowify/VALIDATE.sql) e confirmar colunas e índices antes de subir os containers.
 
 ### Notification
 
-Executar, em ordem e somente as que ainda não constarem no controle de migrations:
-
-```text
-migrations/2026_08_28_000056_seed_communication_credit_insufficient_email_template.php
-migrations/2026_09_02_000057_seed_sale_recovery_dispatch_email_template.php
-migrations/2026_09_02_000058_expand_whatsapp_meta_delivery_statuses.php
-migrations/2026_09_22_000053_seed_sale_delivery_email_v3_template.php
-```
-
-Ela cria/atualiza a correlação `sale_delivery_email_v3` e seu template ativo, sem desativar a v2.
+Executar as migrations normalmente, usando a imagem já construída do serviço Notification, antes do `up` coletivo. A migration da v3 cria/atualiza a correlação `sale_delivery_email_v3` e seu template ativo, sem desativar a v2.
 
 ## Sequência de deploy
 
-Modo de rebuild: incremental. Reconstruir apenas um target cujo branch ou commit tenha mudado. O Dashboard também deve ser reconstruído se tiver mudado.
+Modo de rebuild: completo. Primeiro concluir o build de todos os containers; somente depois iniciar os containers em conjunto.
 
 1. Na VPS `root@217.216.87.77`, executar a pré-checagem em todos os targets operáveis antes de qualquer atualização:
 
@@ -97,22 +70,45 @@ git -C <diretorio> remote get-url origin
 
 Se houver mudança local em qualquer target que será alterado, parar toda a operação e preservar o estado.
 
-2. Para cada participante da tabela, em ordem de dependência, executar:
+2. Atualizar os participantes, em ordem de dependência, com `git fetch origin --prune`, `git switch feat/checkout-email-direct-access` e `git pull --ff-only origin feat/checkout-email-direct-access`. Atualizar cada target não participante para `main` com os mesmos comandos, substituindo a branch. Não executar comandos nos targets mantidos como estão ou marcados como `hold`.
+
+3. Com todos os repositórios já atualizados, executar primeiro o build de todos os participantes:
 
 ```bash
-git -C <diretorio> fetch origin --prune
-git -C <diretorio> switch feat/checkout-email-direct-access
-git -C <diretorio> pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C <diretorio> up -d --build
+docker compose -C /root/opt/lowify/services/service-commerce-v2 build
+docker compose -C /root/opt/lowify/services/services-notifications build
+docker compose -C /root/opt/lowify/edge/edge-public-api build
+docker compose -C /root/opt/lowify/edge/edge-gateway build
+docker compose -C /root/opt/lowify/front/front-member-area build
+docker compose -C /root/opt/lowify/front/front-checkout build
+docker compose -C /root/opt/lowify/front/dashboard-seller build
 ```
 
 Ordem: `services-commerce-v2`, `services-notification`, `edge-public-api`, `edge-gateway`, `front-member-area`, `front-checkout`, `dashboard-seller`.
 
 Usar os diretórios do mapa oficial: `/root/opt/lowify/services/service-commerce-v2`, `/root/opt/lowify/services/services-notifications`, `/root/opt/lowify/edge/edge-public-api`, `/root/opt/lowify/edge/edge-gateway`, `/root/opt/lowify/front/front-member-area`, `/root/opt/lowify/front/front-checkout` e `/root/opt/lowify/front/dashboard-seller`.
 
-3. Em cada target operável não participante, executar os mesmos comandos com `main` no lugar da branch da feature. Não executar comandos nos targets mantidos como estão ou marcados como `hold`.
+Aplicar também o build aos targets não participantes que tiveram branch ou commit alterado para `main`.
 
-4. Após o Commerce e Notification estarem saudáveis, aplicar as migrations descritas na seção Banco de dados pelo procedimento já adotado no ambiente. Não executar DDL manual alternativo.
+4. Antes do `up`, executar o SQL manual do Commerce e rodar as migrations do Notification com a imagem já construída:
+
+```bash
+docker compose -C /root/opt/lowify/services/services-notifications run --rm services-notifications php bin/hyperf.php migrate
+```
+
+5. Somente após todos os builds e os ajustes de banco concluírem sem erro, iniciar os containers:
+
+```bash
+docker compose -C /root/opt/lowify/services/service-commerce-v2 up -d
+docker compose -C /root/opt/lowify/services/services-notifications up -d
+docker compose -C /root/opt/lowify/edge/edge-public-api up -d
+docker compose -C /root/opt/lowify/edge/edge-gateway up -d
+docker compose -C /root/opt/lowify/front/front-member-area up -d
+docker compose -C /root/opt/lowify/front/front-checkout up -d
+docker compose -C /root/opt/lowify/front/dashboard-seller up -d
+```
+
+Iniciar também os targets não participantes que foram construídos para voltar a `main`.
 
 ## Validação pós-deploy
 
