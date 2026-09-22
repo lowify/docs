@@ -18,6 +18,12 @@ Publicar a feature `feat/checkout-email-direct-access` em homologação para val
 
 Todos os demais targets operáveis do `homologation-map.yaml` devem ser sincronizados em `main`. `data_layer` e `checkout-transparent-infra` permanecem como estão; itens ausentes ou não mapeados não participam.
 
+## Targets mantidos como estão
+
+| Chave | Motivo |
+| --- | --- |
+| ct-webhook | Alteração local de outra frente de trabalho; não receberá pré-checagem adicional, Git ou Docker nesta homologação. |
+
 ## Banco de dados
 
 O operador executa manualmente, no banco Commerce de homologação, os arquivos [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) deste diretório. Não executar migrations automáticas no Commerce.
