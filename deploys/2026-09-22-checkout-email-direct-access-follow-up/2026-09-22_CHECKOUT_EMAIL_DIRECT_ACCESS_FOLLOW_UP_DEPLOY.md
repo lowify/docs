@@ -155,7 +155,7 @@ docker compose -C /opt/lowify/edge/edge-public-api up -d
 docker compose -C /opt/lowify/edge/edge-gateway up -d
 ```
 
-14. Não executar `up` para Área de Membros, Checkout ou Dashboard. Os três Composes montam o diretório do repositório em `/var/www/html`; depois do `git pull`, o código PHP/JS atualizado já é servido pelos containers em execução. Os builds desses componentes permanecem preparados, mas não precisam ser ativados neste deploy.
+14. Antes de pular o `up` de Área de Membros, Checkout e Dashboard em produção, confirmar que cada container possui bind mount do repositório em `/var/www/html` e que `opcache.validate_timestamps` está ativo. Essa condição foi confirmada em homologação, onde o código PHP/JS atualizado passa a ser servido após o `git pull` (OPcache com revalidação de até 2 segundos), sem `up`. Se a inspeção de produção tiver o mesmo resultado, não executar `up` nesses três fronts; caso contrário, executar o `up -d` individual do componente afetado.
 
 ## Validação pós-deploy
 
