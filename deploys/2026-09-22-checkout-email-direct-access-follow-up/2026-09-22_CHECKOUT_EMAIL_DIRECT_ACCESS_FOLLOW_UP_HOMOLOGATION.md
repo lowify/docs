@@ -31,7 +31,7 @@ O operador executa manualmente, no banco Commerce de homologação, os arquivos 
 Após o build do Notification e antes do `up`, executar sua migration normalmente:
 
 ```bash
-docker compose -C /root/opt/lowify/services/services-notifications run --rm services-notifications php bin/hyperf.php migrate
+(cd /root/opt/lowify/services/services-notifications && docker compose run --rm services-notifications php bin/hyperf.php migrate --force)
 ```
 
 ## Sequência
@@ -41,6 +41,13 @@ docker compose -C /root/opt/lowify/services/services-notifications run --rm serv
 3. Reconstruir, se o commit tiver mudado: Commerce, Notification, Public API e Gateway. Os três fronts possuem bind mount de código e OPcache com validação de timestamps; após o Git, não precisam de build ou `up`.
 4. Executar o SQL manual do Commerce, validar o resultado e rodar a migration do Notification.
 5. Executar `docker compose up -d` apenas para os serviços reconstruídos, em ordem: Commerce, Notification, Public API e Gateway.
+
+Nesta VPS, use o diretório do serviço antes do `docker compose`; a opção `-C` não é suportada pela versão instalada. Exemplos:
+
+```bash
+(cd /root/opt/lowify/services/service-commerce-v2 && docker compose build)
+(cd /root/opt/lowify/services/service-commerce-v2 && docker compose up -d)
+```
 
 ## Validação
 
