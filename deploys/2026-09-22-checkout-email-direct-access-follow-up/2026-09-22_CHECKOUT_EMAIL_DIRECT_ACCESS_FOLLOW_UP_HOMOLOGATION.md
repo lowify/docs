@@ -13,15 +13,15 @@ Ficam fora deste update alterações no checkout, no provedor de e-mail e em inf
 
 ## Componentes e referências
 
-| Chave no mapa de homologação | Repositório | Branch | Commit local de referência | Papel |
-| --- | --- | --- | --- | --- |
-| services-commerce-v2 | `services-commerce-v2` | `feat/checkout-email-direct-access` | `eade67d` | Dados de acesso, API de registro, URL tokenizada no e-mail e seleção da v3. |
-| edge-gateway | `edge-gateway` | `feat/checkout-email-direct-access` | `1681224` | Roteamento assinado da Área de Membros e encaminhamento das rotas de acesso. |
-| edge-public-api | `edge-public-api` | `feat/checkout-email-direct-access` | `d7d01c0` | Encaminhamento ao Commerce e autorização JWT para gestão do histórico. |
-| front-member-area | `front-member-area` | `feat/checkout-email-direct-access` | `d0d5411` | Emite o evento de acesso após validar o acesso ao produto. |
-| dashboard-seller | `dashboard-seller` | `feat/checkout-email-direct-access` | `2d00b013` | Exibe a etapa Acesso web e seus detalhes. |
-| services-notification | `services-notification` | `feat/checkout-email-direct-access` | `375ba1f` | Template e cadastro da correlação `sale_delivery_email_v3`. |
-| front-checkout | `front-checkout` | `feat/checkout-email-direct-access` | branch já publicada | Redireciona o comprador pago do PIX/upsell para o acesso direto. |
+| Chave no mapa de homologação | Repositório | Branch | Papel |
+| --- | --- | --- | --- |
+| services-commerce-v2 | `services-commerce-v2` | `feat/checkout-email-direct-access` | Dados de acesso, API de registro, URL tokenizada no e-mail e seleção da v3. |
+| edge-gateway | `edge-gateway` | `feat/checkout-email-direct-access` | Roteamento assinado da Área de Membros e encaminhamento das rotas de acesso. |
+| edge-public-api | `edge-public-api` | `feat/checkout-email-direct-access` | Encaminhamento ao Commerce e autorização JWT para gestão do histórico. |
+| front-member-area | `front-member-area` | `feat/checkout-email-direct-access` | Emite o evento de acesso após validar o acesso ao produto. |
+| dashboard-seller | `dashboard-seller` | `feat/checkout-email-direct-access` | Exibe a etapa Acesso web e seus detalhes. |
+| services-notification | `services-notification` | `feat/checkout-email-direct-access` | Template e cadastro da correlação `sale_delivery_email_v3`. |
+| front-checkout | `front-checkout` | `feat/checkout-email-direct-access` | Redireciona o comprador pago do PIX/upsell para o acesso direto. |
 
 Todos os demais targets operáveis de `homologation-map.yaml` devem ser sincronizados em `main`. `data_layer` e `checkout-transparent-infra` permanecem como estão, pois o mapa os protege como infraestrutura. Itens ausentes ou não mapeados no mapa não participam da operação.
 
