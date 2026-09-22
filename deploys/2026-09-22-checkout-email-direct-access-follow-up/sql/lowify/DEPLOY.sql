@@ -1,7 +1,5 @@
--- Deploy: acesso web por link e Área de Membros
+-- Deploy: acesso web por link e Área de Membros (homologação)
 -- Banco: lowify
--- Execução manual, uma única vez, pelo operador.
--- DDL MySQL possui commit implícito. Antes de executar, rode VALIDATE.sql.
 
 ALTER TABLE `sales_access_sessions`
     ADD COLUMN `session_token_hash` BINARY(32) NULL AFTER `ip`,
