@@ -170,12 +170,6 @@ git -C /opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-em
    - Resultado esperado: o administrador ainda pode encontrá-lo/gerenciá-lo; o vendedor não o vê.
 7. Se algum resultado não ocorrer, parar a aprovação e registrar venda de teste, horário e tela observada. Não apagar registros, sessões, filas ou dados para forçar o resultado.
 
-## Testes de compatibilidade antes da produção
-
-Ainda não há uma suíte automatizada para esse fluxo entre Área de Membros, Gateway, Public API, Commerce e Notification.
-
-O roteiro de validação acima deve ser executado em homologação antes da publicação em produção. Uma suíte focada deve ser criada posteriormente com dados de teste reversíveis, cobrindo a rota assinada, autorização de ocultação e a deduplicação de sessão.
-
 ## Rollback
 
 1. Reverter os sete componentes para o commit/branch anterior, em ordem inversa: Dashboard, Checkout, Área de Membros, Gateway, Public API, Notification e Commerce.
