@@ -1,4 +1,4 @@
--- Deploy: acesso web por link e Área de Membros (homologação)
+-- Deploy: acesso web por link e Área de Membros
 -- Banco: lowify
 
 ALTER TABLE `sales_access_sessions`
@@ -9,11 +9,8 @@ ALTER TABLE `sales_access_sessions`
     ADD KEY `idx_sales_access_sessions_token_expiry` (`session_token_hash`, `expires_at`);
 
 ALTER TABLE `sales_delivery`
-    MODIFY COLUMN `type` ENUM('whatsapp', 'email', 'evolution', 'access_link') NOT NULL,
-    MODIFY COLUMN `status` ENUM('pending', 'sent_to_provider', 'sent_pending', 'timed_out', 'fail', 'success', 'delivered', 'read', 'skipped', 'canceled', 'opened', 'hidden') NULL DEFAULT NULL;
-
-ALTER TABLE `sales_delivery`
     MODIFY COLUMN `type` ENUM('whatsapp', 'email', 'evolution', 'access_link', 'content_access') NOT NULL,
+    MODIFY COLUMN `status` ENUM('pending', 'sent_to_provider', 'sent_pending', 'timed_out', 'fail', 'success', 'delivered', 'read', 'skipped', 'canceled', 'opened', 'hidden') NULL DEFAULT NULL,
     ADD COLUMN `product_id` BIGINT UNSIGNED NULL AFTER `sale_id`,
     ADD COLUMN `access_source` ENUM('link_access', 'members_area') NULL AFTER `type`,
     ADD COLUMN `access_session_hash` BINARY(32) NULL AFTER `access_source`,
