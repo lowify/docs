@@ -68,7 +68,7 @@ Modo de rebuild: construir Commerce, Notification, Public API e Gateway; somente
 git -C /opt/lowify/services/service-commerce-v2 fetch origin --prune
 git -C /opt/lowify/services/service-commerce-v2 switch feat/checkout-email-direct-access
 git -C /opt/lowify/services/service-commerce-v2 pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/services/service-commerce-v2 build
+(cd /opt/lowify/services/service-commerce-v2 && docker compose build)
 ```
 
 3. Atualizar e construir o Notification:
@@ -77,7 +77,7 @@ docker compose -C /opt/lowify/services/service-commerce-v2 build
 git -C /opt/lowify/services/services-notifications fetch origin --prune
 git -C /opt/lowify/services/services-notifications switch feat/checkout-email-direct-access
 git -C /opt/lowify/services/services-notifications pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/services/services-notifications build
+(cd /opt/lowify/services/services-notifications && docker compose build)
 ```
 
 4. Atualizar e construir o Public API:
@@ -86,7 +86,7 @@ docker compose -C /opt/lowify/services/services-notifications build
 git -C /opt/lowify/edge/edge-public-api fetch origin --prune
 git -C /opt/lowify/edge/edge-public-api switch feat/checkout-email-direct-access
 git -C /opt/lowify/edge/edge-public-api pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/edge/edge-public-api build
+(cd /opt/lowify/edge/edge-public-api && docker compose build)
 ```
 
 5. Atualizar e construir o Gateway:
@@ -95,10 +95,40 @@ docker compose -C /opt/lowify/edge/edge-public-api build
 git -C /opt/lowify/edge/edge-gateway fetch origin --prune
 git -C /opt/lowify/edge/edge-gateway switch feat/checkout-email-direct-access
 git -C /opt/lowify/edge/edge-gateway pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/edge/edge-gateway build
+(cd /opt/lowify/edge/edge-gateway && docker compose build)
 ```
 
-6. Atualizar a Área de Membros:
+6. Só depois que todos os builds terminarem, executar manualmente [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) no banco Commerce. Em seguida rodar a migration do Notification com sua imagem já construída:
+
+```bash
+(cd /opt/lowify/services/services-notifications && docker compose run --rm services-notifications php bin/hyperf.php migrate --force)
+```
+
+7. Depois dos ajustes de banco concluírem sem erro, iniciar o Commerce:
+
+```bash
+(cd /opt/lowify/services/service-commerce-v2 && docker compose up -d)
+```
+
+8. Iniciar o Public API:
+
+```bash
+(cd /opt/lowify/edge/edge-public-api && docker compose up -d)
+```
+
+9. Iniciar o Gateway:
+
+```bash
+(cd /opt/lowify/edge/edge-gateway && docker compose up -d)
+```
+
+10. Iniciar o Notification:
+
+```bash
+(cd /opt/lowify/services/services-notifications && docker compose up -d)
+```
+
+11. Atualizar a Área de Membros. O `git pull` coloca o código em produção; não executar build ou up:
 
 ```bash
 git -C /opt/lowify/front/front-member-area fetch origin --prune
@@ -106,7 +136,7 @@ git -C /opt/lowify/front/front-member-area switch feat/checkout-email-direct-acc
 git -C /opt/lowify/front/front-member-area pull --ff-only origin feat/checkout-email-direct-access
 ```
 
-7. Atualizar o Checkout:
+12. Atualizar o Checkout. O `git pull` coloca o código em produção; não executar build ou up:
 
 ```bash
 git -C /opt/lowify/front/front-checkout fetch origin --prune
@@ -114,42 +144,12 @@ git -C /opt/lowify/front/front-checkout switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/front-checkout pull --ff-only origin feat/checkout-email-direct-access
 ```
 
-8. Atualizar o Dashboard:
+13. Atualizar o Dashboard. O `git pull` coloca o código em produção; não executar build ou up:
 
 ```bash
 git -C /opt/lowify/front/dashboard-seller fetch origin --prune
 git -C /opt/lowify/front/dashboard-seller switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-email-direct-access
-```
-
-9. Só depois que todos os builds terminarem, executar manualmente [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) no banco Commerce. Em seguida rodar a migration do Notification com sua imagem já construída:
-
-```bash
-docker compose -C /opt/lowify/services/services-notifications run --rm services-notifications php bin/hyperf.php migrate
-```
-
-10. Depois dos ajustes de banco concluírem sem erro, iniciar o Commerce:
-
-```bash
-docker compose -C /opt/lowify/services/service-commerce-v2 up -d
-```
-
-11. Iniciar o Notification:
-
-```bash
-docker compose -C /opt/lowify/services/services-notifications up -d
-```
-
-12. Iniciar o Public API:
-
-```bash
-docker compose -C /opt/lowify/edge/edge-public-api up -d
-```
-
-13. Iniciar o Gateway:
-
-```bash
-docker compose -C /opt/lowify/edge/edge-gateway up -d
 ```
 
 14. Não executar `up` para Área de Membros, Checkout ou Dashboard. Produção espelha a composição confirmada em homologação: os três containers montam o repositório em `/var/www/html` e validam timestamps do OPcache. Depois do `git pull`, o código PHP/JS atualizado passa a ser servido sem reinício.
