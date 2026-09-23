@@ -58,7 +58,7 @@ Executar as migrations normalmente, usando a imagem já construída do serviço 
 
 ## Sequência de deploy
 
-Modo de rebuild: completo. Primeiro concluir o build de todos os containers; somente depois iniciar os containers em conjunto.
+Modo de rebuild: construir Commerce, Notification, Public API e Gateway; somente depois iniciar esses serviços. Área de Membros, Checkout e Dashboard usam bind mount de código e recebem apenas o `git pull`.
 
 1. Antes de qualquer alteração, fazer a pré-checagem em cada target operável: `git status --porcelain=v1`, `git branch --show-current` e `git remote get-url origin`. Se qualquer target que será alterado tiver mudança local, parar toda a operação. Targets não participantes usam `main`; targets `hold` não recebem comando.
 
@@ -98,31 +98,28 @@ git -C /opt/lowify/edge/edge-gateway pull --ff-only origin feat/checkout-email-d
 docker compose -C /opt/lowify/edge/edge-gateway build
 ```
 
-6. Atualizar e construir a Área de Membros:
+6. Atualizar a Área de Membros:
 
 ```bash
 git -C /opt/lowify/front/front-member-area fetch origin --prune
 git -C /opt/lowify/front/front-member-area switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/front-member-area pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/front/front-member-area build
 ```
 
-7. Atualizar e construir o Checkout:
+7. Atualizar o Checkout:
 
 ```bash
 git -C /opt/lowify/front/front-checkout fetch origin --prune
 git -C /opt/lowify/front/front-checkout switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/front-checkout pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/front/front-checkout build
 ```
 
-8. Atualizar e construir o Dashboard:
+8. Atualizar o Dashboard:
 
 ```bash
 git -C /opt/lowify/front/dashboard-seller fetch origin --prune
 git -C /opt/lowify/front/dashboard-seller switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-email-direct-access
-docker compose -C /opt/lowify/front/dashboard-seller build
 ```
 
 9. Só depois que todos os builds terminarem, executar manualmente [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) no banco Commerce. Em seguida rodar a migration do Notification com sua imagem já construída:
