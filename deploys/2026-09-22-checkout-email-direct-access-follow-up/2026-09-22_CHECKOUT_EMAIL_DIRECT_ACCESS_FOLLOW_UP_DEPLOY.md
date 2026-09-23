@@ -182,9 +182,3 @@ O roteiro de validação acima deve ser executado em homologação antes da publ
 2. A migration do Commerce adiciona colunas e índices; não removê-los durante um rollback operacional. O código anterior ignora os campos novos.
 3. A migration do Notification adiciona uma nova correlação/template; mantê-la, pois e-mails já criados podem referenciá-la.
 4. Não apagar registros `content_access`, links tokenizados, sessões ou e-mails já gerados.
-
-## Pendências antes da aprovação
-
-- Publicar as branches remotas e alinhar cada uma com a `main` atual conforme o fluxo de deploy.
-- Executar a homologação e os cenários de validação descritos neste documento antes da publicação em produção.
-- Confirmar o endereço de suporte exibido no rodapé padrão, se aplicável ao provedor de e-mail; a v3 não inclui bloco de suporte genérico.
