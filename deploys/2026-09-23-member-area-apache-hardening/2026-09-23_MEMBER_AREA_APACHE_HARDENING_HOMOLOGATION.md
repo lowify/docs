@@ -10,7 +10,7 @@ Validar em homologação a redução de informações expostas pelo Apache na Á
 | --- | --- |
 | front-member-area | `hotfix/member-area-apache-hardening` |
 
-Todos os demais targets operáveis de `homologation-map.yaml` devem permanecer ou ser sincronizados em `main`. `data_layer` e `checkout-transparent-infra` permanecem sem comandos por serem targets `hold`; itens ausentes e não mapeados também ficam fora da operação.
+Todos os demais targets operáveis de `homologation-map.yaml` devem ser mantidos como estão e não receberão pré-checagem, Git ou Docker. `data_layer` e `checkout-transparent-infra` permanecem sem comandos por serem targets `hold`; itens ausentes e não mapeados também ficam fora da operação.
 
 Modo de rebuild: incremental.
 
@@ -31,8 +31,8 @@ Nenhuma alteração de banco de dados.
 
 ## Sequência de homologação
 
-1. Na VPS `root@217.216.87.77`, pré-checar todos os targets operáveis do mapa com `git status --porcelain=v1`, `git branch --show-current` e `git remote get-url origin`; interromper integralmente se houver mudança local, origem incorreta ou repositório inválido.
-2. Executar `git fetch origin --prune` em todos os targets operáveis; confirmar `origin/main` e `origin/hotfix/member-area-apache-hardening` para o participante.
+1. Na VPS `root@217.216.87.77`, pré-checar somente `/root/opt/lowify/front/front-member-area` com `git status --porcelain=v1`, `git branch --show-current` e `git remote get-url origin`; interromper se houver mudança local, origem incorreta ou repositório inválido.
+2. Executar `git fetch origin --prune` somente nesse repositório e confirmar `origin/hotfix/member-area-apache-hardening`.
 3. Sincronizar o participante:
 
    ```bash
@@ -42,7 +42,7 @@ Nenhuma alteração de banco de dados.
    docker compose up -d --build
    ```
 
-4. Para cada alvo operável não participante, sincronizar `main` com `git switch main` e `git pull --ff-only origin main`. Reconstruir somente se a branch ou o commit mudar. Não executar comandos nos targets `hold`.
+4. Não executar qualquer comando nos demais targets, que foram explicitamente declarados como mantidos como estão.
 
 ## Validação pós-deploy
 
