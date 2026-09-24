@@ -6,7 +6,7 @@ Adicionar `card` ao Checkout Transparente para vendas `ONE_TIME`, cobrando diret
 
 ## Estado
 
-Base comum pronta e Mercado Pago implementado para cartão: configuração pública por método, tokenização no Front Checkout, tentativa idempotente, criação via Orders e confirmação pelo worker. A validação ponta a ponta cobriu recusa e aprovação. Pagar.me e Efí permanecem como os próximos adaptadores de cartão.
+Base comum pronta, com Mercado Pago, Pagar.me e Efí implementados para cartão. O fluxo usa configuração por método, tokenização no Front Checkout, tentativa idempotente e confirmação pelo worker. Pagar.me exige endereço de cobrança; Efí usa cobrança One Step, credenciais da API Cobranças e telefone da pessoa pagadora.
 
 ## Documentos
 

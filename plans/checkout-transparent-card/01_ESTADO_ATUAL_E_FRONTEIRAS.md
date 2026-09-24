@@ -4,20 +4,20 @@
 
 | Componente | Comportamento atual | Mudança necessária |
 | --- | --- | --- |
-| CT API | Seleciona integração por método habilitado/default e aceita `card_credit` com tentativa idempotente. | Reutilizar o contrato para Pagar.me e Efí, adicionando somente os campos específicos de cada gateway. |
+| CT API | Seleciona integração por método habilitado/default e aceita `card_credit` com tentativa idempotente. | Reutilizar o contrato para novos gateways, adicionando somente os campos específicos de cada provedor. |
 | Edge Public API | Mantém a criação da venda pendente e da charge; para cartão, a tentativa recebe apenas o token transitório. | Manter o contrato único ao adicionar novos tokenizadores. |
 | Commerce V2 | Para `checkout_mode=transparent`, cria venda pendente sem validar gateway padrão, Cielo, Pagar.me PSP ou onboarding do cartão normal. | Preservar elegibilidade de produto, seller e limite de parcelas em cada novo método. |
-| CT worker | Mercado Pago cria cartão por Orders, consulta o pedido e publica o resultado no envelope existente. | Implementar os adaptadores Pagar.me e Efí sem alterar o envelope ou a correlação. |
+| CT worker | Mercado Pago e Pagar.me criam cartão por Orders; Efí cria cobrança One Step. Todos consultam status e publicam no envelope existente. | Manter o envelope e a correlação ao adicionar novos gateways. |
 | Resultado CT | Aprovação imediata de cartão confirma charge, venda e entrega no mesmo fluxo idempotente de confirmação. | Cobrir estados pendentes por polling/webhook conforme o provedor. |
-| Dashboard Seller | Mercado Pago configura a Public Key de cartão na edição da integração; o Access Token permanece privado. | Adicionar configurações públicas equivalentes para Pagar.me e Efí. |
+| Dashboard Seller | Mercado Pago e Pagar.me configuram Public Key; Efí configura o Identificador de conta na edição da integração. | Preservar as credenciais privadas fora da tela de edição. |
 
 ## Provedores
 
 | Provedor | Evidência reutilizável | Fronteira da implementação |
 | --- | --- | --- |
 | Mercado Pago | Worker Pix usa `access_token`; cartão usa Public Key no front e Orders no worker. | Implementado e validado com aprovação e recusa. Polling continua como reconciliação; webhook de cartão permanece a validar no rollout. |
-| Pagar.me | Worker CT Pix já usa `/orders`; Banking V2 já monta `credit_card` com token, parcelas, endereço e 3DS. | O código do Banking usa credencial e split da Lowify como referência de payload, não como dependência do CT. Cadastro do seller precisa de tokenização pública e credencial de servidor. |
-| Efí | Front atual usa `payment-token-efi`; Banking V2 já cria cartão One Step com `payment_token`. | Credenciais CT atuais são Pix com certificado. Criar perfil de cartão com `payee_code` e validar a habilitação de Cobranças/cartão da conta do seller. |
+| Pagar.me | Worker CT Pix já usa `/orders`; Banking V2 já monta `credit_card` com token, parcelas e endereço. | Implementado sem split: tokenização no navegador, `auth_and_capture`, endereço de cobrança e polling de `/charges/{id}`. Cadastro do seller precisa de Public Key, credencial de servidor e domínio autorizado para tokenização. |
+| Efí | Front usa `payment-token-efi`; o worker cria cartão One Step com `payment_token`. | O método `card_credit` usa `payee_code`; as credenciais e o certificado da integração autenticam a API Cobranças. Nome, CPF, e-mail e telefone seguem no cliente da cobrança. |
 | Woovi | CT cria charge Pix com `AppID`. | Não há API de cartão direto no produto integrado. Não incluir. |
 | Kiwify | CT cria QR Code Pix com Conta de Serviço. | Não há API de cartão direto nessa integração. Não incluir. |
 
