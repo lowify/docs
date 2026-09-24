@@ -31,7 +31,8 @@ O operador executa manualmente, no banco Commerce de homologação, os arquivos 
 Após o build do Notification e antes do `up`, executar sua migration normalmente:
 
 ```bash
-(cd /root/opt/lowify/services/services-notifications && docker compose run --rm services-notifications php bin/hyperf.php migrate --force)
+cd /root/opt/lowify/services/services-notifications
+docker compose run --rm services-notifications php bin/hyperf.php migrate --force
 ```
 
 ## Sequência
@@ -44,16 +45,21 @@ Após o build do Notification e antes do `up`, executar sua migration normalment
 6. Reconstruir sequencialmente cada front cujo commit mudou:
 
 ```bash
-(cd /root/opt/lowify/front/front-member-area && docker compose up --build -d)
-(cd /root/opt/lowify/front/front-checkout && docker compose up --build -d)
-(cd /root/opt/lowify/front/dashboard-seller && docker compose up --build -d)
+cd /root/opt/lowify/front/front-member-area
+docker compose up --build -d
+cd /root/opt/lowify/front/front-checkout
+docker compose up --build -d
+cd /root/opt/lowify/front/dashboard-seller
+docker compose up --build -d
 ```
 
 Nesta VPS, use o diretório do serviço antes do `docker compose`; a opção `-C` não é suportada pela versão instalada. Exemplos:
 
 ```bash
-(cd /root/opt/lowify/services/service-commerce-v2 && docker compose build)
-(cd /root/opt/lowify/services/service-commerce-v2 && docker compose up -d)
+cd /root/opt/lowify/services/service-commerce-v2
+docker compose build
+cd /root/opt/lowify/services/service-commerce-v2
+docker compose up -d
 ```
 
 ## Validação

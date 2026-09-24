@@ -65,94 +65,106 @@ Modo de rebuild: construir Commerce, Notification, Public API, Gateway, Área de
 2. Atualizar e construir o Commerce:
 
 ```bash
-git -C /opt/lowify/services/service-commerce-v2 fetch origin --prune
-git -C /opt/lowify/services/service-commerce-v2 switch feat/checkout-email-direct-access
-git -C /opt/lowify/services/service-commerce-v2 pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/services/service-commerce-v2 && docker compose build)
+cd /opt/lowify/services/service-commerce-v2
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose build
 ```
 
 3. Atualizar e construir o Notification:
 
 ```bash
-git -C /opt/lowify/services/services-notifications fetch origin --prune
-git -C /opt/lowify/services/services-notifications switch feat/checkout-email-direct-access
-git -C /opt/lowify/services/services-notifications pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/services/services-notifications && docker compose build)
+cd /opt/lowify/services/services-notifications
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose build
 ```
 
 4. Atualizar e construir o Public API:
 
 ```bash
-git -C /opt/lowify/edge/edge-public-api fetch origin --prune
-git -C /opt/lowify/edge/edge-public-api switch feat/checkout-email-direct-access
-git -C /opt/lowify/edge/edge-public-api pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/edge/edge-public-api && docker compose build)
+cd /opt/lowify/edge/edge-public-api
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose build
 ```
 
 5. Atualizar e construir o Gateway:
 
 ```bash
-git -C /opt/lowify/edge/edge-gateway fetch origin --prune
-git -C /opt/lowify/edge/edge-gateway switch feat/checkout-email-direct-access
-git -C /opt/lowify/edge/edge-gateway pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/edge/edge-gateway && docker compose build)
+cd /opt/lowify/edge/edge-gateway
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose build
 ```
 
 6. Só depois que todos os builds terminarem, executar manualmente [DEPLOY.sql](sql/lowify/DEPLOY.sql) e [VALIDATE.sql](sql/lowify/VALIDATE.sql) no banco Commerce. Em seguida rodar a migration do Notification com sua imagem já construída:
 
 ```bash
-(cd /opt/lowify/services/services-notifications && docker compose run --rm services-notifications php bin/hyperf.php migrate --force)
+cd /opt/lowify/services/services-notifications
+docker compose run --rm services-notifications php bin/hyperf.php migrate --force
 ```
 
 7. Depois dos ajustes de banco concluírem sem erro, iniciar o Commerce:
 
 ```bash
-(cd /opt/lowify/services/service-commerce-v2 && docker compose up -d)
+cd /opt/lowify/services/service-commerce-v2
+docker compose up -d
 ```
 
 8. Iniciar o Public API:
 
 ```bash
-(cd /opt/lowify/edge/edge-public-api && docker compose up -d)
+cd /opt/lowify/edge/edge-public-api
+docker compose up -d
 ```
 
 9. Iniciar o Gateway:
 
 ```bash
-(cd /opt/lowify/edge/edge-gateway && docker compose up -d)
+cd /opt/lowify/edge/edge-gateway
+docker compose up -d
 ```
 
 10. Iniciar o Notification:
 
 ```bash
-(cd /opt/lowify/services/services-notifications && docker compose up -d)
+cd /opt/lowify/services/services-notifications
+docker compose up -d
 ```
 
 11. Atualizar e reconstruir a Área de Membros. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
-git -C /opt/lowify/front/front-member-area fetch origin --prune
-git -C /opt/lowify/front/front-member-area switch feat/checkout-email-direct-access
-git -C /opt/lowify/front/front-member-area pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/front/front-member-area && docker compose up --build -d)
+cd /opt/lowify/front/front-member-area
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose up --build -d
 ```
 
 12. Atualizar e reconstruir o Checkout. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
-git -C /opt/lowify/front/front-checkout fetch origin --prune
-git -C /opt/lowify/front/front-checkout switch feat/checkout-email-direct-access
-git -C /opt/lowify/front/front-checkout pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/front/front-checkout && docker compose up --build -d)
+cd /opt/lowify/front/front-checkout
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose up --build -d
 ```
 
 13. Atualizar e reconstruir o Dashboard. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
-git -C /opt/lowify/front/dashboard-seller fetch origin --prune
-git -C /opt/lowify/front/dashboard-seller switch feat/checkout-email-direct-access
-git -C /opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-email-direct-access
-(cd /opt/lowify/front/dashboard-seller && docker compose up --build -d)
+cd /opt/lowify/front/dashboard-seller
+git fetch origin --prune
+git switch feat/checkout-email-direct-access
+git pull --ff-only origin feat/checkout-email-direct-access
+docker compose up --build -d
 ```
 
 14. Executar os rebuilds dos três fronts de forma sequencial, conforme os comandos acima. Eles continuam montando o repositório em `/var/www/html` e validando timestamps do OPcache, mas o `docker compose up --build -d` também é necessário para aplicar as configurações Apache incluídas na imagem.
