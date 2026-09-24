@@ -69,3 +69,4 @@ docker compose up -d
 3. Abrir um produto pela Área de Membros e confirmar origem Área de membros, sem duplicação ao recarregar na mesma sessão.
 4. Validar Área de Membros para nova conta e conta existente.
 5. Como admin 1 ou 2, ocultar um acesso; confirmar que o vendedor não o vê.
+6. Abrir uma URL inexistente em Área de Membros, Checkout e Dashboard e confirmar a tela 404 clara, com lupa e atalho para suporte.

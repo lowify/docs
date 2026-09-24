@@ -7,21 +7,23 @@ Preparar a publicação em produção da continuação da feature `feat/checkout
 - registrar acessos ao conteúdo feitos pelo link tokenizado e pela Área de Membros;
 - apresentar esses acessos como **Acesso web** no detalhe da venda;
 - permitir que apenas administradores de nível 1 e 2 ocultem registros;
-- enviar a nova versão do e-mail de entrega, com acesso tokenizado para conteúdo e orientação adequada para a Área de Membros.
+- enviar a nova versão do e-mail de entrega, com acesso tokenizado para conteúdo e orientação adequada para a Área de Membros;
+- proteger a reutilização de sessão por IP, limitar tentativas de login e migrar senhas legadas após login válido;
+- publicar páginas 404/500 claras e o hardening Apache nos três fronts.
 
-Ficam fora deste update alterações no checkout, no provedor de e-mail e em infraestrutura. O e-mail não é enviado durante o deploy; ele será validado com uma venda de teste após a publicação.
+Ficam fora deste update alterações no provedor de e-mail e em infraestrutura. O Checkout também recebe as páginas 404/500 e o hardening Apache. O e-mail não é enviado durante o deploy; ele será validado com uma venda de teste após a publicação.
 
 ## Componentes e referências
 
 | Componente | Repositório | Branch | Papel |
 | --- | --- | --- | --- |
 | services-commerce-v2 | `services-commerce-v2` | `feat/checkout-email-direct-access` | Dados de acesso, API de registro, URL tokenizada no e-mail e seleção da v3. |
-| edge-gateway | `edge-gateway` | `feat/checkout-email-direct-access` | Roteamento assinado da Área de Membros e encaminhamento das rotas de acesso. |
+| edge-gateway | `edge-gateway` | `feat/checkout-email-direct-access` | Roteamento assinado da Área de Membros, encaminhamento das rotas de acesso e resolução segura do IP de origem. |
 | edge-public-api | `edge-public-api` | `feat/checkout-email-direct-access` | Encaminhamento ao Commerce e autorização JWT para gestão do histórico. |
-| front-member-area | `front-member-area` | `feat/checkout-email-direct-access` | Emite o evento de acesso após validar o acesso ao produto. |
-| dashboard-seller | `dashboard-seller` | `feat/checkout-email-direct-access` | Exibe a etapa Acesso web e seus detalhes. |
+| front-member-area | `front-member-area` | `feat/checkout-email-direct-access` | Emite o evento de acesso, mantém a sessão de acesso em cookie seguro, limita login, migra senhas legadas e entrega páginas de erro. |
+| dashboard-seller | `dashboard-seller` | `feat/checkout-email-direct-access` | Exibe a etapa Acesso web, seus detalhes e páginas de erro Apache. |
 | services-notification | `services-notification` | `feat/checkout-email-direct-access` | Template e cadastro da correlação `sale_delivery_email_v3`. |
-| front-checkout | `front-checkout` | `feat/checkout-email-direct-access` | Redireciona o comprador pago do PIX/upsell para o acesso direto. |
+| front-checkout | `front-checkout` | `feat/checkout-email-direct-access` | Redireciona o comprador pago do PIX/upsell para o acesso direto e entrega páginas de erro Apache. |
 
 Os componentes listados são os únicos participantes deste deploy. Infraestrutura, banco, Redis e demais repositórios não recebem comandos por este documento.
 
@@ -34,6 +36,13 @@ Os componentes listados são os únicos participantes deste deploy. Infraestrutu
 3. A chave única evita múltiplos registros para a mesma venda, produto, origem e sessão.
 4. A Área de Membros chama a rota assinada do Gateway; o Gateway encaminha ao Public API e o Commerce valida venda paga, acesso não revogado e produto da venda antes de persistir.
 5. A tela de detalhes agrupa os registros em **Acesso web**, com data e origem. Admin 1 e 2 podem ocultar/restaurar; vendedores não veem registros ocultos.
+
+### Segurança de acesso e páginas de erro
+
+1. O Gateway determina o IP de origem na borda; a Área de Membros não aceita IP informado pelo navegador.
+2. A sessão de acesso direto é mantida em cookie `Secure`, `HttpOnly` e `SameSite=Lax`; o token nunca fica disponível ao JavaScript.
+3. O login limita tentativas por e-mail e IP; ao autenticar uma senha legada em texto de `tbl_clientes`, ela é substituída por hash seguro.
+4. Área de Membros, Checkout e Dashboard publicam páginas 404 e 500 claras com acesso ao suporte. As imagens Apache dos três fronts aplicam `ServerTokens Prod` e `ServerSignature Off`.
 
 ### E-mail de entrega v3
 
@@ -183,7 +192,11 @@ docker compose up --build -d
    - Resultado esperado: a lista mostra Data e Origem como **Link de acesso** ou **Área de membros**.
 6. Com um administrador de nível 1 ou 2, oculte um registro e atualize a página.
    - Resultado esperado: o administrador ainda pode encontrá-lo/gerenciá-lo; o vendedor não o vê.
-7. Se algum resultado não ocorrer, parar a aprovação e registrar venda de teste, horário e tela observada. Não apagar registros, sessões, filas ou dados para forçar o resultado.
+7. Abra uma URL inexistente em Área de Membros, Checkout e Dashboard.
+   - Resultado esperado: a resposta 404 exibe a tela clara com lupa e o botão de suporte.
+8. Em uma conta de teste que ainda use senha legada, faça login uma vez.
+   - Resultado esperado: o acesso funciona e a senha passa a ser armazenada como hash; não testar nem registrar credenciais de clientes reais.
+9. Se algum resultado não ocorrer, parar a aprovação e registrar venda de teste, horário e tela observada. Não apagar registros, sessões, filas ou dados para forçar o resultado.
 
 ## Rollback
 
