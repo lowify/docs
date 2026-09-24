@@ -38,9 +38,16 @@ Após o build do Notification e antes do `up`, executar sua migration normalment
 
 1. Pré-checar todos os targets operáveis que serão alterados. Se qualquer um estiver sujo, parar toda a operação.
 2. Fazer `fetch`, validar todas as branches remotas e só depois trocar participantes para a feature e demais targets para `main`, sempre com `pull --ff-only`.
-3. Reconstruir, se o commit tiver mudado: Commerce, Notification, Public API e Gateway. Os três fronts possuem bind mount de código e OPcache com validação de timestamps; após o Git, não precisam de build ou `up`.
+3. Reconstruir, se o commit tiver mudado: Commerce, Notification, Public API, Gateway, Área de Membros, Checkout e Dashboard. Embora os três fronts usem bind mount de código e OPcache com validação de timestamps, as imagens agora carregam configurações Apache (incluindo `ServerTokens Prod` e `ServerSignature Off`); após o Git, cada front alterado exige `docker compose up --build -d`.
 4. Executar o SQL manual do Commerce, validar o resultado e rodar a migration do Notification.
-5. Executar `docker compose up -d` apenas para os serviços reconstruídos, em ordem: Commerce, Notification, Public API e Gateway.
+5. Executar `docker compose up -d` para os serviços reconstruídos, em ordem: Commerce, Notification, Public API e Gateway.
+6. Reconstruir sequencialmente cada front cujo commit mudou:
+
+```bash
+(cd /root/opt/lowify/front/front-member-area && docker compose up --build -d)
+(cd /root/opt/lowify/front/front-checkout && docker compose up --build -d)
+(cd /root/opt/lowify/front/dashboard-seller && docker compose up --build -d)
+```
 
 Nesta VPS, use o diretório do serviço antes do `docker compose`; a opção `-C` não é suportada pela versão instalada. Exemplos:
 

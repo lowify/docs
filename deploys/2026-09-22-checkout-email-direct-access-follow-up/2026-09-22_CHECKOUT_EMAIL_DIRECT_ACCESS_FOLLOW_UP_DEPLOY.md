@@ -58,7 +58,7 @@ Executar as migrations normalmente, usando a imagem já construída do serviço 
 
 ## Sequência de deploy
 
-Modo de rebuild: construir Commerce, Notification, Public API e Gateway; somente depois iniciar esses serviços. Área de Membros, Checkout e Dashboard usam bind mount de código e recebem apenas o `git pull`.
+Modo de rebuild: construir Commerce, Notification, Public API, Gateway, Área de Membros, Checkout e Dashboard. Os fronts usam bind mount de código, mas suas imagens agora incluem configurações Apache; portanto, após o `git pull`, é obrigatório executar `docker compose up --build -d` em cada front alterado.
 
 1. Antes de qualquer alteração, fazer a pré-checagem em cada target operável: `git status --porcelain=v1`, `git branch --show-current` e `git remote get-url origin`. Se qualquer target que será alterado tiver mudança local, parar toda a operação. Targets não participantes usam `main`; targets `hold` não recebem comando.
 
@@ -128,31 +128,34 @@ git -C /opt/lowify/edge/edge-gateway pull --ff-only origin feat/checkout-email-d
 (cd /opt/lowify/services/services-notifications && docker compose up -d)
 ```
 
-11. Atualizar a Área de Membros. O `git pull` coloca o código em produção; não executar build ou up:
+11. Atualizar e reconstruir a Área de Membros. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
 git -C /opt/lowify/front/front-member-area fetch origin --prune
 git -C /opt/lowify/front/front-member-area switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/front-member-area pull --ff-only origin feat/checkout-email-direct-access
+(cd /opt/lowify/front/front-member-area && docker compose up --build -d)
 ```
 
-12. Atualizar o Checkout. O `git pull` coloca o código em produção; não executar build ou up:
+12. Atualizar e reconstruir o Checkout. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
 git -C /opt/lowify/front/front-checkout fetch origin --prune
 git -C /opt/lowify/front/front-checkout switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/front-checkout pull --ff-only origin feat/checkout-email-direct-access
+(cd /opt/lowify/front/front-checkout && docker compose up --build -d)
 ```
 
-13. Atualizar o Dashboard. O `git pull` coloca o código em produção; não executar build ou up:
+13. Atualizar e reconstruir o Dashboard. O `git pull` atualiza o código montado; o rebuild é obrigatório para carregar a configuração Apache da imagem:
 
 ```bash
 git -C /opt/lowify/front/dashboard-seller fetch origin --prune
 git -C /opt/lowify/front/dashboard-seller switch feat/checkout-email-direct-access
 git -C /opt/lowify/front/dashboard-seller pull --ff-only origin feat/checkout-email-direct-access
+(cd /opt/lowify/front/dashboard-seller && docker compose up --build -d)
 ```
 
-14. Não executar `up` para Área de Membros, Checkout ou Dashboard. Produção espelha a composição confirmada em homologação: os três containers montam o repositório em `/var/www/html` e validam timestamps do OPcache. Depois do `git pull`, o código PHP/JS atualizado passa a ser servido sem reinício.
+14. Executar os rebuilds dos três fronts de forma sequencial, conforme os comandos acima. Eles continuam montando o repositório em `/var/www/html` e validando timestamps do OPcache, mas o `docker compose up --build -d` também é necessário para aplicar as configurações Apache incluídas na imagem.
 
 ## Validação pós-deploy
 
