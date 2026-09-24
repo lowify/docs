@@ -29,6 +29,36 @@
 4. `metadata_json` segue para Redis em `payment.create`. Token de cartão é transitório: o worker não o registra em `charge_attempts`, `charge_status_checks`, auditorias ou logs de erro. O resultado do gateway passa por sanitização antes de persistir.
 5. O Front Checkout não registra a resposta bruta de tokenização no console. A tela conserva somente token transitório, máscara e identificadores não sensíveis necessários à tentativa.
 
+## Riscos do controle externo da conta
+
+O pagamento é criado na conta do seller. Depois de habilitar a integração, ele ainda pode alterar ou remover recursos diretamente no provedor. Algumas dessas alterações não impedem apenas uma nova venda: elas podem deixar uma cobrança pendente sem confirmação ou fazer o estado financeiro no provedor divergir de uma venda que a Lowify já marcou como paga.
+
+### Mercado Pago
+
+| Ação externa | Consequência |
+| --- | --- |
+| Desconectar a aplicação ou invalidar a autorização OAuth | O `access_token` deixa de servir para criar pedidos e consultar cobranças. Uma cobrança que estiver pendente não pode ser confirmada com segurança até a conta ser conectada novamente. |
+| Cancelar, estornar ou sofrer contestação de uma cobrança já aprovada | O valor pode deixar de pertencer ao seller depois que a venda e a entrega já foram confirmadas. O fluxo atual trata `paid` como estado terminal; a atualização posterior não desfaz venda, entrega ou itens financeiros. |
+
+### Pagar.me
+
+| Ação externa | Consequência |
+| --- | --- |
+| Remover `checkout.lowify.com.br` dos domínios autorizados | O navegador deixa de tokenizar novos cartões. Não há cobrança a consultar nem correção por polling: o checkout fica incapaz de iniciar a tentativa até o domínio ser autorizado de novo. |
+| Revogar ou trocar a Public Key ou a Secret Key na conta do provedor | A Public Key antiga impede a tokenização; a Secret Key antiga impede a criação e a consulta de cobranças. Tentativas em andamento podem ficar sem um resultado confirmável até as chaves cadastradas na integração serem atualizadas. |
+| Cancelar, estornar ou sofrer contestação de uma cobrança já aprovada | O provedor pode passar a mostrar uma situação financeira diferente da venda entregue. Como uma charge `paid` não volta ao polling normal, isso não produz hoje um estorno, bloqueio de entrega ou ajuste financeiro na Lowify. |
+
+### Efí
+
+| Ação externa | Consequência |
+| --- | --- |
+| Revogar ou substituir Client ID, Client Secret ou certificado da aplicação | A autenticação da API de cobranças falha. A Lowify não consegue criar nem consultar cobranças que dependam dessas credenciais até a integração ser corrigida. |
+| Estornar uma cobrança já aprovada ou haver contestação do cartão | A cobrança pode deixar de estar financeiramente liquidada depois da confirmação da venda. O estado local continua `paid`, pois o fluxo atual não reabre charges pagas para aplicar efeitos de estorno ou contestação. |
+
+### Limite atual após a aprovação
+
+Polling e webhook resolvem a demora para saber se uma cobrança ainda pendente foi aprovada, recusada ou cancelada. Eles não resolvem por si só o que fazer quando uma cobrança já paga é alterada depois. Antes de ampliar a ativação do cartão, é preciso definir e implementar o tratamento de estorno e contestação para que dinheiro, venda, entrega e cobrança interna não fiquem em estados incompatíveis.
+
 ## Padrões para os próximos adaptadores
 
 1. Separar `card_brand`, usado pela interface, de `payment_method_id`, usado pelo gateway. A primeira adaptação mostrou que ambos podem divergir, como `mastercard` na tela e `master` no Mercado Pago.
@@ -45,3 +75,6 @@
 - `services-checkout-transparent-worker/app/Process/GatewayInstructionQueueProcess.php`
 - `front-checkout/views/checkout/form/methods/card.php`
 - `front/dashboard-seller/api/dashboard/checkout_transparent/integrations.php`
+- [Mercado Pago: cancelamentos e estornos](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/payment-management/refunds-cancellations)
+- [Pagar.me: cobranças](https://docs.pagar.me/reference/cobran%C3%A7as-1)
+- [Efí: cobranças por cartão](https://dev.efipay.com.br/docs/api-cobrancas/cartao/)
