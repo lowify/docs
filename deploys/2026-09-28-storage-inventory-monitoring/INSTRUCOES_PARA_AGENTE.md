@@ -8,6 +8,7 @@ Execute este pacote na VPS de produção como `root`. Esta é uma instalação l
 2. Crie o diretório de instalação e de relatórios:
 
    ```bash
+   mkdir -p /opt/lowify-monitoring/
    mkdir -p /opt/lowify-monitoring/monitoring
    mkdir -p /var/log/lowify-storage-inventory
    chmod 700 /var/log/lowify-storage-inventory

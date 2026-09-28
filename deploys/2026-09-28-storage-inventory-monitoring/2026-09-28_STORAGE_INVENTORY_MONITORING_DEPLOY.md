@@ -37,6 +37,8 @@ Não há migration, DDL ou DML. A coleta executa apenas consultas em `informatio
 2. Como `root`, restrinja as permissões e prepare o diretório de relatórios:
 
    ```bash
+   mkdir -p /opt/lowify-monitoring/
+   mkdir -p /opt/lowify-monitoring/monitoring
    chmod 755 /opt/lowify-monitoring/storage_inventory.sh
    chmod 755 /opt/lowify-monitoring/monitoring/run_storage_inventory.sh
    mkdir -p /var/log/lowify-storage-inventory
