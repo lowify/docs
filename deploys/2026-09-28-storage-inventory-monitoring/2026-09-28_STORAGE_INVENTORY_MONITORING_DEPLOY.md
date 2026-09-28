@@ -13,9 +13,9 @@ nova fonte de consumo de disco.
 
 ## Componentes e referências
 
-| Repositório/origem | Branch | Referência |
-| --- | --- | --- |
-| `data_layer` | `main` | Artefatos copiados nesta pasta para instalação operacional |
+| Artefato | Referência |
+| --- | --- |
+| Pacote standalone | `artifacts/` nesta mesma pasta; não requer alteração nem deploy de `data_layer` |
 
 Não há alteração de front, edge, serviço de domínio, rota, JWT, fila ou
 contrato de aplicação.
@@ -46,7 +46,7 @@ Não há migration, DDL ou DML. A coleta executa apenas consultas em
 
 ## Sequência de deploy
 
-1. Copie a pasta `artifacts/` deste pacote para a VPS, em
+1. Descompacte o ZIP deste pacote e copie a pasta `artifacts/` para a VPS, em
    `/opt/lowify-monitoring/`.
 2. Como `root`, restrinja as permissões e prepare o diretório de relatórios:
 
