@@ -67,12 +67,6 @@ Não há migration, DDL ou DML. A coleta executa apenas consultas em `informatio
 3. Confirme que a aplicação continua acessível normalmente e que nenhum container foi reiniciado durante a execução manual.
 4. Se uma seção indicar `unavailable` ou `timed out`, a coleta continua válida; encaminhe essa linha ao responsável pela infraestrutura para investigar o componente específico.
 
-## Segurança e operação
-
-- Não exponha esses scripts via rota HTTP nem aceite comandos recebidos por `curl`.
-- Os relatórios usam `umask 077` e devem permanecer acessíveis apenas ao operador autorizado.
-- Antes de compartilhar um relatório fora da infraestrutura, revise nomes de bancos, containers e caminhos internos.
-
 ## Rollback
 
 1. Remova somente a linha adicionada ao `crontab` de `root`.
