@@ -18,7 +18,7 @@ Não há alteração de front, edge, serviço de domínio, rota, JWT, fila ou co
 
 - `artifacts/storage_inventory.sh`: inventário somente leitura, com timeout individual para operações potencialmente lentas.
 - `artifacts/monitoring/run_storage_inventory.sh`: executa a coleta, grava os relatórios com permissão restrita e retém 30 dias.
-- `artifacts/monitoring/crontab.example`: agenda execução a cada 15 minutos.
+- `artifacts/monitoring/crontab.example`: agenda execução a cada hora.
 
 ## Pré-requisitos
 
@@ -55,14 +55,14 @@ Não há migration, DDL ou DML. A coleta executa apenas consultas em `informatio
 5. Instale o agendamento no `crontab` de `root`, ajustando o caminho do exemplo para o diretório de produção:
 
    ```cron
-   */15 * * * * /opt/lowify-monitoring/monitoring/run_storage_inventory.sh >> /var/log/lowify-storage-inventory/cron.log 2>&1
+   17 * * * * /opt/lowify-monitoring/monitoring/run_storage_inventory.sh >> /var/log/lowify-storage-inventory/cron.log 2>&1
    ```
 
-6. Após 20 minutos, confirme que há dois relatórios com horários diferentes e que `cron.log` não contém erro.
+6. Após pouco mais de uma hora, confirme que há dois relatórios com horários diferentes e que `cron.log` não contém erro.
 
 ## Validação pós-deploy
 
-1. Peça ao operador para abrir a pasta `/var/log/lowify-storage-inventory/`. Ele deve ver um relatório novo a cada 15 minutos.
+1. Peça ao operador para abrir a pasta `/var/log/lowify-storage-inventory/`. Ele deve ver um relatório novo a cada hora.
 2. Abra o relatório mais recente e confirme que a primeira seção mostra o espaço livre do disco e que as seções Docker e MariaDB possuem dados.
 3. Confirme que a aplicação continua acessível normalmente e que nenhum container foi reiniciado durante a execução manual.
 4. Se uma seção indicar `unavailable` ou `timed out`, a coleta continua válida; encaminhe essa linha ao responsável pela infraestrutura para investigar o componente específico.
