@@ -9,6 +9,7 @@ Publicar em homologação a configuração de provider por template de e-mail, o
 | Repositório | Branch | Commit |
 | --- | --- | --- |
 | `services-notification` | `feat/checkout-transparent-billing-whatsapp-audit` | `428ae90` |
+| `services-account` | `feat/checkout-transparent-billing-whatsapp-audit` | `93d26fc` |
 | `edge-public-api` | `feat/checkout-transparent-billing-whatsapp-audit` | `8ade30d` |
 | `edge-gateway` | `feat/checkout-transparent-billing-whatsapp-audit` | `07d624f` |
 | `dashboard-seller` | `feat/checkout-transparent-billing-whatsapp-audit` | `daf65cb` |
@@ -18,6 +19,7 @@ Todos os demais targets operáveis em `~/opt/lowify/` devem usar `main`. Este es
 ## Alterações incluídas
 
 - `services-notification`: providers disponíveis, persistência por template, endpoint de overview e agregação diária em Redis.
+- `services-account`: migration que inicializa todas as flags globais de WhatsApp como ativas.
 - `edge-public-api` e `edge-gateway`: rotas administrativas autenticadas.
 - `dashboard-seller`: aba Sistema e relatório por período, template, provider, canal e falha.
 - Cashflow: custo de R$ 0,10 para Pagar.me exclusivamente em Cash In.
@@ -30,7 +32,7 @@ Todos os demais targets operáveis em `~/opt/lowify/` devem usar `main`. Este es
 
 ## Banco de dados
 
-Não há migration nesta entrega. As colunas de provider em `email_template` e `email_single` já pertencem à integração Resend anterior.
+Executar a migration `2026_09_29_000001_enable_whatsapp_flow_settings.php` de `services-account`. Ela faz upsert das nove flags globais de WhatsApp com valor `1`; não há rollback automático de valores administrativos.
 
 ## Sequência de deploy
 
