@@ -65,7 +65,8 @@ Todos os eventos seguem a mesma estrutura base:
   "customer": {
     "name": "Cliente Exemplo",
     "email": "cliente@dominio.com",
-    "phone": "11999999999"
+    "phone": "11999999999",
+    "document": "12345678900"
   },
   "tracking": {
     "click_id": 10,
@@ -97,6 +98,7 @@ Todos os eventos seguem a mesma estrutura base:
 | `customer.name` | `string` | Nome do comprador. |
 | `customer.email` | `string` | E-mail do comprador. |
 | `customer.phone` | `string \| null` | Telefone do comprador no padrão brasileiro, enviado com DDD + número, sem o prefixo `55`. |
+| `customer.document` | `string` | CPF ou CNPJ do comprador, somente números. O campo só é enviado quando o documento estiver preenchido. |
 | `tracking` | `object` | Object com os dados de tracking e campanha, quando disponíveis. |
 | `tracking.click_id` | `integer \| null` | Identificador do clique associado à venda. |
 | `tracking.campaign_id` | `integer \| null` | Identificador da campanha. |
