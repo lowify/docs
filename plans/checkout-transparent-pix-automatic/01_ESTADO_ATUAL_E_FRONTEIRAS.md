@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | Woovi | Possui `POST /api/v1/subscriptions` com `type=PIX_RECURRING`, QR Code para o cliente autorizar cobranças futuras e eventos sobre autorização e pagamento. As cobranças futuras são geradas pela Woovi. | Implementar. Exige AppID da integração, dados reais da pessoa pagadora e webhooks `PIX_AUTOMATIC_*`. |
 | Efí | Possui location de recorrência em `POST /v2/locrec`, recorrência em `POST /v2/rec`, consulta da recorrência e cobrança por `POST /v2/cobr` ou `PUT /v2/cobr/:txid`. | Implementar. Exige agendamento local de `cobr`, dois webhooks próprios de Pix Automático, consulta e recuperação de atualizações que chegarem atrasadas. |
-| Mercado Pago | A API de Assinaturas é um produto separado do Checkout API; sua documentação de adesão apresenta fluxo hospedado por link. O Checkout API Transparente permanece voltado ao Pix avulso por order. | Não implementar no Checkout Transparente. O fluxo não oferece a autorização e as cobranças recorrentes na conta integrada do seller. |
+| Mercado Pago | A API de Assinaturas é um produto separado. Ela cria `preapproval`, devolve um `init_point` e leva o comprador ao checkout hospedado do Mercado Pago. O contrato publicado para assinatura autorizada usa token de cartão; o de recorrência programada usa cliente, perfil de pagamento e credencial armazenada. Já o Checkout API Transparente cria apenas Pix avulso por QR Code, com vencimento. Não há contrato público de autorização Pix Automático, recorrência Pix ou cobrança futura Pix na conta integrada do seller. | Não implementar. A API de Assinaturas não é uma alternativa de Pix Automático para este checkout: mudaria a jornada para uma página hospedada e ainda não fornece o contrato necessário para autorização e cobranças Pix recorrentes. |
 | Pagar.me | A criação de assinatura da API atual não expõe `pix` em `payment_method`. | Não implementar. |
 | Kiwify | A integração atual do Checkout Transparente gera QR Code Pix de produto Kiwify; a API pública disponível nesse fluxo não expõe autorização recorrente para uma conta externa. | Não implementar. |
 
@@ -74,5 +74,8 @@ A documentação confirma que os callbacks de Pix Automático são associados à
 - [Efí: Webhooks](https://dev.efipay.com.br/docs/api-pix/webhooks/)
 - [Efí: Credenciais e escopos](https://dev.efipay.com.br/docs/api-pix/credenciais/)
 - [Mercado Pago: Assinaturas](https://www.mercadopago.com.br/developers/pt/docs/subscriptions/overview)
+- [Mercado Pago: assinatura com pagamento autorizado](https://www.mercadopago.com.br/developers/pt/docs/subscriptions/integration-configuration/subscription-no-associated-plan/authorized-payments)
+- [Mercado Pago: Pix no Checkout API](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/payment-integration/pix)
+- [Mercado Pago: pagamentos com recorrência programada](https://www.mercadopago.com.br/developers/pt/docs/automatic-payments-orders/process-recurring-payments)
 - [Pagar.me: assinatura de plano](https://docs.pagar.me/reference/criar-assinatura-de-plano-1)
 - [Pagar.me: assinaturas](https://docs.pagar.me/reference/assinaturas-1)

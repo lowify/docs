@@ -8,7 +8,9 @@ Neste plano, **autorização do cliente** é o aceite dado no banco para que as 
 
 ## Estado
 
-Planejamento inicial. Nenhuma alteração de código, migration ou cadastro de método foi iniciada por este plano.
+O primeiro corte da Woovi está implementado: disponibilidade para `SUBSCRIPTION`, criação idempotente da autorização, QR Code, cadastro dos webhooks de Pix Automático, confirmação da primeira parcela e envio do evento para venda, entrega e faturamento no Commerce V2.
+
+A Efí continua planejada. Polling, reconciliação periódica, monitoramento de webhooks, cancelamento pela Lowify e reembolso não fazem parte deste corte.
 
 ## Documentos
 
@@ -20,7 +22,7 @@ Planejamento inicial. Nenhuma alteração de código, migration ou cadastro de m
 
 | Tema | Proposta |
 | --- | --- |
-| Provedores | Implementar Woovi e Efí. Mercado Pago, Pagar.me e Kiwify não recebem `pix_automatic`. |
+| Provedores | Woovi implementada no primeiro corte. Efí continua planejada. Mercado Pago, Pagar.me e Kiwify não recebem `pix_automatic`. |
 | Integração | `pix_automatic` é um método próprio em `integration_payment_methods`; sua habilitação é explícita. |
 | Assinatura | A venda inicial, a autorização do cliente e as parcelas precisam ter identificadores que permitam localizar o mesmo pagamento em todos os sistemas. |
 | Woovi | A Woovi gera as cobranças futuras; o Checkout Transparente recebe e processa os avisos sobre a autorização e os pagamentos. |

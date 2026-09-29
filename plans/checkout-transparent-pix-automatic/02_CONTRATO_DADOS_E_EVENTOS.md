@@ -23,6 +23,10 @@ Para Woovi, o cadastro do método cria os sete `integration_webhooks` necessári
 
 Para Efí, o cadastro do método registra e confirma `webhookrec` e `webhookcobr`. As URLs devem preservar a rota local quando a Efí acrescentar `/rec` e `/cobr`; `?ignorar=` é a alternativa documentada. A configuração remota dos dois callbacks deve ser comparada periodicamente ao cadastro local. O Checkout Transparente agenda e cria cada `cobr` sem repetir a mesma cobrança, e consulta autorizações e cobranças conhecidas quando um callback atrasar.
 
+## Migration entregue
+
+`services-checkout-transparent-api/migrations/20260925000000_create_pix_automatic_subscriptions.php` cria `checkout_subscriptions`. `20260928110000_add_efi_pix_automatic_fields.php` acrescenta o `txid` da cobrança inicial e a próxima data de cobrança. `20260928120000_create_checkout_subscription_charges.php` cria uma linha por cobrança recorrente. `20260929170000_add_checkout_subscription_payer.php` preserva o e-mail e o endereço usados para criar a CobR futura da Efí. As chaves únicas de venda, pedido, correlação, assinatura do provedor, parcela e `txid` impedem que uma mesma adesão ou cobrança seja criada duas vezes.
+
 ## Modelo proposto
 
 Criar um agregado de assinatura no banco do Checkout Transparente, vinculado à venda inicial:

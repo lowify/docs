@@ -1,5 +1,11 @@
 # Implementação e aceite
 
+## Estado atual
+
+Woovi cobre a criação da autorização, QR Code, webhooks de Pix Automático, confirmação idempotente da primeira parcela e o evento que confirma a venda no Commerce V2. Efí cobre a Jornada 3: cria a cobrança inicial, a autorização recorrente, os dois callbacks, as `CobR` futuras e as consultas diretas por `idRec` e `txid` quando um callback atrasar.
+
+As migrations `20260928110000_add_efi_pix_automatic_fields.php`, `20260928120000_create_checkout_subscription_charges.php` e `20260929170000_add_checkout_subscription_payer.php` registram, respectivamente, o `txid` inicial e a próxima data da Efí, cada cobrança recorrente com número da parcela, vencimento, estado e E2E, e o pagador necessário para a próxima CobR.
+
 ## Ordem proposta
 
 1. Fechar o agregado de assinatura: registro provisório da autorização recorrente, criação externa idempotente, vínculo em duas etapas com Commerce V2 e contrato de evento de parcela paga.
