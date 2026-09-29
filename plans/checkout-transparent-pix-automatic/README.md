@@ -8,9 +8,9 @@ Neste plano, **autorização do cliente** é o aceite dado no banco para que as 
 
 ## Estado
 
-O primeiro corte da Woovi está implementado: disponibilidade para `SUBSCRIPTION`, criação idempotente da autorização, QR Code, cadastro dos webhooks de Pix Automático, confirmação da primeira parcela e envio do evento para venda, entrega e faturamento no Commerce V2.
+Woovi e Efí estão implementadas para `SUBSCRIPTION`. Ambas criam a autorização, confirmam a primeira parcela e enviam o evento idempotente para venda, entrega e faturamento no Commerce V2.
 
-A Efí continua planejada. Polling, reconciliação periódica, monitoramento de webhooks, cancelamento pela Lowify e reembolso não fazem parte deste corte.
+Na Efí, a Jornada 3 cria a cobrança inicial e a autorização; o Checkout Transparente agenda cada `cobr` futura e consulta a recorrência por `idRec` e a cobrança por `txid`. Cancelamento e reembolso ainda não estão disponíveis como ação do seller na Lowify.
 
 ## Documentos
 
@@ -22,7 +22,7 @@ A Efí continua planejada. Polling, reconciliação periódica, monitoramento de
 
 | Tema | Proposta |
 | --- | --- |
-| Provedores | Woovi implementada no primeiro corte. Efí continua planejada. Mercado Pago, Pagar.me e Kiwify não recebem `pix_automatic`. |
+| Provedores | Woovi e Efí implementadas. Mercado Pago, Pagar.me e Kiwify não recebem `pix_automatic`. |
 | Integração | `pix_automatic` é um método próprio em `integration_payment_methods`; sua habilitação é explícita. |
 | Assinatura | A venda inicial, a autorização do cliente e as parcelas precisam ter identificadores que permitam localizar o mesmo pagamento em todos os sistemas. |
 | Woovi | A Woovi gera as cobranças futuras; o Checkout Transparente recebe e processa os avisos sobre a autorização e os pagamentos. |
@@ -35,4 +35,4 @@ A Efí continua planejada. Polling, reconciliação periódica, monitoramento de
 
 - Assinatura Pix hospedada do Mercado Pago, assinatura Pix da Pagar.me ou assinatura Pix da Kiwify.
 - Reutilizar credenciais ou filas do Banking V2 para cobrar a conta do seller no Checkout Transparente.
-- Reembolso de cobranças recorrentes já liquidadas.
+- Cancelamento e reembolso de Pix Automático pela interface do seller.
