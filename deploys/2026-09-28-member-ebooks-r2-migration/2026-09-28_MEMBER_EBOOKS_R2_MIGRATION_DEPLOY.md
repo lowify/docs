@@ -25,13 +25,7 @@ A operação move somente arquivos `.pdf` e `.PDF`.
 
 ## Sequência de execução
 
-1. Abrir uma sessão persistente:
-
-   ```bash
-   screen -S move-member-pdfs
-   ```
-
-2. Dentro da screen, definir os caminhos e conferir o volume:
+1. Fora de uma `screen`, definir os caminhos, medir a origem e selecionar um PDF para o teste inicial:
 
    ```bash
    SOURCE_DIR=/var/lib/docker/volumes/dashboard-seller_dashboard_seller_images/_data/members_area/ebooks
@@ -42,9 +36,32 @@ A operação move somente arquivos `.pdf` e `.PDF`.
    sudo mkdir -p "$BACKUP_DIR"
    sudo chown root:root "$BACKUP_DIR"
    sudo chmod 750 "$BACKUP_DIR"
+
+   TEST_FILE="$(sudo find "$SOURCE_DIR" -type f -iname "*.pdf" -print -quit)"
+   test -n "$TEST_FILE" || { echo Nenhum PDF encontrado na origem; exit 1; }
+   TEST_RELATIVE_PATH="${TEST_FILE#"$SOURCE_DIR/"}"
    ```
 
-3. Simular a movimentação. Este comando não altera arquivos; revisar a lista retornada:
+2. Mover somente o PDF de teste. Esta etapa não usa `screen`:
+
+   ```bash
+   sudo mkdir -p "$BACKUP_DIR/$(dirname "$TEST_RELATIVE_PATH")"
+   sudo rsync -aiv --remove-source-files \
+     "$TEST_FILE" "$BACKUP_DIR/$TEST_RELATIVE_PATH"
+
+   sudo test ! -f "$TEST_FILE"
+   sudo test -f "$BACKUP_DIR/$TEST_RELATIVE_PATH"
+   ```
+
+3. Abra a Área de Membros e confirme que o PDF de teste continua abrindo pela URL do R2. Se não abrir, execute o rollback e não mova os demais arquivos.
+
+4. Somente após esse sucesso, criar uma sessão persistente para o lote restante:
+
+   ```bash
+   screen -S move-member-pdfs
+   ```
+
+5. Dentro da `screen`, simular a movimentação dos PDFs restantes. Este comando não altera arquivos; revisar a lista:
 
    ```bash
    sudo rsync -aivn \
@@ -55,7 +72,7 @@ A operação move somente arquivos `.pdf` e `.PDF`.
      "$SOURCE_DIR/" "$BACKUP_DIR/"
    ```
 
-4. Executar a movimentação real:
+6. Executar a movimentação real dos PDFs restantes:
 
    ```bash
    sudo rsync -aiv \
@@ -67,7 +84,7 @@ A operação move somente arquivos `.pdf` e `.PDF`.
      "$SOURCE_DIR/" "$BACKUP_DIR/"
    ```
 
-5. Validar o resultado:
+7. Validar o resultado:
 
    ```bash
    echo PDFs restantes no volume:
@@ -80,22 +97,15 @@ A operação move somente arquivos `.pdf` e `.PDF`.
 
    O contador da origem deve ser `0`. Não apagar a pasta de origem, mesmo vazia.
 
-6. Para desacoplar a screen sem interromper, pressionar `Ctrl+A` e depois `D`. Para retornar:
+8. Para desacoplar a screen sem interromper, pressionar `Ctrl+A` e depois `D`. Para retornar:
 
    ```bash
    screen -r move-member-pdfs
    ```
 
-## Validação pós-operação
-
-1. Abra uma Área de Membros com e-book e confirme que o PDF abre pela URL do storage R2.
-2. Abra uma aula com vários PDFs e confirme que todos os downloads continuam funcionando.
-3. Confirme que a origem não possui PDFs e que os arquivos estão em `/backup/pdfs/`.
-4. Se um download falhar, interrompa novas movimentações e execute o rollback. Não remova objetos do R2.
-
 ## Rollback
 
-Para repor os PDFs no volume, mantendo o backup:
+Se o PDF de teste não abrir ou ocorrer falha posterior, repor os PDFs no volume sem apagar o backup:
 
 ```bash
 sudo rsync -aiv \
@@ -103,4 +113,4 @@ sudo rsync -aiv \
   /var/lib/docker/volumes/dashboard-seller_dashboard_seller_images/_data/members_area/ebooks/
 ```
 
-Depois, teste o download que apresentou falha. Não alterar URLs, banco ou remover o backup durante a investigação.
+Depois, testar o download afetado. Não alterar URLs, banco ou remover o backup durante a investigação.
