@@ -86,6 +86,16 @@ lock seller
 
 As chamadas ao Banking ocorrem depois do `commit`.
 
+O mesmo contrato precisa cobrir o ciclo de vida posterior do saque. Hoje a confirmação e o tratamento de falhas de saque ocorrem em caminhos distribuídos; se o saque passar a reservar saldo na entrada, esses caminhos também precisam informar a reserva correspondente:
+
+```text
+saque criado     -> reserva/pending permanece bloqueando saldo
+saque confirmado -> debita o extrato e consome/confirma a reserva
+saque recusado   -> libera/cancela a reserva
+```
+
+Sem essa padronização, uma reserva de saque poderia permanecer bloqueada após confirmação ou recusa, deixando o saldo disponível incorreto. Não basta centralizar somente a criação da solicitação.
+
 Há duas opções técnicas viáveis:
 
 1. Manter `tbl_saques` e `sales_refunds` como reservas de domínio e centralizar no Wallet a criação atômica de ambos.
@@ -111,10 +121,12 @@ Para resultado definitivamente recusado pelo Banking, a reserva deve ser cancela
 
 Antes de implementar, mapear todos os caminhos que criam `tbl_saques`, incluindo rotas administrativas, fluxos legados, workers e integrações. Para cada entrada, definir como ela passará pela mesma operação de reserva atômica.
 
+Mapear também todos os caminhos que confirmam, rejeitam, cancelam ou expiram saques. Cada transição deve consumir ou liberar a reserva associada de maneira idempotente.
+
 Depois do inventário:
 
-1. Definir o contrato interno do Wallet para reservar/cancelar/confirmar saque e refund.
-2. Ajustar todos os criadores de saque para usar esse contrato.
+1. Definir o contrato interno do Wallet para reservar, confirmar/consumir e cancelar/liberar saque e refund.
+2. Ajustar todos os criadores e todos os confirmadores/canceladores de saque para usar esse contrato.
 3. Alterar o refund para criar sua pendência antes de chamar o Banking, através do mesmo contrato.
 4. Exigir e consumir PIN no Public API com contexto correto; negar colaboradores nessa rota.
 5. Manter refund por seller desabilitado até a conclusão dos itens anteriores.
