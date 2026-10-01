@@ -25,7 +25,7 @@ Recarga PIX → Banking V2 → Wallet credita carteira
 | Account | Feature flags, preço padrão e overrides por usuário. |
 | Wallet | Créditos, hold, consume, release, saldo e alertas de insuficiência. |
 | Banking V2 | Cobrança PIX de pacotes e crédito idempotente após pagamento. |
-| Notification | WhatsApp Meta, e-mail, templates, callback e fila de resultados. |
+| Notification | WhatsApp Meta, e-mail, templates, callback e fila de resultados. O e-mail de RDC (`sale/recovery_dispatch`) usa o layout base compartilhado da plataforma e direciona para `/rdc?cod={order}`. |
 | Gateway / Public API | Caminho autenticado entre Dashboard e serviços. |
 | Dashboard Seller | Configuração, recargas, saldo, histórico e reenvios. |
 
