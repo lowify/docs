@@ -1,0 +1,2 @@
+# Execute every 15 minutes as root. Logs are written under /var/log.
+17 * * * * /opt/lowify-monitoring/monitoring/run_storage_inventory.sh >> /var/log/lowify-storage-inventory/cron.log 2>&1
