@@ -1,7 +1,7 @@
 # Feature — Referência externa da venda
 
 > Status: em evolução
-> Última atualização: 2026-09-30
+> Última atualização: 2026-10-01
 > Confiança: confirmada no código
 
 ## Objetivo
@@ -15,7 +15,7 @@ GET ?offer=oferta&external_reference=valor
   -> Front Checkout /go (preserva no redirecionamento)
   -> Front Checkout (campo oculto)
   -> Gateway/Public API
-  -> Commerce V2 (validação e sales.external_reference)
+  -> Commerce V2 (validação, sales.external_reference e herança no upsell)
   -> evento de integração
   -> services-sale-integrations (webhook externo)
 ```
@@ -25,7 +25,7 @@ GET ?offer=oferta&external_reference=valor
 | Componente | Responsabilidade | Entrada/saída relevante |
 | --- | --- | --- |
 | `front-checkout` | Lê e preserva a referência válida no formulário. | `external_reference` em GET e POST. |
-| `services-commerce-v2` | Valida e persiste a referência com a venda. | `sales.external_reference`. |
+| `services-commerce-v2` | Valida e persiste a referência com a venda; upsells herdam o valor da venda original. | `sales.external_reference`. |
 | `services-sale-integrations` | Inclui a referência no payload do webhook. | `external_reference` no JSON externo. |
 | `dashboard-seller` | Exibe o campo quando preenchido. | Detalhes de venda e detalhe administrativo. |
 
@@ -35,11 +35,11 @@ GET ?offer=oferta&external_reference=valor
 
 ## Dados e processamento assíncrono
 
-Uma migration adiciona `sales.external_reference` como coluna anulável. O `BuildSaleDataUseCase` copia o valor para o bloco `sale` do evento consumido pelas integrações.
+Uma migration adiciona `sales.external_reference` como coluna anulável. O `ProcessCheckoutUpsellUseCase` copia a referência da venda original para o upsell. O `BuildSaleDataUseCase` copia o valor para o bloco `sale` do evento consumido pelas integrações.
 
 ## Operação e validação
 
-Validação manual pendente: criar checkout com referência válida, confirmar persistência, conferir a exibição nas duas telas e receber o campo nos webhooks de venda pendente e paga.
+Validação manual pendente: criar checkout com referência válida, concluir um upsell, confirmar que ambas as vendas persistem o valor, conferir a exibição nas duas telas e receber o campo nos webhooks de venda pendente e paga.
 
 ## Limitações e pendências
 
@@ -50,5 +50,6 @@ Validação manual pendente: criar checkout com referência válida, confirmar p
 
 - `front-checkout/views/checkout/index.php`
 - `services-commerce-v2/app/Application/UseCase/Product/ProcessProductCheckoutUseCase.php`
+- `services-commerce-v2/app/Application/UseCase/Product/ProcessCheckoutUpsellUseCase.php`
 - `services-commerce-v2/app/Application/UseCase/Sale/BuildSaleDataUseCase.php`
 - `services-sale-integrations/app/Infrastructure/Integration/Webhook/WebhookSender.php`

@@ -1,0 +1,10 @@
+SELECT
+    COLUMN_NAME,
+    COLUMN_TYPE,
+    IS_NULLABLE,
+    COLUMN_DEFAULT,
+    ORDINAL_POSITION
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'lowify'
+  AND TABLE_NAME = 'sales'
+  AND COLUMN_NAME = 'external_reference';
