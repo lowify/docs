@@ -19,11 +19,8 @@ O método aceita cobranças a partir de R$ 4,50. Cartão e Pix Automático da Ri
 
 ## Pré-requisitos
 
-1. Confirmar que os seis repositórios estão sem alteração local e que o `HEAD` corresponde aos commits da tabela.
-2. Confirmar no CT API os valores já usados pelos gateways com webhook: `EDGE_WEBHOOK_BASE_URL` e `CHECKOUT_WEBHOOK_RECEIVER_KEY`. Eles formam a URL exclusiva registrada na RisePay para cada integração.
-3. Confirmar que CT API, worker e edge de webhook usam as chaves de cifragem e a conectividade Redis já exigidas pelo Checkout Transparente. O token privado da RisePay não deve aparecer em variáveis de ambiente, logs ou comandos de deploy; ele é informado pelo seller e armazenado pela integração.
-4. Confirmar acesso de saída do worker a `https://api.risepay.com.br` e acesso público da RisePay ao host configurado em `EDGE_WEBHOOK_BASE_URL`.
-5. Não cadastrar uma integração RisePay antes de CT API, worker e edge de webhook estarem publicados. O cadastro dispara primeiro a validação em `GET /api/External/CompanyDetails` e depois o registro do webhook em `POST /api/External/Webhooks`.
+1. Confirmar que os repositórios estão sem alteração local e que o `HEAD` corresponde aos commits da tabela.
+2. Publicar CT API, worker e edge de webhook antes de cadastrar uma integração RisePay.
 
 ## Banco de dados
 
@@ -41,7 +38,7 @@ Não executar o `down` da migration nem remover o gateway depois que houver inte
 
 ## Sequência de deploy
 
-1. Publicar o `services-checkout-transparent-api`, aplicar a migration e confirmar que a API está saudável:
+1. Publicar o `services-checkout-transparent-api` e aplicar a migration:
 
    ```bash
    cd /opt/lowify-ct/services-checkout-transparent-api
@@ -56,7 +53,7 @@ Não executar o `down` da migration nem remover o gateway depois que houver inte
    docker compose logs --tail=100 app
    ```
 
-2. Publicar o `services-checkout-transparent-worker` antes de cadastrar qualquer integração. Ele precisa estar disponível para consumir `integration.configure`, registrar o webhook e criar/consultar Pix:
+2. Publicar o `services-checkout-transparent-worker`:
 
    ```bash
    cd /opt/lowify-ct/services-checkout-transparent-worker
@@ -70,7 +67,7 @@ Não executar o `down` da migration nem remover o gateway depois que houver inte
    docker compose logs --tail=100
    ```
 
-3. Publicar o `edge-checkout-transparent-webhook` antes de ativar sellers. O webhook não confirma pagamento pelo corpo recebido: ele localiza a transação e pede a consulta autenticada ao worker:
+3. Publicar o `edge-checkout-transparent-webhook`:
 
    ```bash
    cd /opt/lowify-ct-webhook/edge-checkout-transparent-webhook/edge/edge-checkout-transparent-webhook
@@ -113,17 +110,16 @@ Não executar o `down` da migration nem remover o gateway depois que houver inte
    git rev-parse --short HEAD
    ```
 
-6. Só depois dos serviços saudáveis, cadastrar uma integração de teste pelo Dashboard com o token privado da conta RisePay. A integração deve concluir os dois passos: validação da credencial e cadastro do webhook. Não marcar outra integração RisePay como padrão antes desse resultado.
+6. Cadastrar uma integração RisePay de teste no Dashboard com o token privado da conta. Confirmar que o cadastro termina como ativo antes de usá-la no checkout.
 
 ## Validação pós-deploy
 
 1. Confirmar que existe uma linha ativa em `integration_gateways` com `code = 'risepay'`, `supports_webhook = 1`, `supports_polling = 1` e intervalo de `60` segundos.
-2. Salvar uma integração RisePay de teste no Dashboard. Confirmar que ela fica ativa somente após validar a conta e cadastrar o webhook `transaction.updated`.
+2. Salvar uma integração RisePay de teste no Dashboard e confirmar que ela fica ativa.
 3. Criar um produto de teste de valor igual ou superior a R$ 4,50, habilitar Checkout Transparente e selecionar a integração RisePay.
 4. Abrir o checkout, gerar o Pix e conferir que a transação possui QR Code/copia e cola. Tentar valor abaixo de R$ 4,50 em ambiente de teste e confirmar a recusa antes de criar a cobrança na RisePay.
 5. Pagar uma cobrança de teste. Confirmar, pelo identificador da charge, que webhook ou polling levou a mesma charge para `paid` uma única vez e que a venda, a entrega e os efeitos usuais do Commerce V2 foram concluídos sem duplicação.
-6. Reenviar o evento de webhook da mesma transação, quando a RisePay permitir. A cobrança, venda e entrega devem permanecer únicas. Como verificação complementar, confirmar nos logs do edge, CT API e worker que o evento resultou em uma consulta de status da transação.
-7. Verificar que token privado e resposta bruta da RisePay não aparecem nos logs do Dashboard, edge, CT API ou worker.
+6. Reenviar o evento de webhook da mesma transação, quando a RisePay permitir. A cobrança, venda e entrega devem permanecer únicas.
 
 ## Rollback
 
