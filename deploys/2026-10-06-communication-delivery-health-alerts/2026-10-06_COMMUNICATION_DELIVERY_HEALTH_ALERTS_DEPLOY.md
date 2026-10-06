@@ -37,21 +37,6 @@ Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compart
 5. Limpar e resolver o incidente sintético de homologação `delivery-health-hml-20261006205305` antes de qualquer promoção. Não transportar esse dado de teste para produção.
 6. Escolher uma janela de menor volume para a migration: ela cria índices em `whatsapp_meta` e `email_single`.
 
-## Configuração
-
-Os defaults de código permitem deploy sem valor novo obrigatório. Se a operação precisar alterar o comportamento, declarar somente os nomes abaixo no `.env` de `services-notifications`; nunca registrar valores secretos neste documento.
-
-| Variável | Default |
-| --- | --- |
-| `DELIVERY_HEALTH_WHATSAPP_META_PROVIDER_FAILURE_THRESHOLD` | `5` |
-| `DELIVERY_HEALTH_WHATSAPP_TEMPLATE_FAILURE_THRESHOLD` | `5` |
-| `DELIVERY_HEALTH_EMAIL_PROVIDER_FAILURE_THRESHOLD` | `5` |
-| `DELIVERY_HEALTH_EMAIL_TEMPLATE_FAILURE_THRESHOLD` | `5` |
-| `DELIVERY_HEALTH_NOTIFICATION_COOLDOWN_MINUTES` | `10` |
-| `DELIVERY_HEALTH_BATCH_SIZE` | `500` |
-
-Valores ausentes, inválidos ou menores que `1` voltam aos defaults. Não habilitar override de teste em produção.
-
 ## Banco de dados
 
 Aplicar somente no banco do `services-notification` a migration:
