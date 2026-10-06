@@ -10,11 +10,11 @@ Esta entrega não reenvia mensagens, não bloqueia novos envios, não altera pro
 
 ## Componentes e referências
 
-| Repositório | Branch de deploy | Commit de referência | Responsabilidade |
-| --- | --- | --- | --- |
-| `services-account` | `feat/communication-delivery-health-alerts` | `7570fd9` | Endpoint interno idempotente e upsert das sysvars globais. |
-| `services-notification` | `feat/communication-delivery-health-alerts` | `0a79e1c` | Processo a cada minuto, cursor Redis, migration, logs e notificações in-app. |
-| `dashboard-seller` | `feat/communication-delivery-health-alerts` | `3d4b79db` | Banner prioritário, resolução local e roteamento das notificações. |
+| Repositório | Branch de deploy | Responsabilidade |
+| --- | --- | --- |
+| `services-account` | `feat/communication-delivery-health-alerts` | Endpoint interno idempotente e upsert das sysvars globais. |
+| `services-notification` | `feat/communication-delivery-health-alerts` | Processo a cada minuto, cursor Redis, migration, logs e notificações in-app. |
+| `dashboard-seller` | `feat/communication-delivery-health-alerts` | Banner prioritário, resolução local e roteamento das notificações. |
 
 Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compartilhado fora da migration do Notification ou filas existentes.
 
@@ -72,19 +72,7 @@ As sysvars `communication_delivery_maintenance_*` não precisam de seed: são cr
 
 Os caminhos abaixo seguem o padrão já usado no servidor principal. O operador deve confirmar host e diretórios produtivos antes do início; estes não são os caminhos da VPS de homologação.
 
-### 1. Pré-checagem
-
-Em cada diretório participante, antes de alterar qualquer branch:
-
-```bash
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-```
-
-Se qualquer saída de `git status --porcelain=v1` não for vazia, parar todo o deploy.
-
-### 2. `services-account`
+### 1. `services-account`
 
 ```bash
 cd /opt/lowify/services/services-account
@@ -99,7 +87,7 @@ docker compose logs --tail=50
 
 Resultado esperado: container `Up`, health sem erro e endpoint interno disponível na rede entre serviços.
 
-### 3. `services-notification` e migration
+### 2. `services-notification` e migration
 
 ```bash
 cd /opt/lowify/services/services-notifications
@@ -117,7 +105,7 @@ docker compose logs --tail=80 services-notifications
 
 Resultado esperado: processo `delivery_health.0` iniciado, migration marcada como aplicada e nenhum erro de schema, Redis ou HTTP interno nos logs.
 
-### 4. `dashboard-seller`
+### 3. `dashboard-seller`
 
 ```bash
 cd /opt/lowify/front/dashboard-seller
@@ -131,25 +119,16 @@ docker compose ps
 
 O compose do Dashboard monta o diretório do repositório no container. Confirmar que a branch não é trocada por outra operação enquanto a validação estiver em andamento.
 
-## Testes de compatibilidade em homologação
-
-Executar somente após os três containers estarem saudáveis e a migration estar aplicada.
-
-- Roteiro: [caso de injeção controlada](../../plans/communication-delivery-health-alerts/HOMOLOGATION_ERROR_INJECTION_TEST.md).
-- Executor: containers `services-notifications`, `services-account` e `front-dashboard-seller`.
-- Dados: cinco registros sintéticos `whatsapp_meta` com identificador exclusivo; não usar telefone, conteúdo ou dados de clientes reais.
-- Resultado esperado: sysvar ativa, log mínimo, duas notificações internas `admin`, banner visível para admin autorizado, resolução idempotente e reabertura apenas após falha nova.
-- Limpeza: remover exclusivamente dados sintéticos da execução e restaurar as sysvars ao estado anterior. Não limpar filas, chaves Redis genéricas ou notificações de terceiros.
-
 ## Validação pós-deploy
 
-1. Faça login com um administrador de perfil 1, 2 ou 4.
-2. Execute o cenário sintético homologado; quando o alerta for aberto, recarregue qualquer página do Dashboard.
-3. Confirme que aparece uma faixa vermelha com o texto sobre falhas recorrentes de envio, acima de avisos de cadastro incompleto.
-4. Clique em **Detalhes** e confirme que abre o Status de serviços sem remover o alerta.
-5. Clique em **Resolvido**. Cancele uma vez e confirme que o alerta continua. Depois confirme a resolução e veja o banner desaparecer.
-6. Abra as notificações internas e confirme que o alerta leva ao Status de serviços apenas para administrador autorizado.
-7. Se qualquer resultado visível não ocorrer, parar a promoção e registrar página, horário e comportamento observado. Não limpar filas ou dados para forçar aprovação.
+Esta validação depende de uma falha real de template ou de provedor atingir o limiar configurado após o deploy. Não injetar nem induzir falhas em produção.
+
+1. Aguardar a abertura natural de um incidente e fazer login com um administrador de perfil 1, 2 ou 4.
+2. Confirmar que aparece uma faixa vermelha sobre falhas recorrentes de envio, acima de avisos de cadastro incompleto.
+3. Clicar em **Detalhes** e confirmar que abre o Status de serviços sem remover o alerta.
+4. Clicar em **Resolvido**. Cancelar uma vez e confirmar que o alerta continua. Depois confirmar a resolução e verificar o desaparecimento do banner.
+5. Abrir as notificações internas e confirmar que o alerta leva ao Status de serviços apenas para administrador autorizado.
+6. Se qualquer resultado visível não ocorrer, registrar página, horário e comportamento observado. Não limpar filas ou dados para forçar aprovação.
 
 ## Rollback
 
