@@ -10,13 +10,13 @@ O escopo não inclui bloqueio global por seller, alteração de vendas/comissõe
 
 ## Componentes e referências
 
-| Componente | Host | Repositório | Branch de deploy | Commit |
-| --- | --- | --- | --- | --- |
-| Dashboard Seller | `144.126.149.57` | `dashboard-seller` | `fix/affiliate-qa-hotfixes` | `41aed79b` |
-| Commerce V2 | `144.126.149.57` | `services-commerce-v2` | `fix/affiliate-qa-hotfixes` | `ca313cd` |
-| Public API | `144.126.149.57` | `edge-public-api` | `fix/affiliate-qa-hotfixes` | `e985776` |
-| Gateway | `144.126.149.57` | `edge-gateway` | `fix/affiliate-qa-hotfixes` | `a9eea25` |
-| Integrações de venda | `147.93.180.183` | `services-sale-integrations` | `fix/affiliate-webhook-payload` | `cd3d44b` |
+| Componente | Host | Repositório | Branch de deploy |
+| --- | --- | --- | --- |
+| Dashboard Seller | `144.126.149.57` | `dashboard-seller` | `fix/affiliate-qa-hotfixes` |
+| Commerce V2 | `144.126.149.57` | `services-commerce-v2` | `fix/affiliate-qa-hotfixes` |
+| Public API | `144.126.149.57` | `edge-public-api` | `fix/affiliate-qa-hotfixes` |
+| Gateway | `144.126.149.57` | `edge-gateway` | `fix/affiliate-qa-hotfixes` |
+| Integrações de venda | `147.93.180.183` | `services-sale-integrations` | `fix/affiliate-webhook-payload` |
 
 As branches devem ser revisadas e publicadas no remoto antes da janela. Os demais componentes ficam fora do escopo.
 
