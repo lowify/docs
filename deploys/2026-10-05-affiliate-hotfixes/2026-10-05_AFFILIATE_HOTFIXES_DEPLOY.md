@@ -16,7 +16,7 @@ O escopo não inclui bloqueio global por seller, alteração de vendas/comissõe
 | Commerce V2 | `144.126.149.57` | `services-commerce-v2` | `fix/affiliate-qa-hotfixes` |
 | Public API | `144.126.149.57` | `edge-public-api` | `fix/affiliate-qa-hotfixes` |
 | Gateway | `144.126.149.57` | `edge-gateway` | `fix/affiliate-qa-hotfixes` |
-| Integrações de venda | `147.93.180.183` | `services-sale-integrations` | `fix/affiliate-webhook-payload` |
+| Integrações de venda | `147.93.180.183` | `services-sale-integrations` | `fix/affiliate-qa-hotfixes` |
 
 As branches devem ser revisadas e publicadas no remoto antes da janela. Os demais componentes ficam fora do escopo.
 
@@ -130,8 +130,8 @@ No host de integrações, em `/opt/lowify/services/services-sale-integrations`:
 
 ```bash
 git fetch origin --prune
-git switch fix/affiliate-webhook-payload
-git pull --ff-only origin fix/affiliate-webhook-payload
+git switch fix/affiliate-qa-hotfixes
+git pull --ff-only origin fix/affiliate-qa-hotfixes
 docker compose up --build -d
 docker compose ps
 ```
