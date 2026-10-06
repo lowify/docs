@@ -10,13 +10,13 @@ O escopo não inclui bloqueio global por seller, alteração de vendas/comissõe
 
 ## Componentes e referências
 
-| Componente | Repositório | Branch de deploy | Commit |
-| --- | --- | --- | --- |
-| Dashboard Seller | `dashboard-seller` | `fix/affiliate-qa-hotfixes` | `41aed79b` |
-| Commerce V2 | `services-commerce-v2` | `fix/affiliate-qa-hotfixes` | `ca313cd` |
-| Public API | `edge-public-api` | `fix/affiliate-qa-hotfixes` | `e985776` |
-| Gateway | `edge-gateway` | `fix/affiliate-qa-hotfixes` | `a9eea25` |
-| Integrações de venda | `services-sale-integrations` | `fix/affiliate-webhook-payload` | `cd3d44b` |
+| Componente | Host | Repositório | Branch de deploy | Commit |
+| --- | --- | --- | --- | --- |
+| Dashboard Seller | `144.126.149.57` | `dashboard-seller` | `fix/affiliate-qa-hotfixes` | `41aed79b` |
+| Commerce V2 | `144.126.149.57` | `services-commerce-v2` | `fix/affiliate-qa-hotfixes` | `ca313cd` |
+| Public API | `144.126.149.57` | `edge-public-api` | `fix/affiliate-qa-hotfixes` | `e985776` |
+| Gateway | `144.126.149.57` | `edge-gateway` | `fix/affiliate-qa-hotfixes` | `a9eea25` |
+| Integrações de venda | `147.93.180.183` | `services-sale-integrations` | `fix/affiliate-webhook-payload` | `cd3d44b` |
 
 As branches devem ser revisadas e publicadas no remoto antes da janela. Os demais componentes ficam fora do escopo.
 
@@ -70,7 +70,7 @@ A mudança é aditiva. Em rollback, não remover as tabelas nem os eventos de au
 
 Modo de rebuild: incremental.
 
-### 1. Commerce V2 — atualizar e construir
+### 1. Commerce V2 — atualizar e construir (`144.126.149.57`)
 
 No host principal, em `/opt/lowify/services/service-commerce-v2`:
 
@@ -93,7 +93,7 @@ docker compose up -d
 docker compose ps
 ```
 
-### 4. Atualizar Public API e Gateway
+### 4. Atualizar Public API e Gateway (`144.126.149.57`)
 
 Atualizar e reconstruir sequencialmente:
 
@@ -113,7 +113,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-### 5. Atualizar o Dashboard Seller
+### 5. Atualizar o Dashboard Seller (`144.126.149.57`)
 
 O Dashboard usa o código do repositório como volume; atualizar somente o Git, sem build ou restart:
 
@@ -124,7 +124,7 @@ git switch fix/affiliate-qa-hotfixes
 git pull --ff-only origin fix/affiliate-qa-hotfixes
 ```
 
-### 6. Atualizar Integrações de venda por último
+### 6. Atualizar Integrações de venda por último (`147.93.180.183`)
 
 No host de integrações, em `/opt/lowify/services/services-sale-integrations`:
 
