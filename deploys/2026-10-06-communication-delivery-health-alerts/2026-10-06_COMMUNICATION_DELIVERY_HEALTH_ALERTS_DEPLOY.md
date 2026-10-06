@@ -115,11 +115,9 @@ git fetch origin --prune
 git switch feat/communication-delivery-health-alerts
 git pull --ff-only origin feat/communication-delivery-health-alerts
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
 ```
 
-O compose do Dashboard monta o diretório do repositório no container. Confirmar que a branch não é trocada por outra operação enquanto a validação estiver em andamento.
+O compose do Dashboard monta o diretório do repositório no container; portanto não é necessário executar `docker compose up -d --build` para esta entrega. Confirmar que a branch não é trocada por outra operação enquanto a validação estiver em andamento.
 
 ## Validação pós-deploy
 
