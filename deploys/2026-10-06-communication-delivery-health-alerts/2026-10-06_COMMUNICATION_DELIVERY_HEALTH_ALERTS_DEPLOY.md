@@ -8,6 +8,8 @@ Publicar a detecção recorrente de falhas de entrega por WhatsApp Meta e e-mail
 
 Esta entrega não reenvia mensagens, não bloqueia novos envios, não altera provedores e não expõe conteúdo, telefones, e-mails ou payloads de entrega.
 
+O cenário controlado foi executado corretamente em homologação: a detecção criou os logs mínimos, ativou a manutenção global e publicou as notificações internas para administradores. A validação visual do Dashboard deve ser concluída quando a branch da feature estiver selecionada sem troca concorrente de diretório.
+
 ## Componentes e referências
 
 | Repositório | Branch de deploy | Responsabilidade |
