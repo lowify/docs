@@ -1,6 +1,6 @@
 # Deploy — Alertas de saúde de entregas
 
-> Status: preparação operacional — **não promover para produção antes de concluir a validação visual em homologação e limpar o cenário sintético ativo**.
+> Status: homologação atualizada em 2026-10-08 — deploy, migration e alteração manual do template padrão validados. **Não promover para produção antes de concluir a validação visual do alerta de falha recorrente e limpar o cenário sintético ativo.**
 
 ## Objetivo
 
@@ -8,7 +8,15 @@ Publicar a detecção recorrente de falhas de entrega por WhatsApp Meta e e-mail
 
 Esta entrega não reenvia mensagens, não bloqueia novos envios, não altera provedores e não expõe conteúdo, telefones, e-mails ou payloads de entrega.
 
-Foram executados testes em homologação com cenário controlado: a detecção criou os logs mínimos, ativou a manutenção global e publicou as notificações internas para administradores. A validação visual do Dashboard deve ser concluída quando a branch da feature estiver selecionada sem troca concorrente de diretório.
+Foram executados testes em homologação com cenário controlado: a detecção criou os logs mínimos, ativou a manutenção global e publicou as notificações internas para administradores. A validação visual da configuração manual no Dashboard foi concluída em 2026-10-08; o fluxo visual do alerta de falha recorrente ainda depende de uma ocorrência compatível.
+
+## Registro de homologação — 2026-10-08
+
+- Publicados `services-account`, `services-notifications`, `dashboard-seller`, `edge-public-api` e `edge-gateway` na branch `feat/communication-delivery-health-alerts`.
+- Os componentes de serviço, API e Gateway foram reconstruídos; o Dashboard foi atualizado somente por Git, pois o container monta o diretório do repositório.
+- A migration `2026_10_08_000061_add_default_type_to_whatsapp_meta_templates` foi aplicada com sucesso no Notification.
+- Em **Configurações do sistema → WhatsApp Meta**, a seleção do template padrão de recuperação de venda foi alterada e a mudança foi confirmada em `whatsapp_meta_templates`.
+- A rotação automática causada por falha recorrente e a notificação interna associada permanecem pendentes de uma ocorrência apropriada; não induzir essa falha em produção.
 
 ## Componentes e referências
 
