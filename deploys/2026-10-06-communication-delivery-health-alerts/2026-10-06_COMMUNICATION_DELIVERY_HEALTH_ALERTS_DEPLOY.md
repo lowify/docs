@@ -29,7 +29,8 @@ Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compart
 - A migration `2026_10_06_000060_create_delivery_health_logs_and_templates` cria `delivery_health_logs`, índices compostos e os quatro templates in-app.
 - A migration `2026_10_08_000061_add_default_type_to_whatsapp_meta_templates` adiciona o estado persistido do template padrão de recuperação de venda. O valor `default_type = 1` representa `SALE_RECOVERY` e inicia em `sale_recovering_ct_4`.
 - Quando o template padrão dessa família falha recorrentemente, o Notification não ativa a manutenção global nem o banner. Ele registra o evento, notifica administradores e muda `default_type = 1` para o próximo template. Em `_7`, não há rotação circular: a notificação pede ajuste manual.
-- Em **Configurações do sistema → WhatsApp Meta**, o Dashboard exibe somente para leitura a etapa **Recuperação de venda — etapa 1** e seu template padrão. O valor vem da resposta já existente de `/admin/system/overview`; não há nova rota nem edição nessa tela.
+- A migration também classifica `sale_recovering_ct_1` a `_7` como `template_type = SALE_RECOVERY`. O overview existente carrega essas opções para o Dashboard, sem lista fixa no front-end.
+- Em **Configurações do sistema → WhatsApp Meta**, o Dashboard exibe a etapa **Recuperação de venda — etapa 1**, permite selecionar um template dessa classificação e o salva pela rota administrativa própria. O valor atual e as opções vêm da resposta já existente de `/admin/system/overview`.
 
 ## Pré-requisitos e bloqueios de promoção
 
