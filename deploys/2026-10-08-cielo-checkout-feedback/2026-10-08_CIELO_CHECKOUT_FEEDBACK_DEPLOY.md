@@ -23,13 +23,6 @@ O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o 
 3. A referência percorre Banking → Commerce → Checkout em `meta.reference`. Pix e outros adquirentes não passam pelo novo mapeamento de mensagens Cielo.
 4. Para cartão, a tarifa de plataforma passa a ser `taxa_seller + percentual/MDR`. No split Cielo, os valores continuam enviados separadamente como taxa fixa e MDR.
 
-## Pré-requisitos
-
-1. Publicar as alterações da branch `fix/cielo-integration` no repositório remoto antes de iniciar o deploy.
-2. Confirmar que as árvores de trabalho da VPS estão limpas. Não sobrescrever alterações locais.
-3. Manter as configurações Cielo existentes. Não há variável de ambiente nova.
-4. A tabela `ordinary_logs` já deve existir, como nas instalações atuais do Banking V2.
-
 ## Banco de dados
 
 Não há migration nem DDL neste deploy. Os novos registros usam a tabela existente `ordinary_logs`; eventos brutos continuam na tabela já existente `charge_card_events`.
