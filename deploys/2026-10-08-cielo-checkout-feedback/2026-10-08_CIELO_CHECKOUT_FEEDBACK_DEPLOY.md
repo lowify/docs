@@ -47,7 +47,8 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
-   docker compose up -d --build
+   docker compose build
+   docker compose up -d
    docker compose ps
    docker compose logs --tail=100
    ```
@@ -72,7 +73,8 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
-   docker compose up -d --build
+   docker compose build
+   docker compose up -d
    docker compose ps
    docker compose logs --tail=100
    ```
