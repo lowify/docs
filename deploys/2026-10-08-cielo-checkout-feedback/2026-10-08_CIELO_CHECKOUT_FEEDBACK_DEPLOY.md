@@ -38,7 +38,9 @@ Não há migration nem DDL neste deploy. Os novos registros usam a tabela existe
 
 Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova referência segura entra antes dos consumidores.
 
-1. Publicar `services-banking-v2`:
+1. Publicar `services-banking-v2`.
+
+   Atualizar a revisão:
 
    ```bash
    cd /opt/lowify/services/services-banking-v2
@@ -47,13 +49,20 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
+   ```
+
+   Construir e iniciar o serviço:
+
+   ```bash
    docker compose build
    docker compose up -d
    docker compose ps
    docker compose logs --tail=100
    ```
 
-2. Publicar `services-commerce-v2`:
+2. Publicar `services-commerce-v2`.
+
+   Atualizar a revisão:
 
    ```bash
    cd /opt/lowify/services/service-commerce-v2
@@ -62,6 +71,11 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
+   ```
+
+   Construir e iniciar o serviço:
+
+   ```bash
    docker compose build
    docker compose up -d
    docker compose ps
