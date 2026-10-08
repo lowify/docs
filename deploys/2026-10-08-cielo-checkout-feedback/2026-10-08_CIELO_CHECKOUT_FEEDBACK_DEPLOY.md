@@ -23,10 +23,6 @@ O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o 
 3. A referência percorre Banking → Commerce → Checkout em `meta.reference`. Pix e outros adquirentes não passam pelo novo mapeamento de mensagens Cielo.
 4. Para cartão, a tarifa de plataforma passa a ser `taxa_seller + percentual/MDR`. No split Cielo, os valores continuam enviados separadamente como taxa fixa e MDR.
 
-## Banco de dados
-
-Não há migration nem DDL neste deploy. Os novos registros usam a tabela existente `ordinary_logs`; eventos brutos continuam na tabela já existente `charge_card_events`.
-
 ## Sequência de deploy
 
 Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova referência segura entra antes dos consumidores.
