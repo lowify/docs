@@ -62,6 +62,10 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
+   docker compose build
+   docker compose up -d
+   docker compose ps
+   docker compose logs --tail=100
    ```
 
 3. Publicar `front-checkout`:
@@ -73,10 +77,6 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
-   docker compose build
-   docker compose up -d
-   docker compose ps
-   docker compose logs --tail=100
    ```
 
 ## Validação pós-deploy
