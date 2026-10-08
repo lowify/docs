@@ -4,7 +4,7 @@
 
 ## Objetivo
 
-Publicar a detecção recorrente de falhas de entrega por WhatsApp Meta e e-mail. Quando uma categoria tiver os últimos `N` envios terminais em falha, o Notification ativa uma manutenção global pelo Account, grava um log mínimo, publica uma notificação interna para administradores e o Dashboard Seller mostra um alerta prioritário que pode ser reconhecido. A família `sale_recovering_ct_1` a `sale_recovering_ct_7` é exceção: ela gera somente notificação interna e alterna o template de recuperação de venda.
+Publicar a detecção recorrente de falhas de entrega por WhatsApp Meta e e-mail. Quando uma categoria tiver os últimos `N` envios terminais em falha, o Notification ativa uma manutenção global pelo Account, grava um log mínimo, publica uma notificação interna para administradores e o Dashboard Seller mostra um alerta prioritário que pode ser reconhecido. A família `sale_recovering_ct_3` a `sale_recovering_ct_7` é exceção: ela gera somente notificação interna e alterna o template de recuperação de venda.
 
 Esta entrega não reenvia mensagens, não bloqueia novos envios, não altera provedores e não expõe conteúdo, telefones, e-mails ou payloads de entrega.
 
@@ -29,7 +29,7 @@ Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compart
 - A migration `2026_10_06_000060_create_delivery_health_logs_and_templates` cria `delivery_health_logs`, índices compostos e os quatro templates in-app.
 - A migration `2026_10_08_000061_add_default_type_to_whatsapp_meta_templates` adiciona o estado persistido do template padrão de recuperação de venda. O valor `default_type = 1` representa `SALE_RECOVERY` e inicia em `sale_recovering_ct_4`.
 - Quando o template padrão dessa família falha recorrentemente, o Notification não ativa a manutenção global nem o banner. Ele registra o evento, notifica administradores e muda `default_type = 1` para o próximo template. Em `_7`, não há rotação circular: a notificação pede ajuste manual.
-- A migration também classifica `sale_recovering_ct_1` a `_7` como `template_type = SALE_RECOVERY`. O overview existente carrega essas opções para o Dashboard, sem lista fixa no front-end.
+- A migration também classifica `sale_recovering_ct_3` a `_7` como `template_type = SALE_RECOVERY`. O overview existente carrega essas opções para o Dashboard, sem lista fixa no front-end.
 - Em **Configurações do sistema → WhatsApp Meta**, o Dashboard exibe a etapa **Recuperação de venda — etapa 1**, permite selecionar um template dessa classificação e o salva pela rota administrativa própria. O valor atual e as opções vêm da resposta já existente de `/admin/system/overview`.
 
 ## Pré-requisitos e bloqueios de promoção
@@ -56,7 +56,7 @@ Ela cria:
 - índices por `updated_at`/`id`, template e provider nas tabelas de envio;
 - templates `delivery_health_*` em `in_app_notifications_template`.
 - coluna nullable e única `whatsapp_meta_templates.default_type`;
-- registros da família `sale_recovering_ct_1` a `_7` e templates in-app de rotação/esgotamento.
+- registros da família `sale_recovering_ct_3` a `_7` e templates in-app de rotação/esgotamento.
 
 Antes de aplicar, conferir o status da migration. Depois, conferir que ela aparece como `Yes`. Não executar rollback automático de schema, não apagar logs e não limpar Redis como parte da reversão.
 
@@ -64,7 +64,7 @@ As sysvars `communication_delivery_maintenance_*` não precisam de seed: são cr
 
 ### Ajuste manual do template de recuperação
 
-O template ativo é consultável diretamente em `whatsapp_meta_templates`: o registro com `default_type = 1` é o padrão de recuperação de venda. Para trocar manualmente, realizar uma transação, remover o `default_type` do registro atual e atribuir `1` ao template desejado da família `sale_recovering_ct_1` a `_7`. O índice único garante que só exista um padrão desse tipo. Não usar rotação circular nem definir `default_type` em templates de outra família.
+O template ativo é consultável diretamente em `whatsapp_meta_templates`: o registro com `default_type = 1` é o padrão de recuperação de venda. Para trocar manualmente, realizar uma transação, remover o `default_type` do registro atual e atribuir `1` ao template desejado da família `sale_recovering_ct_3` a `_7`. O índice único garante que só exista um padrão desse tipo. Não usar rotação circular nem definir `default_type` em templates de outra família.
 
 ## Sequência de deploy
 
