@@ -1,7 +1,7 @@
 # Feature — integração Cielo
 
 > Status: em evolução
-> Última atualização: 2026-09-02
+> Última atualização: 2026-10-08
 > Confiança: parcialmente confirmada
 
 ## Objetivo
@@ -46,6 +46,8 @@ Dashboard/Checkout -> Gateway e Public API -> Account, Banking v2, Commerce v2 e
 ## Operação e validação
 
 A preparação aplica os SQLs de `lowify` e `services-banking` antes de reconstruir os containers. Providers/gateways entram ativos, mas só ficam utilizáveis após aprovação da conta. O roteiro operacional está no [deploy Cielo](../../deploys/2026-09-02-cielo-integration/2026-09-02_CIELO_INTEGRATION_DEPLOY.md).
+
+No `front-checkout`, o nome do titular aceita nomes compostos com iniciais intermediárias, como `LUCAS R PRADO`. A validação do titular no Commerce e Banking V2 limita presença, tipo e tamanho; não há restrição adicional por inicial.
 
 ## Limitações e pendências
 
