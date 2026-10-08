@@ -8,11 +8,11 @@ Também ajustar a taxa de cartão para somar a taxa fixa do seller (`taxa_seller
 
 ## Componentes e referências
 
-| Repositório | Diretório na VPS | Branch de deploy | Commit obrigatório | Entrega |
-| --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `fix/cielo-integration` | `f8df52c` | Mapeia a falha Cielo, grava log ordinário e devolve referência segura para o Checkout. |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `fix/cielo-integration` | `454313c` | Propaga a referência segura e soma taxa fixa do seller ao MDR do cartão. |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `fix/cielo-integration` | `9655f7b` | Exibe a mensagem segura devolvida pelo Checkout. |
+| Repositório | Diretório na VPS | Branch de deploy | Entrega |
+| --- | --- | --- | --- |
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `fix/cielo-integration` | Mapeia a falha Cielo, grava log ordinário e devolve referência segura para o Checkout. |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `fix/cielo-integration` | Propaga a referência segura e soma taxa fixa do seller ao MDR do cartão. |
+| `front-checkout` | `/opt/lowify/front/front-checkout` | `fix/cielo-integration` | Exibe a mensagem segura devolvida pelo Checkout. |
 
 O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o campo `meta` entre Commerce e Checkout.
 
@@ -25,7 +25,7 @@ O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o 
 
 ## Pré-requisitos
 
-1. Publicar os três commits da tabela no repositório remoto antes de iniciar o deploy.
+1. Publicar as alterações da branch `fix/cielo-integration` no repositório remoto antes de iniciar o deploy.
 2. Confirmar que as árvores de trabalho da VPS estão limpas. Não sobrescrever alterações locais.
 3. Manter as configurações Cielo existentes. Não há variável de ambiente nova.
 4. A tabela `ordinary_logs` já deve existir, como nas instalações atuais do Banking V2.
@@ -52,8 +52,6 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    docker compose logs --tail=100
    ```
 
-   Conferir que `git rev-parse --short HEAD` retorna `f8df52c` ou um descendente aprovado dessa revisão.
-
 2. Publicar `services-commerce-v2`:
 
    ```bash
@@ -68,8 +66,6 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    docker compose logs --tail=100
    ```
 
-   Conferir que `git rev-parse --short HEAD` retorna `454313c` ou um descendente aprovado dessa revisão.
-
 3. Publicar `front-checkout`:
 
    ```bash
@@ -83,8 +79,6 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    docker compose ps
    docker compose logs --tail=100
    ```
-
-   Conferir que `git rev-parse --short HEAD` retorna `9655f7b` ou um descendente aprovado dessa revisão.
 
 ## Validação pós-deploy
 
