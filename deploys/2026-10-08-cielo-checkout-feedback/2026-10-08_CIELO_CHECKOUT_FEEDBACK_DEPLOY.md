@@ -47,6 +47,9 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
+   docker compose up -d --build
+   docker compose ps
+   docker compose logs --tail=100
    ```
 
 2. Publicar `services-commerce-v2`:
@@ -58,9 +61,6 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
    git switch fix/cielo-integration
    git pull --ff-only origin fix/cielo-integration
    git rev-parse --short HEAD
-   docker compose up -d --build
-   docker compose ps
-   docker compose logs --tail=100
    ```
 
 3. Publicar `front-checkout`:
@@ -87,7 +87,7 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
 
 ## Rollback
 
-1. Se necessário, retornar os componentes na ordem inversa: `front-checkout`, `services-commerce-v2` e `services-banking-v2`, sempre reconstruindo o container após mudar a revisão.
+1. Se necessário, retornar os componentes na ordem inversa: `front-checkout`, `services-commerce-v2` e `services-banking-v2`. Reconstruir os containers somente dos dois serviços após mudar a revisão.
 2. Não executar alterações no banco: não há migration a desfazer.
 3. Preservar `ordinary_logs`, `charge_card_events`, cobranças e vendas já registradas. O rollback não altera a taxa registrada em transações criadas enquanto esta versão esteve ativa.
 4. Antes de reabrir o Checkout, verificar cobranças de cartão pendentes ou em processamento para evitar duplicação de tentativas.
