@@ -51,3 +51,9 @@ Front Checkout -> tokenização do provedor -> Edge -> Commerce V2 (venda penden
 - Recorrência, débito, boleto, Woovi Parcelado e checkout hospedado Kiwify.
 - Split, credenciais de plataforma e onboarding do cartão normal da Lowify.
 - Alterar credenciais privadas ou habilitar cartão em uma integração existente sem ação explícita do seller.
+
+## Complemento desta branch
+
+Esta branch, `feat/checkout-transparent-card`, também inclui o relatório de erros por integração do Checkout Transparente. O Dashboard abre o relatório pela ação da própria integração e consulta a CT API pelo caminho autenticado já usado pelo Dashboard. O relatório mostra data, origem (`Integração` ou `Gerar checkout`), resumo e detalhes completos em modal.
+
+O armazenamento é aditivo em `integration_errors`; a migration `20261012000000_create_integration_errors.php` precisa ser aplicada junto da CT API. O contrato, a ordem de deploy e os casos de aceite estão em [Implementação, rollout e aceite](03_IMPLEMENTACAO_ROLLOUT_E_ACEITE.md).

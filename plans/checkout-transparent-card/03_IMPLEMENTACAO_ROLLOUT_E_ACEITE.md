@@ -15,6 +15,7 @@
 3. Estender `IntegrationGatewayCredentialRules`, criação/edição de integração e o formulário/API do Dashboard para os campos de cartão por método.
 4. Acrescentar `card_credit` à disponibilidade e retornar somente configuração pública da integração selecionada.
 5. Implementar criação de charge sem token, criação idempotente de tentativa, serialização segura e transições de estado.
+6. Criar `integration_errors` e registrar retornos falhos de configuração e checkout com detalhes sanitizados.
 
 ### Fase 2 - Edge, Commerce e Front Checkout
 
@@ -23,6 +24,7 @@
 3. Manter as regras de produto `ONE_TIME`, seller com CT habilitado, limite de parcelas e venda pendente duplicada.
 4. Criar tokenizadores por integração no Front Checkout. Remover logs de token e impedir fallback de PAN/CVV para Edge ou Commerce.
 5. Enviar endereço, documento e telefone conforme o contrato do provedor.
+6. No Dashboard, incluir a ação de relatório por integração, a lista paginada por cursor e o modal de detalhes; manter a chamada na cadeia autenticada dos Edges.
 
 ### Fase 3 - Worker, status e webhooks
 
@@ -83,6 +85,13 @@ O fluxo foi exercitado com mock HTTP isolado: aprovação imediata, recusa imedi
 4. Começar com sellers internos, observando tentativa, resultado, status final e confirmação no Commerce V2.
 5. Em rollback, retirar `card_credit` da disponibilidade. Charges já criadas continuam consultáveis e confirmáveis; migrations aditivas permanecem.
 
+### Complemento: relatório de erros
+
+1. Publicar primeiro a CT API e aplicar a migration aditiva `20261012000000_create_integration_errors.php` pelo fluxo normal de migrations do serviço.
+2. Publicar Edge Public API e Edge Gateway, que expõem e encaminham a consulta autenticada de lista e detalhe.
+3. Publicar Dashboard Seller por último. A ação de erros só deve ser usada depois de os três componentes anteriores estarem disponíveis.
+4. Não remover a tabela no rollback. Erros já registrados ajudam a reconciliar integrações e tentativas iniciadas antes da reversão.
+
 ## Casos de aceite
 
 | Caso | Resultado esperado |
@@ -95,6 +104,9 @@ O fluxo foi exercitado com mock HTTP isolado: aprovação imediata, recusa imedi
 | Reenvio da mesma tentativa | Idempotência impede nova cobrança no provedor. |
 | Token e dados de cartão | Não aparecem em MariaDB, Redis de resultado, logs, auditoria ou resposta HTTP. |
 | Woovi e Kiwify | Não anunciam nem aceitam `card`. |
+| Falha de configuração | É registrada uma vez em `integration_errors` como `Integração`, com dados sensíveis redigidos. |
+| Falha ao gerar ou consultar pagamento | É registrada em `integration_errors` como `Gerar checkout`, sem expor segredo, cartão, documento ou endereço. |
+| Relatório do seller | A ação da integração abre lista com data, origem, resumo truncado, `Ver mais` e modal com detalhes da própria integração. |
 
 ## Tasks executáveis
 

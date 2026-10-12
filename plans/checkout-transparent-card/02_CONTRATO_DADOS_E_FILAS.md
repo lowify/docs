@@ -49,6 +49,24 @@ O contrato base usa `POST /charges/{reference_id}/card-attempts`, com `X-Lowify-
 
 As migrations devem ser aditivas. A consulta ao MariaDB confirmou `charges`, `charge_attempts`, `charge_status_checks`, `integrations`, `integration_keys` e `integration_gateways` como tabelas implantadas.
 
+## Relatório de erros da integração
+
+`integration_errors` registra somente o necessário para o seller entender uma falha de sua própria integração:
+
+| Campo | Uso |
+| --- | --- |
+| `integration_id` | Escopo da integração dona do erro. |
+| `source` | `integration` para configuração/credencial e `checkout` para criação ou consulta de cobrança. |
+| `message` | Resumo exibido na lista. |
+| `details_json` | Contexto sanitizado, disponível somente no detalhe. |
+| `created_at` | Data exibida na listagem. O cursor usa `id`, coberto pelo índice da integração. |
+
+A migration `20261012000000_create_integration_errors.php` cria a tabela aditiva, com índice por integração e cursor.
+
+O registro acontece no retorno do worker: falha de configuração/OAuth usa `integration`; falha ao criar, agendar ou consultar uma cobrança usa `checkout`. Antes de persistir, mensagens e detalhes passam pela sanitização: token, senha, chave, certificado, dados de cartão, documento e endereço não entram no relatório.
+
+O Dashboard não lê MariaDB diretamente. Ele chama a CT API pela cadeia autenticada Dashboard -> Edge Gateway -> Edge Public API -> CT API. Os endpoints só retornam uma integração que pertença ao seller autenticado; a lista usa cursor `before_id` e limite máximo de 50 itens, e o detalhe exige o mesmo escopo.
+
 ## Fila e confirmação
 
 O envelope atual de `payment.create` já possui `uuid`, `provider`, `correlation_id`, valor, `charge_id`, `sale_id`, integração e idempotência. Para cartão, acrescentar um bloco de pagamento transitório e tipado, com token, bandeira e parcelas, e um identificador de tentativa.
