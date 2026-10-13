@@ -4,6 +4,8 @@ Data: 2026-10-13. Revisão estática das branches remotas `feat/checkout-transpa
 
 Os [esclarecimentos e regras de aceite](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md) detalham os pontos 1–9 e registram as decisões posteriores do produto: gateway único por seller/método, ativação após aprovação, cancelamento bloqueando novos ciclos, regras comerciais no Commerce V2 e inclusão de RisePay no escopo. A descrição abaixo registra o código examinado, não implementação dessas correções.
 
+Refinamentos: apenas cancelamento explícito cancela a assinatura; atraso/falta de pagamento não o fazem. O ajuste do envelope usa nonce estável por tentativa, sem novos campos temporais obrigatórios. O [mapa Banking V2 e polling por conta](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) detalha a adaptação solicitada e um processo de recuperação com estado em banco.
+
 ## Parecer
 
 A direção arquitetural é adequada: métodos separados por integração, tokenização no provedor, tentativas de cartão separadas da cobrança e entidades próprias para autorização/parcelas recorrentes. Isso evita encaixar toda recorrência em uma cobrança Pix avulsa.

@@ -18,6 +18,8 @@ Isso está explícito em `CommerceWebhookClient::notifySubscriptionPayment`. O e
 
 Portanto, o problema não é ausência de webhook do CT: é que o plano original não publica a segunda etapa, adicionada na branch do edge-webhook principal. Se o desenho desejado for eliminar essa dependência, é necessário mudar o contrato de saída do CT e o consumidor; ela não desaparece só por existir o ct-webhook.
 
+Problema objetivo: no conjunto de `main` examinado, o CT chamaria `/subscription-paid`, mas essa rota só existe na branch da feature do edge-webhook principal. A notificação falharia e não chegaria ao consumidor Commerce. Incluir e publicar essa dependência resolve o desencontro; o uso dos dois webhooks não é, por si só, um defeito arquitetural.
+
 ## 2. Token no checkout, descriptografia no CT e duplicidade
 
 ### O que está implementado
@@ -41,15 +43,15 @@ Outra lacuna: o formulário só exclui campos brutos do `FormData` para alguns p
 
 ### Como fechar o desenho pretendido
 
-Separar três identidades, porque têm funções diferentes:
+Decisão posterior do produto: neste momento exigir somente um nonce, reaproveitando os IDs de venda/cobrança/tentativa existentes. Não exigir novos campos de tempo ou outro ID de operação no contrato como condição deste ajuste.
 
-| Identidade | Função | Comportamento em repetição |
-| --- | --- | --- |
-| ID da operação/tentativa | Impedir duas cobranças da mesma intenção. | Mantido no duplo clique, retry HTTP e retomada de timeout. |
-| Nonce/JTI do envelope | Identificar o envelope e detectar replay indevido. | Novo envelope pode ter outro nonce, mas não deve virar nova operação automaticamente. |
-| `issued_at` / `expires_at` | Restringir o período de uso inicial. | Validado com relógio do servidor e tolerância limitada; não é uma chave de deduplicação. |
+Proposta mínima: nonce aleatório criptograficamente forte, com pelo menos 128 bits, gerado uma vez por tentativa e preservado no duplo clique/reenvio. Incluir o nonce no conteúdo autenticado do envelope e encaminhá-lo como identidade de tentativa, dentro do escopo seller + cobrança + método. Nova cifra do mesmo retry mantém o nonce; nova tentativa após recusa conhecida recebe outro nonce.
 
-O contrato do envelope deve vincular operação, sessão/checkout e integração/método esperados. O CT valida esse contexto contra uma operação autorizada pelo servidor. Preço, seller, produto e parcelas não se tornam confiáveis só porque vieram criptografados: qualquer pessoa com a chave pública consegue gerar um JWE. A autorização continua nas rotas e a regra da venda continua no Commerce.
+Redis pode controlar `ct:attempt:{seller}:{charge}:{nonce}` com reserva atômica `SET NX`, estado e referência ao resultado. A requisição concorrente retorna “em processamento” ou resultado existente, sem fazer outra chamada externa. O TTL é retenção/lease desse controle, não validade temporal do cartão. Não usar PAN/CVV/envelope como valor dessa chave.
+
+Para o controle não se perder com expiração/reinício do Redis, persistir o nonce na chave de idempotência da tentativa existente, protegida por unicidade no banco. Consultar esse registro antes de criar outra tentativa; resultado desconhecido vai para reconciliação. Assim o nonce pode ser a única identidade nova sem tornar Redis o único registro do pagamento.
+
+O CT valida o contexto contra uma cobrança autorizada pelo servidor. Preço, seller, produto e parcelas não se tornam confiáveis só porque vieram criptografados: qualquer pessoa com a chave pública consegue gerar um JWE. A autorização continua nas rotas e a regra da venda continua no Commerce.
 
 Persistir no CT a identidade da operação, escopo, fingerprint dos campos de negócio permitidos, estado (`received`, `processing`, resultado conhecido ou `unknown`), IDs externos, timestamps e resposta segura. Usar constraint única para a identidade e locking/transação para concorrer com outra requisição.
 
@@ -57,7 +59,7 @@ Persistir no CT a identidade da operação, escopo, fingerprint dos campos de ne
 - Mesma identidade com valor, parcelas ou escopo incompatíveis: rejeitar conflito.
 - Timeout após enviar: marcar resultado desconhecido e reconciliar. Não cobrar de novo sem saber o resultado anterior.
 - Nova tentativa após recusa conhecida: criar outro ID de tentativa, vinculado à mesma venda, conforme a regra de negócio.
-- A política de envelope expirado e retry deve permitir consultar um resultado já existente por uma rota autorizada; recuperar resultado não exige reutilizar cartão/CVV.
+- Consultar resultado existente por uma rota autorizada, sem reutilizar cartão/CVV; expiração de cache não significa permissão para nova cobrança.
 
 **Problema atual de identidade:** a public-api deriva a chave de tentativa de `orderId + paymentToken` ou `orderId + encryptedCard`. Se uma repetição gera outro token/envelope, a chave muda. Adicionar hora ao token pode agravar isso: o payload fica único, mas o pagamento repetido deixa de parecer a mesma operação. O ID da operação deve ser independente da cifra e sobreviver à repetição.
 
@@ -69,7 +71,9 @@ Para deduplicação, guardar metadados operacionais, não os dados brutos do car
 
 Um token de provedor não é equivalente ao CVV, mas sua retenção depende do contrato, finalidade e proteção aplicáveis. Não estabelecer retenção genérica sem essa análise. Evitar também hash de PAN/CVV como mecanismo de deduplicação. O roteiro recomenda não persistir o envelope sensível e consultar a operação pelos IDs externos em recuperação.
 
-**Aceite:** duplo clique, duas requisições concorrentes, novo envelope para o mesmo ID e timeout depois de sucesso produzem no máximo uma cobrança lógica; envelope expirado, adulterado ou de outro contexto é rejeitado; nenhum log/fila/auditoria armazena cartão/CVV.
+**Verificação de CVV no código atual:** não foi encontrada persistência explícita de CVV ou do JWE no caminho CT examinado. `CreateRisePayCardAttemptUseCase` abre os dados em memória e envia à RisePay; a tentativa grava metadados sem cartão/CVV, e o resultado publicado contém campos selecionados. `JobPayloadFactory::cardPaymentCreate` envia token do provider, não CVV. Isso não comprova ausência de captura em logs/APM/proxy do ambiente, que não foram auditados. A falha do formulário ainda pode levar CVV em aberto à infraestrutura antes da filtragem na public-api.
+
+**Aceite:** duplo clique, duas requisições concorrentes, novo envelope para o mesmo nonce e timeout depois de sucesso produzem no máximo uma cobrança lógica; envelope adulterado ou de outro contexto é rejeitado; expiração/perda do Redis não libera outra cobrança; nenhum log/fila/auditoria armazena cartão/CVV.
 
 ## 3. O problema do refresh Mercado Pago, em um exemplo
 
@@ -81,6 +85,15 @@ Um token de provedor não é equivalente ao CVV, mas sua retenção depende do c
 Quando o token antigo expirar/for rejeitado, as cobranças podem falhar apesar do refresh registrado como sucesso. `executeByIntegrationId` também pode sobrepor a credencial atual da integração com a cópia do método, quando recebe o método.
 
 **Aceite:** uma única fonte para credenciais OAuth compartilhadas, ou atualização consistente das cópias e da expiração; nenhuma renovação deixa Pix/cartão presos a um token antigo. Validar com credenciais sintéticas e homologação sem imprimir tokens.
+
+Onde acontece, em `services-checkout-transparent/services-checkout-transparent-api`, versão `ecc012a0`:
+
+- `CreateIntegrationUseCase`, linhas 111–138: grava as credenciais tanto em `integration_keys` quanto em `integration_payment_method_keys` para Pix.
+- `UpsertIntegrationPaymentMethodUseCase::integrationCredentialsForMethod`, linhas 328–348: herda/copia o `access_token` para cartão Mercado Pago.
+- `ApplyMercadoPagoOAuthTokenRefreshResultUseCase::persistTokens`, linhas 119–126: refresh grava usando `$this->keys`, isto é, chaves da integração, sem atualizar as chaves dos métodos.
+- `GetGatewayContextUseCase::execute`, linha 73: o contexto da cobrança retorna `credentialsForPaymentMethod`, isto é, a cópia do método.
+
+As linhas referem-se ao commit da feature; a `main` local não contém necessariamente as mesmas linhas/classes novas.
 
 ## 4. O problema das filas e da criação parcial, em exemplos
 
@@ -94,9 +107,13 @@ Isso não significa que toda requisição duplica, nem que não existe retry. Si
 
 **Aceite:** registrar a intenção de publicação junto do cadastro (outbox ou mecanismo equivalente), retomar as operações incompletas e consumir com reserva/ACK e recuperação após queda. Persistir etapas/IDs externos e usar idempotência do provider quando disponível. Falha de publicação, kill do worker e timeout intermediário não podem abandonar nem recriar cegamente a operação.
 
+Alternativa solicitada: um `Process` pode ler operações pendentes diretamente do banco, reservá-las e retomar pelo último checkpoint. Isso permite que o banco, e não Redis, seja a fonte de verdade do trabalho. Precisa de lease/locking, estado, próximo retry e reconciliação de resultado desconhecido; não basta reenviar todos os `pending`. Ver [mapa Banking V2 e proposta de recuperação](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md).
+
 ## 5. Cancelamento deve parar autorização, cobrança e novos ciclos
 
 **Regra definida pelo produto:** identificar o cancelamento, cancelar a cobrança ainda não liquidada e impedir geração de novos valores.
+
+Esclarecimento obrigatório: atraso, ausência de pagamento, falha/expiração de uma parcela não cancelam a assinatura. Somente cancelamento explícito provoca cancelamento de negócio. Preservar estado da autorização separado do estado de cada parcela; autorização rejeitada/tecnicamente indisponível é outro estado, não inferência de cancelamento por inadimplência. O polling atual agrupa `EXPIRADA` com `CANCELADA`; essa normalização precisa ser revista conforme o contrato e a regra acima.
 
 Hoje o polling Efí reconhece `CANCELADA`/`EXPIRADA` e altera o estado da assinatura. O resolvedor do ct-webhook trata pagamento inicial e parcela concluída, mas não fecha o fluxo de cancelamento da autorização. A confirmação de uma parcela também pode transformar uma assinatura cancelada em `active`, pois atualiza o estado sem proteger o cancelamento anterior.
 
@@ -118,6 +135,8 @@ Exemplo: cliente paga a primeira cobrança, mas o webhook não chega. O CT tenta
 
 **Aceite:** persistir/distinguir tipo da parcela; consultar a inicial em `/v2/cob/{txid}` e as posteriores em `/v2/cobr/{txid}`, interpretando a resposta correta de cada contrato. Não confundir `/v2/rec/{idRec}`, que consulta a autorização, com pagamento. Referências: [Efí — cobrança imediata](https://dev.efipay.com.br/docs/api-pix/cobrancas-imediatas/) e [Pix Automático](https://dev.efipay.com.br/docs/api-pix/pix-automatico/).
 
+Alternativa aprovada para mapear: polling dos recebimentos por conta, correlacionando txid/end-to-end com a operação local. Pode recuperar a primeira cobrança e pagamento atrasado sem consultar cada registro individualmente. Precisa paginar, persistir progresso/eventos e deduplicar com webhook; recebimentos não informam sozinhos cancelamento de autorização. O [mapa Banking V2](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) detalha essas trilhas.
+
 ## 7. Quando gerar a cobrança de billing
 
 Aqui, “billing” significa o custo/cobrança da Lowify pelo processamento, não uma nova cobrança do cartão do comprador. O provider já cobra o valor da compra segundo o parcelamento contratado.
@@ -136,6 +155,8 @@ Além disso, a consulta seleciona antes de filtrar o provider. Registros Woovi p
 
 **Aceite:** filtrar provider no banco e controlar `next_poll_at`/`last_polled_at` ou cursor justo, com índice adequado. Verificar 250+ registros, providers misturados e estados que não mudam: todos os elegíveis recebem consulta dentro do SLA. Acompanhar idade do registro sem consulta, não somente quantidade de requests. Concorrência dos workers deve respeitar limites do provider e não multiplicar cobranças.
 
+Direção solicitada pelo produto: adotar polling por conta/integração, inspirado no Banking V2. O [mapa do padrão atual e adaptação CT](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) registra processos, endpoints, cursores, paginação, limitações e testes do ajuste.
+
 ## 9. Regras adicionais definidas pelo produto
 
 | Requisito | Tratamento / critério de aceite |
@@ -144,7 +165,7 @@ Além disso, a consulta seleciona antes de filtrar o provider. Registros Woovi p
 | Ativar só depois de validar | Método não fica disponível enquanto integração/credenciais/escopos/webhooks exigidos estiverem pendentes ou reprovados. Tentativa de ativação mostra modal de “integração não aprovada”, com motivo seguro. Backend também rejeita; não basta ocultar botão. |
 | Um gateway ativo por método | Confirmado pelo usuário: exclusividade por seller + método. Pix na Efí e cartão na RisePay podem coexistir; dois gateways para cartão não. `is_default` sozinho não basta: preservar no máximo um método efetivamente habilitado/disponível em concorrência, em todos os endpoints. |
 | Regra de cartão centralizada no Commerce V2 | Commerce é a fonte das regras da venda: produto, valor, parcelas, limites e elegibilidade. CT mantém segurança e restrições técnicas do provider, mas não cria outra regra comercial independente. Encaminhar parcelas ao Commerce e validar o contrato autoritativo antes da execução. |
-| Habilitar RisePay | Entra no escopo de aceite, em vez de permanecer excluído. Código já possui provider JWE, decryptor e caminho de cobrança, mas está sob flag desabilitada. Habilitar exige chave pública/privada, validade/vínculo do envelope, idempotência estável, confirmação/reconciliação de timeout e homologação das rotas. Não considerar cumprido apenas por alterar a flag. |
+| Habilitar RisePay | Entra no escopo de aceite, em vez de permanecer excluído. Código já possui provider JWE, decryptor e caminho de cobrança, mas está sob flag desabilitada. Habilitar exige chave pública/privada, nonce/vínculo do envelope, idempotência estável, confirmação/reconciliação de timeout e homologação das rotas. Não considerar cumprido apenas por alterar a flag. |
 
 Ao trocar o gateway ativo, não perder a associação das assinaturas/obrigações existentes com a integração original. Desabilitar novas vendas não pode impedir reconciliação e cancelamento de operações antigas. Definir explicitamente se assinaturas antigas continuam até cancelamento; não migrá-las automaticamente para outro provider.
 

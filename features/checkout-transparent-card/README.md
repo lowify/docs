@@ -18,6 +18,8 @@ Decisões do produto registradas em 2026-10-13: um gateway ativo por seller/mét
 
 ## Viabilidade por provedor
 
+Refinamentos aprovados: neste ajuste, nonce estável por tentativa, sem novos campos temporais obrigatórios; banco preserva a idempotência mesmo com controle Redis. Assinatura Pix só é cancelada explicitamente, nunca por atraso/falta de pagamento. O [mapa do polling Banking V2 e adaptação por conta](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) orienta a recuperação de recebimentos, autorizações e operações pendentes no CT.
+
 | Provedor | Evidência no código | Necessário para cartão direto | Decisão |
 | --- | --- | --- | --- |
 | Mercado Pago | Worker Pix com `access_token`. | `public_key` do seller no front, tokenização Mercado Pago.js e worker de cartão. Validar a adoção de Orders, caminho recomendado pelo provedor para novas integrações. | Viável. |
