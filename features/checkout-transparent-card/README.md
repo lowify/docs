@@ -12,6 +12,8 @@ Permitir pagamento único por cartão no Checkout Transparente usando a conta do
 
 Documento para encaminhar ao dev: [problemas, correções sugeridas e critérios de aceite](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_CORRECTIONS.md). Inclui a atualização das credenciais de método na mesma transação do refresh OAuth e a regra de envio somente de token/envelope onde cartão bruto não é necessário.
 
+O documento apresenta os ajustes em linguagem de produto e pede uma análise do próprio dev para cada regra: como funciona hoje, evidência no código/teste, se precisa de correção e resultado. Regras combinadas não devem ser tratadas como comportamento já implementado; a avaliação do dev ainda está pendente.
+
 Requisito adicional: cartão disponível no checkout do seller deve aparecer também em Editar Produto, com configuração e parcelas consistentes com Commerce V2, sem ativar automaticamente todos os produtos ou apagar preferências por indisponibilidade temporária. Ver C13 do documento para o dev.
 
 Retornos de erro de cartão devem ter catálogo/mapeamento por provider e etapa, mensagens públicas genéricas e fallback seguro. Referência confirmada: `CieloEcommerceCheckoutErrorMapper` do Banking V2, não o catch genérico que expõe mensagem de exception. Ver C14 do documento para o dev; inclui tokenização, 3DS, execução, polling e resultado desconhecido sem incentivar cobrança duplicada.

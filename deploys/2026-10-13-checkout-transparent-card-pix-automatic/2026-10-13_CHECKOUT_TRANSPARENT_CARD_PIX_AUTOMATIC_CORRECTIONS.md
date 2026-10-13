@@ -1,208 +1,211 @@
-# Checkout Transparente — correções para implementação pelo dev
+# Checkout Transparente — revisão e ajustes para o dev
 
-Data: 2026-10-13. Este é o documento consolidado para encaminhar ao desenvolvedor. Identifica os problemas, onde procurar, a correção sugerida e o teste de aceite. Não registra correções já implementadas nem autoriza deploy.
+Data: 2026-10-13.
 
-Base: branches `feat/checkout-transparent-card` e commits da [revisão original](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md). O [detalhamento técnico](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md) e o [mapa de polling Banking V2](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) são evidências complementares; este arquivo reúne as orientações finais do produto.
+Objetivo: conferir o que já funciona e ajustar os pontos necessários para que cartão e Pix Automático operem conforme as regras combinadas. Este documento reúne o comportamento esperado, o problema observado e uma sugestão de correção.
 
-## Regras confirmadas
+A revisão inicial foi feita nas branches `feat/checkout-transparent-card`, nas versões registradas no [roteiro de revisão](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md). Ela não substitui a conferência do dev na versão que será entregue. Nenhuma correção nos serviços foi implementada por este documento.
 
-- Encaminhar apenas token/envelope e campos permitidos quando dados brutos do cartão não forem necessários ao contrato. Exceções precisam ser explícitas e limitadas ao fluxo que realmente as exige.
-- Usar nonce estável por tentativa, sem exigir novos campos temporais neste ajuste. Não armazenar CVV; também não guardar o envelope com CVV como histórico.
-- Cancelar assinatura somente por cancelamento explícito. Atraso, falta de pagamento e falha/expiração de parcela não cancelam a assinatura.
-- Billing de cartão uma vez, na primeira parcela/confirmação elegível; billing de Pix assinatura no pagamento de cada recorrência.
-- Um gateway ativo por seller e por método; métodos diferentes podem usar gateways diferentes.
-- Só disponibilizar método após validação/aprovação; mostrar modal seguro enquanto integração não aprovada.
-- Centralizar regras comerciais de cartão no Commerce V2. Habilitar RisePay depois de fechar os requisitos técnicos e homologar.
-- Se cartão estiver disponível no checkout do seller, a configuração de cartão também deve aparecer em Editar Produto, respeitando elegibilidade do produto e as mesmas regras comerciais.
-- Mapear todos os caminhos de erro de cartão e retornar códigos/mensagens públicas genéricas e estáveis, seguindo o padrão de mapper de checkout do Banking V2, sem repassar textos brutos do provider.
+## Como usar este documento
 
-## C01 — incluir dependências já implementadas no update
+Antes de alterar cada item, o dev deve conferir o código atual e testar o comportamento. Se já estiver correto, registrar a evidência e não refazer a implementação. Se estiver diferente, explicar brevemente a diferença e aplicar o ajuste.
 
-**Problema:** o plano original lista sete repositórios, omite `edge-webhook` principal e declara que Commerce V2 não tem código a publicar. A implementação da feature depende de ambos para a confirmação recorrente.
+Para cada regra e item C01–C14, registrar:
 
-**Evidência:** a rota `/api/checkout-transparent/subscription-paid` **já existe** na branch `feat/checkout-transparent-card` do edge-webhook, commit `74be04f3`. `CommerceWebhookClient::notifySubscriptionPayment`, no CT-API, chama essa rota. `CheckoutTransparentWebhookHandler` encaminha o evento para `sales:subscriptions:actions`. Commerce V2 também tem mudanças na branch (`a4b0015c`).
+- **Situação atual:** já atende, atende em parte, precisa de ajuste ou ainda não foi possível verificar.
+- **Análise do dev:** como funciona hoje, com referência ao código e ao teste realizado.
+- **Resultado:** o que foi alterado, os commits e o teste que comprova a correção; ou por que não foi necessário alterar.
 
-**Correção sugerida:** completar a matriz/ordem do próximo plano de update com esses repositórios e revisões compatíveis. Não recriar a rota nem alterar a arquitetura dos dois webhooks por causa deste achado. A ausência na `main` não é defeito da branch de entrega; o risco ocorre se esses componentes forem omitidos na atualização. Se já estiverem publicados em outro update, registrar o commit compatível como pré-requisito e verificar a rota/consumidor.
+As situações abaixo começam pendentes dessa análise. “Regra confirmada” significa que o comportamento foi combinado com o produto, não que já esteja implementado.
 
-**Aceite:** confirmação real chega de ct-webhook ao CT e deste ao Commerce, criando/confirmando a venda correta. No merge do Commerce, preservar correções mais recentes de valor bruto/taxas da `main`; não substituir `main` por uma branch antiga.
+## Regras combinadas — conferir uma a uma
 
-## C02 — enviar somente token/envelope quando o cartão bruto não é necessário
+| Comportamento esperado | O que a revisão inicial indica | Item | Análise do dev |
+| --- | --- | --- | --- |
+| Enviar somente token ou dados criptografados quando o cartão em aberto não for necessário. Não guardar CVV. | Alguns fluxos ainda enviam campos do cartão junto do token. Não foi encontrada gravação explícita de CVV no caminho CT; registros do ambiente ainda precisam ser conferidos. | C02 | Pendente |
+| Uma repetição da mesma tentativa não pode cobrar novamente. Usar um nonce: identificador aleatório mantido ao reenviar. | A identificação atual muda se o token ou os dados criptografados mudarem. | C03 | Pendente |
+| A assinatura só é cancelada por cancelamento explícito, nunca por atraso ou falta de pagamento. | O tratamento de cancelamento está incompleto; há situações que podem reativar uma assinatura cancelada. | C06 | Pendente |
+| A cobrança de serviço da Lowify acontece uma vez no cartão, na primeira parcela/confirmação elegível, e no pagamento de cada recorrência Pix. | Há cobrança de serviço no fluxo avulso; não foi encontrado o caminho equivalente por parcela Pix recorrente. | C08 | Pendente |
+| Cada método pode estar ativo em apenas um gateway por seller. Dois cartões de crédito ativos em gateways diferentes não são permitidos. | Escolher um padrão não garante que os demais estejam desativados. | C10 | Pendente |
+| Só disponibilizar um método depois de aprovado. Enquanto não aprovado, explicar isso em um modal. | A habilitação pode ocorrer antes de terminar a validação. | C10 | Pendente |
+| Usar no cartão as mesmas regras comerciais do Commerce V2, como valor e número de parcelas. | O caminho transparente remove a informação de parcelas antes de enviá-la ao Commerce. | C11 | Pendente |
+| Disponibilizar cartão RisePay após concluir os ajustes e testes necessários. | O código existe, mas o cartão está desabilitado. | C12 | Pendente |
+| Cartão disponível no checkout também aparece em Editar Produto, sem ativar automaticamente todos os produtos. | A edição usa condições próprias de disponibilidade; o dev precisa conferir a tela e o salvamento. | C13 | Pendente |
+| Todos os erros de cartão têm mensagens compreensíveis e seguras, sem mostrar respostas técnicas do gateway. | Há tratamento diferente conforme a etapa; o Banking V2 tem um exemplo de padronização no fluxo Cielo. | C14 | Pendente |
 
-**Problema confirmado:** `front-checkout/views/checkout/form/index.php` monta `FormData(form)` e remove `card_number`, `card_expiry`, `card_cvv` e outros campos apenas em condições limitadas. MP/Pagar.me/Efí podem enviar esses campos junto do token. `process.php` encaminha o payload; a public-api só remove os dados antes do Commerce, tarde demais para evitar passagem pela infraestrutura.
+## C01 — incluir todos os componentes na atualização
 
-**Correção sugerida:** construir payload por allowlist/contrato de fluxo. Depois da tokenização, remover PAN/CVV/validade brutos em todos os contextos em que não são necessários, não apenas para dois nomes de provider. Encaminhar `payment_token` ou `encrypted_card`, nonce, parcelas e dados de comprador estritamente necessários.
+**O que revisar:** o plano original lista sete repositórios, mas a confirmação de uma recorrência também depende do edge-webhook principal e do Commerce V2.
 
-Preservar somente exceções comprovadas do contrato (ex.: fluxo específico de 3DS legado); não retirar seus dados indiscriminadamente nem presumir que qualquer 3DS exige cartão aberto. A exceção deve depender do fluxo validado pelo servidor, não de uma flag arbitrária enviada pelo navegador. Reforçar a filtragem nas fronteiras públicas/internas e não encaminhar CVV ao Commerce.
+**Como ajustar:** incluir esses componentes na atualização, ou comprovar que suas versões compatíveis já foram publicadas. A rota de confirmação já está na branch da feature do edge-webhook (`74be04f3`); não é necessário criá-la novamente. O problema é deixar essa etapa fora da atualização, não a existência de dois webhooks.
 
-**Sobre armazenamento:** não foi encontrada gravação explícita de CVV/JWE no caminho CT analisado. RisePay abre em memória e envia ao provedor; tentativas/resultados armazenam campos selecionados. Isso não prova ausência de captura por logs/APM/proxy, ainda não auditados. O problema confirmado aqui é transporte desnecessário de campos brutos, não uma alegação de CVV já persistido.
+**Como conferir:** um pagamento recebido pelo webhook próprio do CT chega ao Commerce e confirma a venda correta. Ao integrar a branch do Commerce, preservar as correções mais novas de valor bruto e taxas da `main`.
 
-**Aceite:** conferir requisições no navegador e payloads entre camadas para cada provider/fluxo: somente token/envelope quando suficiente; legado/3DS continuam compatíveis; banco, fila, logs e auditoria sem CVV/PAN bruto.
+## C02 — não enviar dados de cartão sem necessidade
 
-## C03 — nonce e deduplicação independentes do token/cifra
+**O que revisar:** em alguns fluxos o navegador gera o token, mas ainda envia número, validade e CVV junto dele. Remover esses dados só antes do Commerce não evita que eles passem pelos componentes anteriores.
 
-**Problema confirmado:** `edge-public-api/app/Http/Controllers/ProductController.php::createTransparentCardAttempt` deriva a chave da tentativa de `orderId + paymentToken/encryptedCard`. Novo token ou nova cifra muda a chave mesmo quando é retry da mesma tentativa. O middleware do CT apenas exige o header; a deduplicação efetiva depende do use case/banco.
+**Como ajustar:** depois de gerar o token, enviar apenas ele e os dados necessários à compra. Para RisePay, enviar o pacote criptografado, sem uma cópia do cartão em aberto. Manter uma exceção somente quando o fluxo realmente exigir, como algum caminho específico de autenticação do cartão; a exceção precisa ser validada no servidor, não apenas escolhida pelo navegador.
 
-**Correção sugerida:** gerar nonce criptograficamente aleatório (pelo menos 128 bits) uma vez por tentativa, mantê-lo nos retries e incluir no envelope autenticado quando houver JWE. Propagá-lo por front → public-api → CT como chave de idempotência, usando o escopo seller/cobrança/método existente. Validar correspondência entre nonce externo e interno no JWE e autorização/ownership da cobrança.
+Não foi encontrada gravação explícita de CVV ou do pacote criptografado no caminho CT examinado. O dev também deve conferir se registros de erro ou ferramentas de monitoramento capturam esses dados.
 
-Redis pode reservar execução com `SET NX` e guardar apenas estado/referência segura. Persistir o mesmo nonce na tentativa com constraint única e transação/locking já usados pelo CT; retorno concorrente deve reutilizar tentativa/resultado. Nova tentativa após recusa conhecida usa outro nonce; timeout/estado desconhecido não libera nova cobrança. Não deduplicar por PAN/CVV ou conteúdo criptografado.
+**Como conferir:** revisar os dados enviados em cada fluxo de cartão e os registros gerados. Não pode haver CVV guardado, inclusive dentro de um pacote criptografado mantido como histórico. Os fluxos antigos que precisam de tratamento específico devem continuar funcionando.
 
-**Aceite:** dois POSTs simultâneos, nova cifra com mesmo nonce e expiração/perda do Redis não geram segunda cobrança. Mudança de valor/parcelas/escopo sob a mesma identidade é conflito, não outra tentativa. Não exigir `issued_at`/`expires_at` novos neste ajuste.
+## C03 — reconhecer a mesma tentativa quando houver reenvio
 
-## C04 — sincronizar credenciais Mercado Pago após refresh
+**O que revisar:** hoje a identificação da tentativa depende do token ou do pacote criptografado. Se eles mudarem durante um reenvio, a mesma intenção de compra pode parecer uma tentativa nova.
 
-**Problema confirmado no CT-API:**
+**Como ajustar:** gerar uma identificação aleatória, chamada nonce, uma vez por tentativa e mantê-la no duplo clique e nas repetições da requisição. Usá-la junto dos identificadores existentes de seller, cobrança e método. Quando houver pacote criptografado, incluir o nonce nele e conferir se corresponde ao enviado pela requisição.
 
-- `CreateIntegrationUseCase` grava credenciais em `integration_keys` e nas chaves do método Pix.
-- `UpsertIntegrationPaymentMethodUseCase::integrationCredentialsForMethod` herda o `access_token` para cartão.
-- `ApplyMercadoPagoOAuthTokenRefreshResultUseCase::persistTokens` renova somente `integration_keys`.
-- `GetGatewayContextUseCase::execute` lê `integration_payment_method_keys`; `executeByIntegrationId` pode sobrepor o token renovado com a cópia antiga quando recebe o método.
+Redis pode ajudar a impedir duas execuções ao mesmo tempo. O banco também deve guardar a identificação da tentativa, para que perder ou expirar esse controle no Redis não permita cobrar outra vez. Se o pagamento foi recusado de forma conhecida, uma nova tentativa pode receber outro nonce. Se a resposta ficou desconhecida, consultar o resultado antes de permitir outra cobrança.
 
-**Correção sugerida para este pacote:** manter o modelo atual de credenciais por método, mas estender `persistTokens` para gravar a versão renovada nas chaves de todos os métodos que utilizam o OAuth dessa mesma integração, na mesma transação da integração. Propagar `access_token` e, onde houver cópia utilizada, `refresh_token`; manter metadados de expiração coerentes. Incluir métodos desabilitados que possam voltar a ser habilitados, sem ativá-los automaticamente.
+**Como conferir:** duplo clique, dois envios simultâneos, nova criptografia com o mesmo nonce e reinício do Redis não duplicam a cobrança. Mudanças no valor ou nas parcelas não são aceitas silenciosamente como a mesma tentativa. Não exigir novos campos de tempo neste ajuste.
 
-Usar a criptografia/repositórios existentes. A gravação repetida do mesmo resultado não pode falhar por constraint de hash/duplicar histórico desnecessariamente. Não sobrescrever configuração pública ou credenciais de outra conta/método independente. Aplicar o mesmo princípio aos caminhos de renovação/reconexão que atualizam a mesma credencial compartilhada. Garantir que as leituras resolvam a versão mais recente após commit.
+## C04 — usar a credencial renovada do Mercado Pago em todos os métodos
 
-Como evolução futura, pode-se eliminar cópias de OAuth e manter referência à fonte única por integração. Não é necessário fazer essa refatoração maior para fechar este pacote.
+**O que revisar:** ao configurar Pix/cartão, o sistema guarda cópias da credencial de acesso. A renovação atualiza a integração, mas a cobrança pode continuar lendo a cópia antiga do método.
 
-**Aceite:** após refresh sintético `A → B`, contextos Pix e cartão devolvem `B`, inclusive `executeByIntegrationId` com método; método desabilitado usa `B` ao voltar; falha na transação não deixa versões parcialmente atualizadas; reentrega do resultado é idempotente. Nenhum token aparece em logs.
+**Como ajustar:** na renovação, atualizar também as credenciais dos métodos que usam a mesma conta Mercado Pago. Fazer essas gravações juntas: ou todas são concluídas, ou nenhuma é aplicada. Atualizar a informação de validade e incluir métodos desabilitados, sem ativá-los automaticamente.
 
-## C05 — processo de recuperação com fonte de verdade em banco
+Para este pacote, essa alteração pode preservar a estrutura atual. Não é necessário redesenhar todo o armazenamento. Usar o mesmo cuidado na reconexão da conta, não alterar credenciais de outra conta e aceitar uma resposta de renovação repetida sem erro.
 
-**Problema confirmado:** `CreateCheckoutSubscriptionUseCase` salva cadastro antes de publicar e retorna o existente sem republicar. Consumidores usam `BLPOP` e retries em memória; queda após retirada pode perder o trabalho. `EfiBankSubscriptionClient::create` faz várias chamadas sem checkpoints persistidos suficientes para retomada.
+**Como conferir:** renovar uma credencial de teste e verificar que Pix e cartão usam a nova versão. Um método desabilitado também usa a versão nova quando voltar a ser habilitado. Nenhuma credencial aparece nos registros de erro.
 
-**Correção sugerida:** criar um `Process` de recuperação que leia operações incompletas no banco, com estado, próximo retry, lease/reserva transacional e IDs/etapas externas persistidos. Gravar a intenção de execução/publicação junto do cadastro. Redis pode continuar como transporte/acelerador; não deve ser o único registro da pendência.
+## C05 — retomar operações que ficaram pela metade
 
-Persistir resultados/eventos a aplicar de forma durável e permitir retomada de efeitos Commerce/billing após reinício. Onde a fila continuar sendo o único caminho de entrega, adicionar reserva/ACK/reentrega ou assegurar reconstituição idempotente pelo banco. Antes de repetir uma criação cujo resultado ficou desconhecido, consultar/reconciliar a operação externa. Não salvar CVV/JWE para viabilizar retry automático; solicitar entrada novamente quando necessária, sem recriar cegamente pagamento já enviado.
+**O que revisar:** uma assinatura pode ser salva, mas sua tarefa não ser enviada. Um processo também pode parar depois de retirar uma tarefa da fila. Na Efí, a criação possui várias etapas; repetir tudo pode criar recursos novamente.
 
-**Aceite:** falha de Redis após cadastro, kill de processo, timeout após sucesso no provider e falha em etapa intermediária não abandonam a operação nem duplicam cobrança/venda/billing. Ver seção 4 do [mapa Banking V2](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md).
+**Como ajustar:** criar um processo de recuperação que leia as operações incompletas no banco, saiba qual etapa já terminou e retome a partir dela. Guardar o progresso e os identificadores retornados pelo gateway. Cada operação deve ser assumida por um processo de cada vez, com recuperação caso ele pare.
 
-## C06 — cancelamento explícito e transições seguras
+Redis pode continuar transportando tarefas, mas o banco deve permitir descobrir o que ainda falta. Incluir confirmação de venda e cobrança de serviço entre os efeitos a recuperar. Se a chamada ao gateway foi enviada e a resposta se perdeu, consultar antes de criar outra cobrança. Não guardar CVV para facilitar a retomada.
 
-**Problema confirmado:** o ct-webhook Efí não fecha o tratamento do evento de cancelamento de recorrência; polling agrupa `EXPIRADA` com `CANCELADA`; `ConfirmCheckoutSubscriptionPaymentUseCase` pode voltar assinatura cancelada a `active`. Resultado tardio de criação de parcela pode também escrever `pending` sobre estado já concluído.
+**Como conferir:** simular falha na publicação, reinício do processo e resposta perdida após sucesso no gateway. A operação é recuperada sem cobrança, venda ou custo duplicados.
 
-**Onde:** `EfiBankWebhookPaymentResolver` no ct-webhook; `GatewayResultQueueProcess`, `EfiBankSubscriptionSchedulerProcess` e `ConfirmCheckoutSubscriptionPaymentUseCase` no CT-API; handlers de execução de assinatura/parcela no worker.
+## C06 — cancelar somente quando houver cancelamento explícito
 
-**Correção sugerida:** separar estado da autorização/assinatura do estado financeiro de cada parcela. Atraso, falha e expiração de parcela não cancelam a assinatura. Normalizar cancelamento somente a partir de evento/ação explícita do contrato; tratar estado desconhecido/rejeitado/tecnicamente expirado sem inferir inadimplência como cancelamento.
+**O que revisar:** o recebimento do cancelamento ainda não fecha todas as etapas. Além disso, um pagamento que chega depois pode reativar a assinatura, e uma resposta antiga pode sobrescrever o estado mais recente da parcela.
 
-Cancelamento explícito bloqueia novos ciclos no scheduler e na execução de instrução já enfileirada, e solicita cancelamento das cobranças ainda abertas. Persistir confirmação/pendência externa. Pagamento atrasado confirma a parcela e seus efeitos financeiros, mas não reativa assinatura cancelada. Proteger estados finais contra reentrega e ordem invertida.
+**Como ajustar:** tratar separadamente a situação da assinatura e a situação de cada pagamento. Atraso, falta de pagamento ou expiração de uma parcela não cancelam a assinatura.
 
-**Aceite:** cancelar antes/depois do agendamento e durante execução; receber pagamento após cancelamento; repetir resultados fora de ordem. Nenhum ciclo novo após cancelamento, nenhum pagamento real perdido, nenhum cancelamento automático por falta de pagamento.
+Quando houver cancelamento explícito, impedir novas cobranças e cancelar as que ainda estiverem abertas, conforme o que o gateway permite. Conferir também tarefas já na fila. Se um pagamento antigo chegar depois, registrá-lo corretamente, mas manter a assinatura cancelada. Mensagens repetidas ou antigas não podem desfazer um pagamento ou cancelamento já confirmado.
 
-## C07 — polling por conta para recebimentos e autorizações
+**Como conferir:** cancelar antes e depois do agendamento e receber pagamento atrasado. Não há novos ciclos após o cancelamento; o histórico financeiro permanece correto; inadimplência não causa cancelamento automático.
 
-**Problema confirmado:** a rotina atual escolhe até 100 assinaturas por `updated_at` antes de filtrar Efí; pode repetir o mesmo lote indefinidamente. A primeira parcela Efí é criada em `/v2/cob`, mas consultada como `/v2/cobr`.
+## C07 — consultar os pagamentos por conta, sem deixar registros para trás
 
-**Onde:** `CheckoutSubscriptionRepository::pendingOrActiveForPolling`, `CheckoutSubscriptionChargeRepository::pendingForPolling`, `EfiBankSubscriptionPollingProcess`; worker `EfiBankSubscriptionClient::checkStatus`.
+**O que revisar:** a consulta atual pode selecionar sempre as mesmas 100 assinaturas. A primeira cobrança Efí também é consultada como se fosse uma cobrança recorrente, embora tenha sido criada em outro tipo de operação.
 
-**Correção sugerida:** adaptar o padrão Banking V2 para contas/integrações CT, com três trilhas: recebimentos, autorizações/cancelamentos e recuperação pontual. Para Efí, a listagem de recebimentos `/v2/pix` pode recuperar primeira cobrança e pagamento tardio; correlacionar conta + txid + end-to-end à parcela correta. Consulta pontual inicial usa `/v2/cob/{txid}`; recorrente, `/v2/cobr/{txid}`.
+**Como ajustar:** adotar consultas periódicas por conta/integração, aproveitando o padrão Banking V2. Conferir recebimentos, autorizações/cancelamentos e operações específicas que ficaram pendentes. Cada conta precisa de seu próprio progresso de consulta, para não misturar sellers nem permitir que uma conta bloqueie as demais.
 
-Usar cursor/checkpoint separado por provider/ambiente/conta/tipo; janelas com sobreposição; paginação completa; persistência dos itens antes de avançar; deduplicação compartilhada com webhook; justiça entre contas e limite de trabalho por conta. Continuar reconciliando operações antigas mesmo após desabilitar integração para novas vendas. Verificar a semântica temporal das listas para não perder cancelamento de autorização criada há meses.
+Percorrer todas as páginas de resultados e guardar o que foi encontrado antes de avançar. Reconsultar um pequeno intervalo já visto ajuda a encontrar eventos que chegaram depois; as repetições não podem gerar efeitos duplicados. Pagamento de parcela antiga deve confirmar aquela parcela, não a mais recente.
 
-**Aceite:** mais de 100 itens por minuto, 250+ registros, contas misturadas, falha/reinício e pagamento antigo recebido hoje: todas as contas avançam, todos os pagamentos conhecidos são aplicados uma vez, cancelamentos explícitos são recuperados. Não copiar cegamente locks, limites e mapeamento genérico de estados do Banking; consultar o [mapa completo](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md).
+Na Efí, a consulta específica da primeira cobrança usa `/v2/cob/{txid}`; as recorrentes usam `/v2/cobr/{txid}`. Continuar acompanhando operações antigas mesmo após trocar o gateway usado em novas vendas. O [mapa Banking V2](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) contém os detalhes para implementar.
 
-## C08 — billing no momento aprovado e aprovação de compra separada da autorização
+**Como conferir:** usar mais de 100 resultados por minuto, 250 ou mais registros e contas diferentes. Todas avançam, pagamentos antigos são encontrados e cada pagamento é aplicado uma vez. Conferir também cancelamento de uma autorização criada há meses.
 
-**Problemas confirmados:** `ConfirmCheckoutSubscriptionPaymentUseCase` não publica o billing equivalente ao caminho avulso. Além disso, `front-checkout/transparent_payment.php` trata assinatura `active` como pagamento confirmado, mas `active` também vem de autorização aprovada sem pagamento.
+## C08 — cobrar o serviço no momento certo e não confundir autorização com pagamento
 
-**Correção sugerida:** manter billing de cartão uma vez na primeira parcela/confirmação elegível, aproveitando `SnapshotChargeFeesUseCase`, `ConfirmChargePaymentUseCase` e `BillingItemsQueueClient`. Acrescentar snapshot/publicação correspondente ao pagamento de cada recorrência Pix, com identidade persistente por assinatura/parcela/tipo de custo. Fechar publicação/reentrega com C05.
+**O que revisar:** não foi encontrado o caminho de cobrança do serviço da Lowify para cada pagamento recorrente Pix. A tela também pode mostrar pagamento confirmado apenas porque o cliente autorizou a assinatura.
 
-Expor no contrato estado da autorização separado de pagamento da parcela inicial. Ajustar front e confirmação Commerce para não apresentar autorização como dinheiro recebido. A ativação da autorização pode permitir agendamento conforme o contrato sem significar compra paga nem cancelamento por ausência de pagamento.
+**Como ajustar:** cartão gera a cobrança de serviço uma vez, na primeira parcela/confirmação elegível. Pix assinatura gera essa cobrança quando cada recorrência é paga, sem repetição por consulta ou notificação duplicada. Reaproveitar as regras de taxas existentes e guardar qual parcela originou cada custo.
 
-**Aceite:** cartão em 12 parcelas gera um único custo conforme a política; cada recorrência Pix paga gera seu custo uma vez. Autorizar/agendar/consultar/repetir webhook não gera billing. Autorização aprovada com pagamento inicial pendente não aparece como pagamento confirmado. Registrar o tratamento financeiro do pagamento inicial Pix na política de aceite.
+Mostrar separadamente “assinatura autorizada” e “pagamento recebido”. Autorizar a assinatura permite seguir o fluxo previsto de agendamento, mas não significa que o dinheiro foi recebido. Conferir também como o pagamento inicial Pix entra na regra de cobrança do serviço.
 
-## C09 — calendário único e avanço idempotente de vencimento
+**Como conferir:** uma compra de cartão em 12 parcelas gera um único custo conforme a regra combinada; cada recorrência Pix paga gera seu custo uma vez. Autorização ou agendamento não aparece como pagamento confirmado nem gera cobrança de serviço por si só.
 
-**Problema confirmado:** primeiro vencimento no worker limita o dia ao mês; vencimentos seguintes em `GatewayResultQueueProcess::nextSubscriptionDueAt` usam `modify('+1 month')`, que pode produzir `31/jan → 03/mar`.
+## C09 — tratar corretamente vencimentos nos dias 30 e 31
 
-**Correção sugerida:** centralizar política de calendário, persistir dia/data-âncora e calcular cada ciclo a partir dela, não do dia já limitado em fevereiro. Proposta: último dia disponível naquele mês e retorno ao dia-âncora no seguinte. Alinhar fuso, frequência e ajuste de dia útil exigido pelo provider. Resultado repetido não avança o ciclo novamente nem altera parcela já paga.
+**O que revisar:** o primeiro vencimento e os seguintes usam cálculos diferentes. Somar um mês ao dia 31 pode levar diretamente a março, pulando fevereiro.
 
-**Aceite:** dias 28–31, fevereiro normal/bissexto, frequência anual/semestral e reentrega: não pula mês, não deriva o aniversário, não cria duas parcelas para o mesmo ciclo. Exemplo esperado após aprovação da política: `31/jan → 28/fev → 31/mar`.
+**Como ajustar:** usar a mesma regra em todos os ciclos e guardar o dia originalmente escolhido. A proposta é usar o último dia disponível nos meses menores e voltar ao dia original depois: `31/jan → 28/fev → 31/mar`. Confirmar essa política antes de aplicá-la e considerar ano bissexto, fuso e ajustes de dia útil do gateway.
 
-## C10 — aprovação antes de ativar e apenas um gateway por método
+Uma resposta repetida não deve avançar o calendário duas vezes nem alterar uma parcela já paga.
 
-**Problema confirmado:** métodos podem ser habilitados antes da conclusão assíncrona de validações; a unicidade existente é integração/método, não seller/método efetivamente ativo. Limpar `is_default` não impede dois métodos habilitados.
+**Como conferir:** testar dias 28 a 31, fevereiro, anos bissextos e frequências mensal/semestral/anual. Não pode pular mês, mudar o dia original indevidamente ou criar duas parcelas do mesmo ciclo.
 
-**Onde:** `UpsertIntegrationPaymentMethodUseCase`, `IntegrationPaymentMethodRepository`, disponibilidade do checkout e resultados de configuração no CT; modal de métodos no dashboard.
+## C10 — ativar só depois da aprovação e manter um gateway por método
 
-**Correção sugerida:** distinguir configuração solicitada de disponibilidade aprovada. Permitir ativação somente com integração ativa e requisitos daquele método concluídos, incluindo credenciais, escopos e webhooks exigidos. Responder com erro seguro e mostrar modal “integração não aprovada” quando pendente/reprovada.
+**O que revisar:** o método pode ser habilitado antes de terminar sua validação. Escolher um gateway como padrão também não garante que cartão esteja desativado nos outros.
 
-Implementar troca atômica por seller/método: reservar um registro de controle/seleção único para esse escopo, desabilitar o método anterior para novas vendas e habilitar o novo na mesma transação. Ajustar validações existentes que exigem outro padrão ativo para permitir essa troca atômica. Garantir a invariável em criação, edição, backfill e disponibilidade, não apenas no dashboard. Não migrar autorizações antigas nem impedir reconciliação da integração anterior.
+**Como ajustar:** só liberar o método quando sua integração e verificações necessárias estiverem aprovadas. Enquanto não estiver, mostrar um modal explicando que a integração ainda não foi aprovada; o servidor também deve impedir a ativação.
 
-**Aceite:** duas ativações concorrentes deixam no máximo um gateway disponível para aquele método; Pix e cartão em gateways diferentes funcionam; método pendente não aparece no checkout nem é ativável por requisição direta.
+Para cada seller, cartão só pode estar ativo em um gateway. Ao trocar, desativar cartão no anterior e ativar no novo como uma única mudança, inclusive quando duas pessoas fizerem isso ao mesmo tempo. Pix pode usar outro gateway, mas também só um para esse método. Não transferir automaticamente assinaturas antigas; continuar acompanhando-as na conta original.
 
-## C11 — fechar rota de edição e regra comercial no Commerce
+**Como conferir:** tentar ativar integração pendente e fazer duas ativações simultâneas. Nunca ficam dois gateways com cartão ativo. Pix e cartão em gateways diferentes continuam permitidos.
 
-**Problemas confirmados:** dashboard chama `PATCH /checkout-transparent/integrations/{id}`, mas essa rota não foi encontrada no gateway da feature. A public-api remove `installments` do payload enviado ao Commerce, impedindo esse caminho de validar a escolha contra a regra do produto.
+## C11 — permitir edição da integração e usar as regras de venda do Commerce
 
-**Correção sugerida:** adicionar encaminhamento PATCH no gateway com autenticação/permissão compatíveis com as rotas existentes. Encaminhar parcelas e demais campos comerciais não sensíveis ao Commerce e executar lá as mesmas regras autoritativas de cartão: produto, valor, elegibilidade e limites. O CT mantém restrições técnicas do provider, sem duplicar política comercial. Não reintroduzir campos brutos de cartão para corrigir parcelas.
+**O que revisar:** o dashboard chama uma rota de edição que não foi encontrada no gateway da feature. No cartão transparente, a informação de parcelas é retirada antes de chegar ao Commerce.
 
-**Aceite:** editar integração pelo dashboard chega ao destino e respeita ownership; parcelas acima do limite do produto ou valor adulterado são rejeitados no servidor; checkout legado permanece compatível.
+**Como ajustar:** completar o encaminhamento da edição com as mesmas verificações de acesso já usadas nas outras rotas. Enviar ao Commerce as informações comerciais necessárias, inclusive parcelas, sem dados sensíveis do cartão.
 
-## C12 — habilitar RisePay e impedir vazamento em erros
+O Commerce V2 deve aplicar as mesmas regras de produto, preço e parcelamento já usadas nas vendas. O CT continua verificando exigências próprias do gateway, sem criar uma regra comercial diferente.
 
-**Situação:** RisePay tem tokenização JWE, decryptor e criação de transação, mas permanece desabilitada pelo plano/flag. Foi solicitada sua habilitação. Sanitizadores atuais também deixam segredo/CPF/e-mail em alguns textos livres; há caminhos de mensagens de erro brutas.
+**Como conferir:** editar integração pelo dashboard e testar parcelas acima do limite ou valor alterado na requisição. O servidor rejeita escolhas inválidas, preserva o acesso de cada seller e mantém o checkout normal funcionando.
 
-**Correção sugerida:** fechar C02/C03/C05 antes da ativação RisePay, conferir rota, chaves pública/privada, seleção de método, consulta de status e reconciliação por referência quando o envio teve resultado desconhecido. Homologar e atualizar o novo plano para permitir a flag; não considerar pronto só por trocar `false` para `true`.
+## C12 — disponibilizar RisePay e proteger informações nos erros
 
-Nos erros, usar códigos/mensagens públicas permitidas e payloads operacionais selecionados; sanitizar antes de gravar/publicar/expor, inclusive texto livre. Não confiar somente no nome da chave do JSON ou em regex de número de cartão. Aplicar aos logs, erros de tentativa, auditoria e relatório seller, mantendo isolamento por seller.
+**O que revisar:** cartão RisePay já tem código, mas está desabilitado. Alguns caminhos de erro também podem guardar ou mostrar textos técnicos contendo informações que deveriam ser protegidas.
 
-**Aceite:** RisePay aprovada/recusada/pendente/timeout funciona sem repetição de cobrança; dados sintéticos de cartão/CVV/segredo não aparecem em logs, banco, fila ou painel; seller não lê erro de outra integração.
+**Como ajustar:** concluir proteção dos dados, controle de repetição e recuperação antes de habilitar RisePay. Conferir criação, consulta, aprovação, recusa e resposta perdida; não considerar concluído apenas por ligar a configuração.
+
+Nos erros, guardar apenas informações necessárias ao diagnóstico, retirando dados de cartão, credenciais e dados pessoais desnecessários antes de registrar ou mostrar. O relatório do seller também deve ser seguro e restrito às próprias integrações.
+
+**Como conferir:** homologar os resultados RisePay, inclusive resposta desconhecida, sem cobrar novamente. Usar dados fictícios para verificar que informações protegidas não aparecem em registros, respostas ou painel.
 
 ## C13 — mostrar cartão também em Editar Produto
 
-**Requisito do produto:** quando cartão estiver disponível no checkout, a tela Editar Produto precisa exibir a configuração correspondente, incluindo habilitação e regras de parcelas existentes. Mostrar a configuração não significa ativar cartão automaticamente em todos os produtos.
+**O que revisar:** a edição usa suas próprias condições para mostrar cartão. O dev precisa conferir se elas reconhecem cartão aprovado no CT, mesmo sem integração de cartão no checkout normal.
 
-**Pontos confirmados para revisão:** `dashboard-seller/product_form.php` carrega `seller.payment_methods.credit_card.available`; `views/dashboard/products/form/_components/checkout.php` condiciona a seção a `$cardFeatureEnabled` e calcula `$creditCardEnabled` combinando disponibilidade com configuração salva. Revisar também `product_edit.php`, `views/dashboard/products/form/index.php` e o caminho de salvamento. A inclusão deste requisito não afirma que a falha visual foi reproduzida em ambiente.
+**Como ajustar:** usar uma disponibilidade consistente entre checkout e Editar Produto. Se o seller tem cartão disponível e o produto permite esse pagamento, mostrar a opção de habilitar/desabilitar e configurar parcelas. Isso não significa ativar cartão automaticamente em todos os produtos.
 
-**Correção sugerida:** unificar a disponibilidade de cartão usada pelo checkout e pelo formulário de edição, considerando o método CT ativo/aprovado, não somente a integração de cartão do checkout normal. Propagar essa informação pelo contrato público/Commerce até o dashboard e ajustar as condições de renderização para permitir a edição quando o seller tem cartão disponível. Manter valor salvo, habilitação e limites de parcelas do produto sob as regras autoritativas do Commerce (C11).
+Preservar as escolhas salvas e as regras do Commerce. Se a integração ficar temporariamente indisponível, explicar isso sem apagar a preferência de cartão ao salvar outra informação.
 
-Disponibilidade da integração e preferência salva do produto são estados distintos. Se a integração ficar temporariamente indisponível, indicar isso sem apagar silenciosamente a configuração do produto ao salvar outra informação. Se o produto não for elegível para cartão, manter a regra de elegibilidade e explicar a restrição.
+**Como conferir:** editar, salvar e reabrir o produto; o checkout deve refletir a escolha e as parcelas. Testar seller com apenas cartão CT, falha temporária de consulta e produtos que não permitem cartão.
 
-**Aceite:** seller com cartão CT aprovado e disponível vê a opção em Editar Produto; ativa/desativa e ajusta parcelas, salva e reabre com os valores preservados; o checkout reflete a configuração salva. Seller sem integração de cartão normal, mas com cartão CT disponível, também vê a opção. Alteração de campo não relacionado e falha temporária da consulta não zeram a preferência de cartão. Testar regressão do cartão normal e produtos não elegíveis.
+## C14 — mostrar erros de cartão de forma simples e consistente
 
-## C14 — mapear erros de cartão e padronizar retornos genéricos
+**O que revisar:** tokenização, criação, consulta e processamento posterior tratam erros de maneiras diferentes. Uma mensagem genérica apenas na tela final não cobre os erros das etapas anteriores.
 
-**Problema:** o CT tem falhas distintas de tokenização, validação, criação, consulta e execução assíncrona, sem um contrato público único equivalente ao mapper de checkout do Banking. Há mensagens técnicas/provider em exceptions e resultados; ocultar apenas o erro final na página não cobre respostas HTTP, SDK, polling e fila.
+**Como ajustar:** montar uma lista dos erros de Mercado Pago, Pagar.me, Efí e RisePay e definir a mensagem segura de cada grupo. Incluir geração do token, autenticação do cartão (3DS), dados inválidos, recusa, integração indisponível, falha interna, consulta e resposta desconhecida. Incluir fluxos antigos se compartilharem os componentes alterados.
 
-**Referência confirmada no Banking V2 (`112062fc`):**
+Usar como referência o `CieloEcommerceCheckoutErrorMapper` do Banking V2: ele transforma os códigos do gateway em mensagens próprias do checkout. Esse padrão está no fluxo Cielo; os códigos precisam ser conferidos separadamente nos outros gateways. Não copiar o tratamento geral de exceções que ainda retorna a mensagem técnica.
 
-- `app/Application/Service/CieloEcommerce/CieloEcommerceCheckoutErrorMapper.php`: converte status/códigos Cielo em `code`, `alert_title`, `alert_message`, `reason`, com fallback para código desconhecido.
-- `app/Application/Exception/CieloEcommerceCheckoutPaymentException.php`: transporta o contrato seguro separado do detalhe técnico.
-- `app/Application/UseCase/CieloEcommerce/ChargeCard/CreateChargeCardUseCase.php::throwCheckoutPaymentError`: aplica o mapper e registra a ocorrência separadamente.
-- `app/Http/Controller/ChargeCardController.php`: devolve o código normalizado com `checkout` no caminho da exception específica. O catch genérico ainda devolve `$e->getMessage()`; não copiar esse fallback como garantia de segurança.
-
-Essa referência está implementada especificamente no fluxo Cielo. Não presumir que todos os providers do Banking já têm cobertura equivalente. Reutilizar o padrão de contrato e os códigos aplicáveis, não copiar códigos de recusa Cielo como se fossem códigos MP/Pagar.me/Efí/RisePay.
-
-**Onde revisar no CT:** clients de cartão `MercadoPagoPaymentClient`, `PagarMePaymentClient`, `EfiBankPaymentClient` no worker; `CreateCardChargeAttemptUseCase`, `CreateRisePayCardAttemptUseCase`, `ChargeController`, `GatewayResultQueueProcess` e respostas de consulta no CT-API; `ProductController::createTransparentCardAttempt` na public-api; `views/checkout/form/methods/card.php`, tratamento de submit e `transparent_payment.php` no front. Incluir retornos de webhook e polling que atualizam as mesmas tentativas.
-
-**Correção sugerida:** criar/adaptar mapper de erro de checkout com adapters por provider e uma normalização comum. Mapear explicitamente os códigos conhecidos de cada API/SDK e erros locais; erro desconhecido sempre cai em mensagem segura. Não basear regra comercial somente em substring de mensagem livre. Preservar códigos técnicos necessários ao diagnóstico em registro interno sanitizado, com ID de correlação; comprador recebe somente campos públicos permitidos.
-
-Inventário obrigatório para o dev, por provider e etapa: origem do erro, status/código técnico, categoria normalizada, mensagem pública, resultado conhecido/desconhecido e possibilidade de retry. Cobrir MP, Pagar.me, Efí e RisePay; incluir legado/3DS quando compartilhar componentes alterados. Validar códigos com contratos oficiais e fixtures sintéticas/homologação; não afirmar lista completa de códigos externos somente a partir das falhas já observadas.
-
-| Família que deve ser coberta | Retorno público sugerido / comportamento |
+| Situação | Exemplo de retorno ao comprador |
 | --- | --- |
-| Dados inválidos, cartão vencido, token inválido/expirado, falha de tokenização | Mensagem controlada para conferir dados/refazer tokenização; nunca texto bruto do SDK, token ou CVV. Reaproveitar códigos Banking aplicáveis, como `card_payment_invalid_card`/`card_payment_expired_card`, apenas com classificação comprovada. |
-| Recusa do emissor, limite/saldo insuficiente, cartão restrito, análise de risco | Código normalizado e mensagem genérica segura, sem motivo interno de fraude: “Pagamento não autorizado. Utilize outro cartão ou meio de pagamento.” Orientação mais específica somente quando aprovada e respaldada pelo código do provider. |
-| 3DS: não autenticado, falha, abandono, indisponibilidade | Mensagem controlada de autenticação não concluída; não expor payload/credencial 3DS nem tratar autenticação como cobrança concluída. |
-| Credenciais, integração não aprovada, provider indisponível, rate limit | “Pagamento por cartão indisponível no momento. Utilize outro meio de pagamento.” Diagnóstico detalhado restrito à operação, sanitizado; não culpar dados do comprador. |
-| Falha antes de enviar, Redis/worker, exceção interna ou resposta malformada | Fallback seguro de processamento; preservar HTTP/estado apropriados. Retry só quando o resultado for comprovadamente conhecido e seguro. |
-| Timeout/falha após envio com resultado desconhecido | “Estamos verificando seu pagamento. Aguarde a confirmação.” Manter pendência/reconciliação e o mesmo nonce; não mostrar recusa definitiva nem incentivar outra cobrança imediata. |
-| Consulta de status falhou, mas tentativa ainda existe | Mensagem segura de consulta temporariamente indisponível; não transformar a tentativa em recusada por uma falha de polling. |
-| Pagamento explicitamente cancelado/abortado ou erro não catalogado | Código estável e mensagem permitida do catálogo; fallback genérico obrigatório. Não repassar `$exception->getMessage()`, `body.message` ou erro livre do provider ao checkout. |
+| Dados inválidos ou cartão vencido | “Confira os dados do cartão e tente novamente”, ou orientação específica aprovada. |
+| Pagamento recusado | “Pagamento não autorizado. Utilize outro cartão ou meio de pagamento.” |
+| Autenticação do cartão não concluída | “Não foi possível concluir a autenticação do cartão.” |
+| Integração ou serviço indisponível | “Pagamento por cartão indisponível no momento. Utilize outro meio de pagamento.” |
+| Chamada enviada, mas resultado ainda desconhecido | “Estamos verificando seu pagamento. Aguarde a confirmação.” Não incentivar outra cobrança. |
+| Consulta temporariamente indisponível | Explicar que a consulta falhou, sem declarar que o pagamento foi recusado. |
+| Erro ainda não catalogado | Mensagem genérica segura, nunca a resposta técnica recebida do gateway. |
 
-Aplicar a normalização no backend como fonte do retorno público; mapear também falhas de SDK que acontecem antes da chamada ao backend. Submit e consulta posterior da mesma tentativa devem exibir a mesma categoria/contrato, sem cada tela inventar seu texto a partir de erro técnico. Manter compatibilidade com o envelope HTTP existente e adicionar os campos normalizados de forma coordenada entre consumidores.
+Padronizar as mensagens no servidor e tratar também erros que acontecem no navegador antes do envio. A consulta posterior deve mostrar a mesma situação da tentativa. Manter o diagnóstico técnico separado, com dados protegidos, sem copiá-lo para o comprador ou relatório do seller.
 
-Separar a mensagem pública do diagnóstico interno também no banco: relatório seller não deve acabar expondo resposta técnica bruta porque o checkout a ocultou. Diagnóstico não significa guardar a resposta completa ou PAN/CVV/credenciais; selecionar e sanitizar os campos (C12).
+**Como conferir:** o dev entrega a lista de erros mapeados e testes dos grupos conhecidos e desconhecidos. Nenhuma etapa mostra dados sensíveis ou respostas brutas. Uma consulta falha não transforma pagamento aprovado em recusa; resposta desconhecida continua em acompanhamento.
 
-**Aceite:** testes parametrizados para cada entrada catalogada e fallback desconhecido de todos os providers/etapas; criação síncrona, erro assíncrono, polling, webhook e tokenização exibem somente contratos seguros. Validar strings sintéticas com PAN/CVV/token/CPF/e-mail e ausência de vazamento no navegador/API/painel/logs. Timeout desconhecido mantém pendência e não provoca outra cobrança; sucesso não é convertido em erro por falha de consulta. O dev entrega o inventário de códigos e sua cobertura junto dos commits.
+## Referências rápidas para o dev
 
-## Ordem e entrega esperada do dev
+Os caminhos e exemplos completos estão no [detalhamento da revisão](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md). Para localizar os principais ajustes:
 
-1. Fechar contratos C02/C03/C06/C08/C10/C11 e incluir as dependências C01 na entrega.
-2. Corrigir credenciais, recuperação durável e calendário: C04/C05/C09.
-3. Integrar polling por conta, callbacks, cancelamento e billing: C06/C07/C08.
-4. Fechar painel/rotas, paridade da edição de produto, retornos genéricos de cartão e homologar RisePay: C10/C11/C12/C13/C14.
-5. Executar os oito grupos do [roteiro funcional e de código](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo regressão do checkout legado, concorrência e falhas.
+- **C02/C03:** formulário e envio no front; `ProductController::createTransparentCardAttempt` na public-api; tentativas e proteção do cartão no CT-API.
+- **C04:** `ApplyMercadoPagoOAuthTokenRefreshResultUseCase::persistTokens`, criação de integração/métodos e `GetGatewayContextUseCase` no CT-API.
+- **C05–C09:** criação/confirmação de assinatura, processos de resultado/agendamento/consulta no CT-API; `EfiBankSubscriptionClient` no worker; resolvedor Efí no ct-webhook.
+- **C10/C11:** métodos e disponibilidade no CT; rotas do gateway/public-api; regras de produto e checkout no Commerce.
+- **C12/C14:** criação RisePay no CT-API, clientes dos gateways no worker, respostas HTTP e mensagens do front. Referência Banking: mapper e exceção Cielo de checkout e `ChargeCardController`.
+- **C13:** `product_form.php`, `product_edit.php` e `views/dashboard/products/form/_components/checkout.php` no dashboard.
 
-Para schema necessário, criar migrations novas; não editar migrations já commitadas. Validar backfill com dados antigos e repetição, constraints/índices com consultas reais e compatibilidade de versões durante rollout. Preservar worktrees locais e correções de `main`; não limpar Redis nem apagar operações para fazer testes passarem.
+## Ordem sugerida e retorno esperado
 
-Registrar por item: commits alterados, teste executado, resultado e pendência. Atualizar o plano de deploy com todos os componentes, flags e contratos finais. Não há aprovação de liberação até os bloqueios terem evidência de correção e homologação; somente sintaxe PHP e leitura estática foram validadas na revisão inicial.
+1. O dev preenche a análise das regras e confere os itens na branch que será entregue.
+2. Ajusta os dados enviados, o controle de repetição, as credenciais e a recuperação de operações.
+3. Fecha consultas por conta, cancelamento, calendário e cobrança de serviço.
+4. Confere ativação, edição de integração/produto, mensagens de erro e RisePay.
+5. Executa os grupos do [roteiro de testes](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo checkout normal, repetições e falhas.
+
+Entregar as regras e os itens com situação preenchida, evidências e alterações realizadas. Justificar quando não for necessária correção e registrar o que ainda depender de decisão ou teste.
+
+Se precisar mudar o banco, criar uma alteração nova, sem reescrever migrations já commitadas. Conferir dados antigos, execução repetida e tempo de consulta com volume maior. Preservar alterações locais e correções recentes da `main`; não apagar filas ou operações para fazer testes passarem.
+
+Atualizar o plano de entrega com todos os componentes e configurações necessários. A revisão inicial validou leitura de código e sintaxe PHP, não pagamentos reais, banco ou carga. A liberação depende da comprovação dos ajustes e dos testes em homologação.
