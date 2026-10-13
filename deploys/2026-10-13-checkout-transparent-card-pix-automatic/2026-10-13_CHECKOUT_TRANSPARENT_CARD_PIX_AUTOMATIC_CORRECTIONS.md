@@ -8,13 +8,20 @@ A revisão inicial foi feita nas branches `feat/checkout-transparent-card`, nas 
 
 ## Como usar este documento
 
-Antes de alterar cada item, o dev deve conferir o código atual e testar o comportamento. Se já estiver correto, registrar a evidência e não refazer a implementação. Se estiver diferente, explicar brevemente a diferença e aplicar o ajuste.
+Antes de alterar cada item, o dev deve conferir o código atual e realizar as verificações técnicas pertinentes. Se já estiver correto, registrar a evidência e não refazer a implementação. Se estiver diferente, explicar brevemente a diferença e aplicar o ajuste.
+
+As responsabilidades ficam separadas:
+
+- **Dev:** analisar as regras no código, implementar os ajustes, fazer as verificações técnicas e registrar as mudanças. Preparar as condições necessárias para testar e corrigir os problemas encontrados.
+- **Responsável pelo produto (solicitante):** executar o roteiro de testes funcionais, conferir o comportamento no checkout/dashboard e registrar o resultado de cada cenário. Essa execução não fica atribuída ao dev.
+
+Os trechos “Como conferir” descrevem o resultado esperado. A conferência funcional fica com o responsável pelo produto; verificações de banco, filas, segurança, concorrência e simulação de falhas ficam com o dev. Quando um cenário exigir uma condição técnica, o dev a prepara em ambiente de teste e o responsável pelo produto confere o efeito visível, sem precisar operar banco ou filas.
 
 Para cada regra e item C01–C14, registrar:
 
 - **Situação atual:** já atende, atende em parte, precisa de ajuste ou ainda não foi possível verificar.
 - **Análise do dev:** como funciona hoje, com referência ao código e ao teste realizado.
-- **Resultado:** o que foi alterado, os commits e o teste que comprova a correção; ou por que não foi necessário alterar.
+- **Resultado técnico do dev:** o que foi alterado, os commits e a verificação técnica realizada; ou por que não foi necessário alterar. A validação funcional pelo responsável do produto deve ser registrada separadamente, sem ser marcada como concluída antes da execução.
 
 As situações abaixo começam pendentes dessa análise. “Regra confirmada” significa que o comportamento foi combinado com o produto, não que já esteja implementado.
 
@@ -202,9 +209,9 @@ Os caminhos e exemplos completos estão no [detalhamento da revisão](2026-10-13
 2. Ajusta os dados enviados, o controle de repetição, as credenciais e a recuperação de operações.
 3. Fecha consultas por conta, cancelamento, calendário e cobrança de serviço.
 4. Confere ativação, edição de integração/produto, mensagens de erro e RisePay.
-5. Executa os grupos do [roteiro de testes](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo checkout normal, repetições e falhas.
+5. O dev entrega as mudanças com as verificações técnicas e condições de teste documentadas. O responsável pelo produto executa os cenários funcionais do [roteiro de testes](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo checkout normal e repetição de ações; o dev prepara as simulações técnicas de falha quando necessárias.
 
-Entregar as regras e os itens com situação preenchida, evidências e alterações realizadas. Justificar quando não for necessária correção e registrar o que ainda depender de decisão ou teste.
+O dev entrega as regras e os itens com análise técnica preenchida, evidências e alterações realizadas. Justificar quando não for necessária correção e registrar o que ainda depender de decisão ou teste. A conclusão funcional é preenchida pelo responsável pelo produto após executar o roteiro; até lá, permanece pendente.
 
 Se precisar mudar o banco, criar uma alteração nova, sem reescrever migrations já commitadas. Conferir dados antigos, execução repetida e tempo de consulta com volume maior. Preservar alterações locais e correções recentes da `main`; não apagar filas ou operações para fazer testes passarem.
 

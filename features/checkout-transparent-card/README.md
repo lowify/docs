@@ -14,6 +14,8 @@ Documento para encaminhar ao dev: [problemas, correções sugeridas e critérios
 
 O documento apresenta os ajustes em linguagem de produto e pede uma análise do próprio dev para cada regra: como funciona hoje, evidência no código/teste, se precisa de correção e resultado. Regras combinadas não devem ser tratadas como comportamento já implementado; a avaliação do dev ainda está pendente.
 
+Responsabilidades definidas: o dev analisa, corrige e verifica tecnicamente; o responsável pelo produto (solicitante) executa o roteiro funcional e registra a validação na interface. O dev prepara as condições técnicas necessárias aos testes, sem exigir que o responsável opere banco ou filas.
+
 Requisito adicional: cartão disponível no checkout do seller deve aparecer também em Editar Produto, com configuração e parcelas consistentes com Commerce V2, sem ativar automaticamente todos os produtos ou apagar preferências por indisponibilidade temporária. Ver C13 do documento para o dev.
 
 Retornos de erro de cartão devem ter catálogo/mapeamento por provider e etapa, mensagens públicas genéricas e fallback seguro. Referência confirmada: `CieloEcommerceCheckoutErrorMapper` do Banking V2, não o catch genérico que expõe mensagem de exception. Ver C14 do documento para o dev; inclui tokenização, 3DS, execução, polling e resultado desconhecido sem incentivar cobrança duplicada.

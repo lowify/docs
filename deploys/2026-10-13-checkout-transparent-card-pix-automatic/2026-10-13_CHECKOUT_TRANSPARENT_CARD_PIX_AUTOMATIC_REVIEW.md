@@ -112,6 +112,10 @@ Separar seleção por provedor, definir próxima consulta/cursor e distribuir lo
 
 ## Roteiro de revisão e homologação
 
+**Responsáveis:** o dev faz a análise de código e as verificações técnicas. O responsável pelo produto (solicitante) executa o roteiro funcional e registra os resultados na interface. A tabela abaixo mantém os dois tipos de conferência lado a lado; isso não atribui ao dev a execução dos testes funcionais.
+
+Para cenários que exigem simular falha de serviço, manipular entrega de eventos ou preparar volume de dados, o dev prepara e acompanha a condição no ambiente de teste. O responsável pelo produto confere o efeito no checkout/dashboard. Banco, filas, logs e efeitos internos são conferência técnica do dev, não exigência de operação pelo responsável do produto. Registrar separadamente “verificação técnica” e “validação funcional”; uma não substitui a outra.
+
 Executar em ambiente com bancos/Redis isolados e contas sandbox. Para cada cenário, guardar ID da venda, assinatura, parcela, tentativa e operação do provedor, sem dados sensíveis. Conferir navegador, API, banco, fila e efeito final em Commerce/billing.
 
 | Grupo | Análise de código | Fluxos funcionais mínimos / critério de aceite |
