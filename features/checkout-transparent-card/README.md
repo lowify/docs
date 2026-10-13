@@ -14,6 +14,8 @@ A branch `feat/checkout-transparent-card` implementa cartão e amplia o CT para 
 
 Consultar o [roteiro de revisão de código, funcionalidade e banco](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md) para versões examinadas, achados e condições de liberação. As seções de viabilidade e fluxo proposto abaixo são a referência inicial de desenho, não uma homologação dos caminhos implementados.
 
+Decisões do produto registradas em 2026-10-13: um gateway ativo por seller/método; disponibilidade somente após aprovação; cancelamento impede novos ciclos; regras comerciais de cartão centralizadas no Commerce V2; RisePay incluído no escopo. Cartão gera billing uma vez na primeira parcela/confirmação elegível; Pix assinatura, no pagamento de cada recorrência. O [detalhamento técnico](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md) distingue esses requisitos do comportamento atual e descreve o envelope JWE RisePay, que é diferente dos tokens opacos dos demais providers.
+
 ## Viabilidade por provedor
 
 | Provedor | Evidência no código | Necessário para cartão direto | Decisão |

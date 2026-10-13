@@ -2,6 +2,8 @@
 
 Data: 2026-10-13. Revisão estática das branches remotas `feat/checkout-transparent-card`, comparadas com `origin/main`, após fetch. Complementa o [plano de deploy](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_DEPLOY.md); não autoriza publicação.
 
+Os [esclarecimentos e regras de aceite](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md) detalham os pontos 1–9 e registram as decisões posteriores do produto: gateway único por seller/método, ativação após aprovação, cancelamento bloqueando novos ciclos, regras comerciais no Commerce V2 e inclusão de RisePay no escopo. A descrição abaixo registra o código examinado, não implementação dessas correções.
+
 ## Parecer
 
 A direção arquitetural é adequada: métodos separados por integração, tokenização no provedor, tentativas de cartão separadas da cobrança e entidades próprias para autorização/parcelas recorrentes. Isso evita encaixar toda recorrência em uma cobrança Pix avulsa.
@@ -37,6 +39,8 @@ Prioridade P1: resolver ou comprovar segurança antes da liberação. P2: corrig
 **Confirmado:** Commerce V2 possui mudanças exclusivas da feature para resolver métodos transparentes, compartilhar a referência da assinatura e tratar confirmação recorrente. O edge-webhook principal adiciona `/api/checkout-transparent/subscription-paid` e o encaminhamento da ação de assinatura. Essas alterações não estão nas respectivas `main` examinadas.
 
 Publicar somente os sete componentes do plano deixa esse caminho incompleto. Integrar essas dependências antes do aceite e testar a confirmação até a venda/acesso, não somente até o status no CT.
+
+O ct-webhook próprio recebe os eventos dos provedores. A dependência do edge-webhook principal é outra etapa: `CommerceWebhookClient::notifySubscriptionPayment` chama a rota acima para levar a confirmação ao Redis principal/Commerce. Não se trata de substituir ou ignorar o webhook isolado do CT.
 
 **Cuidado adicional:** a branch de Commerce está atrás da `main` em mudanças alheias à feature. Não substituir o estado atual por essa branch. A implementação de `ProcessSubscriptionChargePaidUseCase::recurringSale` também precisa preservar a correção da `main` que recompõe o valor bruto da parcela; a versão da feature clona valores sem a mesma recomposição. Revisar o resultado do merge, incluindo taxas e valor da venda recorrente.
 
@@ -82,6 +86,8 @@ Separar a recuperação por tipo de cobrança; homologar a primeira parcela sem 
 
 Antes do aceite, comprovar como cada parcela gera o custo contratado exatamente uma vez. Se a política comercial isenta alguma parcela, documentar isso e testar a exceção. Validar valor bruto, taxas, repasse e reentrega sem débito duplicado.
 
+Regra financeira definida posteriormente pelo produto: cartão gera billing uma vez na primeira parcela/confirmação elegível; Pix assinatura gera billing no pagamento de cada recorrência. O achado trata do custo Lowify, não propõe cobrar novamente o comprador em cada prestação de cartão.
+
 ### 8. P1 — polling pode repetir os mesmos registros e abandonar outros
 
 **Confirmado:** a consulta de assinaturas aplica `ORDER BY updated_at` e limite antes do filtro Efí feito no processo. Registros ativos cujo status não muda continuam elegíveis sem avançar um cursor/`last_polled_at`. O mesmo lote pode ocupar repetidamente o limite de 100; registros de outro provedor também consomem posições. Há problema semelhante na consulta de parcelas pendentes.
@@ -94,9 +100,9 @@ Separar seleção por provedor, definir próxima consulta/cursor e distribuir lo
 - Reentrega de resultado não deve voltar parcela paga para pendente nem avançar vencimento duas vezes. Cancelamento e confirmação fora de ordem precisam preservar invariantes.
 - O dashboard usa `PATCH /checkout-transparent/integrations/{id}`, mas a rota correspondente não foi encontrada no gateway da feature. Testar edição real, não apenas criação.
 - A configuração por método pode ser habilitada antes de terminar validação assíncrona de escopo/webhook. Exercitar falha e repetição do cadastro, sem deixar método disponível em estado parcialmente configurado.
-- A exclusividade do método padrão por seller não está garantida pela constraint de método por integração; testar duas ativações concorrentes e confirmar estratégia de locking/constraint.
+- A exclusividade do método padrão por seller não está garantida pela constraint de método por integração. Regra definida pelo produto: somente um gateway ativo por seller/método, não apenas um padrão; testar ativações concorrentes e proteção no backend.
 - Validar parcelas contra o limite do produto no servidor. A remoção de `installments` do payload Commerce não pode eliminar essa proteção.
-- RisePay cartão continua com código/catálogo sob flag desabilitada. Não incluir no aceite de providers ativos; garantir que configuração manual não exponha um fluxo não homologado.
+- RisePay cartão continua com código/catálogo sob flag desabilitada. O produto solicitou habilitá-lo: incluir no roteiro de implementação e homologação, fechando envelope, idempotência e reconciliação antes da ativação.
 
 ## Roteiro de revisão e homologação
 
