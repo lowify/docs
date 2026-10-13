@@ -2,6 +2,8 @@
 
 Data: 2026-10-13. Revisão estática das branches remotas `feat/checkout-transparent-card`, comparadas com `origin/main`, após fetch. Complementa o [plano de deploy](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_DEPLOY.md); não autoriza publicação.
 
+**Entrega para o desenvolvedor:** usar o [documento consolidado de problemas, correções e aceite](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_CORRECTIONS.md). Esta revisão é a base de evidências e do roteiro funcional.
+
 Os [esclarecimentos e regras de aceite](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW_DETAILS.md) detalham os pontos 1–9 e registram as decisões posteriores do produto: gateway único por seller/método, ativação após aprovação, cancelamento bloqueando novos ciclos, regras comerciais no Commerce V2 e inclusão de RisePay no escopo. A descrição abaixo registra o código examinado, não implementação dessas correções.
 
 Refinamentos: apenas cancelamento explícito cancela a assinatura; atraso/falta de pagamento não o fazem. O ajuste do envelope usa nonce estável por tentativa, sem novos campos temporais obrigatórios. O [mapa Banking V2 e polling por conta](2026-10-13_CHECKOUT_TRANSPARENT_POLLING_BANKING_V2_MAP.md) detalha a adaptação solicitada e um processo de recuperação com estado em banco.
@@ -39,6 +41,8 @@ Prioridade P1: resolver ou comprovar segurança antes da liberação. P2: corrig
 ### 1. P1 — plano de deploy não fecha o fluxo de venda
 
 **Confirmado:** Commerce V2 possui mudanças exclusivas da feature para resolver métodos transparentes, compartilhar a referência da assinatura e tratar confirmação recorrente. O edge-webhook principal adiciona `/api/checkout-transparent/subscription-paid` e o encaminhamento da ação de assinatura. Essas alterações não estão nas respectivas `main` examinadas.
+
+A rota já está implementada na branch de entrega do edge-webhook (`74be04f3`); a correção aqui é completar/verificar a lista do update, não recriar código por ele ainda não estar em `main`.
 
 Publicar somente os sete componentes do plano deixa esse caminho incompleto. Integrar essas dependências antes do aceite e testar a confirmação até a venda/acesso, não somente até o status no CT.
 

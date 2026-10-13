@@ -2,6 +2,8 @@
 
 Data: 2026-10-13. Complemento ao [roteiro de revisão](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), em resposta aos pontos 1–9 discutidos com o responsável pelo produto. Mesmas versões de código do roteiro original. Este documento registra diagnóstico e requisitos; não indica que as correções foram implementadas.
 
+Para encaminhar ao dev, usar o [documento consolidado de problemas e correções](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_CORRECTIONS.md), que reúne as orientações finais e testes de aceite. Este arquivo mantém os esclarecimentos e evidências.
+
 ## 1. Por que aparecem dois webhooks?
 
 O CT tem, sim, seu webhook próprio: `services-checkout-transparent/edge-checkout-transparent-webhook`. Ele recebe eventos externos, resolve integração/cobrança e publica a confirmação no Redis isolado do CT. Foi incluído na revisão.
@@ -18,7 +20,7 @@ Isso está explícito em `CommerceWebhookClient::notifySubscriptionPayment`. O e
 
 Portanto, o problema não é ausência de webhook do CT: é que o plano original não publica a segunda etapa, adicionada na branch do edge-webhook principal. Se o desenho desejado for eliminar essa dependência, é necessário mudar o contrato de saída do CT e o consumidor; ela não desaparece só por existir o ct-webhook.
 
-Problema objetivo: no conjunto de `main` examinado, o CT chamaria `/subscription-paid`, mas essa rota só existe na branch da feature do edge-webhook principal. A notificação falharia e não chegaria ao consumidor Commerce. Incluir e publicar essa dependência resolve o desencontro; o uso dos dois webhooks não é, por si só, um defeito arquitetural.
+Confirmação: a rota já está na branch `feat/checkout-transparent-card` usada para a feature, commit `74be04f3`. Não é necessário criá-la novamente. O problema objetivo é a omissão desse repositório na lista do update original: se ele não for atualizado nem já estiver publicado em revisão compatível, o CT não conseguirá entregar a confirmação. A ausência na `main` não é, por si só, defeito da branch de entrega. Incluir/verificar a dependência resolve o desencontro.
 
 ## 2. Token no checkout, descriptografia no CT e duplicidade
 
@@ -85,6 +87,8 @@ Um token de provedor não é equivalente ao CVV, mas sua retenção depende do c
 Quando o token antigo expirar/for rejeitado, as cobranças podem falhar apesar do refresh registrado como sucesso. `executeByIntegrationId` também pode sobrepor a credencial atual da integração com a cópia do método, quando recebe o método.
 
 **Aceite:** uma única fonte para credenciais OAuth compartilhadas, ou atualização consistente das cópias e da expiração; nenhuma renovação deixa Pix/cartão presos a um token antigo. Validar com credenciais sintéticas e homologação sem imprimir tokens.
+
+Correção recomendada para este pacote: estender `persistTokens` para atualizar as chaves dos métodos que usam o OAuth daquela integração na mesma transação das chaves da integração, incluindo métodos desabilitados sem ativá-los. Manter expiração coerente e gravação idempotente do resultado. Isso fecha o problema preservando o modelo atual; fonte única por referência pode ser uma evolução posterior. Ver C04 do documento consolidado.
 
 Onde acontece, em `services-checkout-transparent/services-checkout-transparent-api`, versão `ecc012a0`:
 

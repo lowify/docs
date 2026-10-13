@@ -10,6 +10,8 @@ Permitir pagamento único por cartão no Checkout Transparente usando a conta do
 
 ## Estado da implementação
 
+Documento para encaminhar ao dev: [problemas, correções sugeridas e critérios de aceite](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_CORRECTIONS.md). Inclui a atualização das credenciais de método na mesma transação do refresh OAuth e a regra de envio somente de token/envelope onde cartão bruto não é necessário.
+
 A branch `feat/checkout-transparent-card` implementa cartão e amplia o CT para Pix Automático. A revisão de 2026-10-13 identificou dependências também em Commerce V2 e edge-webhook, além dos sete repositórios do plano original. Há bloqueios de segurança, consistência e recuperação; implementação em branch não significa disponibilidade em produção.
 
 Consultar o [roteiro de revisão de código, funcionalidade e banco](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md) para versões examinadas, achados e condições de liberação. As seções de viabilidade e fluxo proposto abaixo são a referência inicial de desenho, não uma homologação dos caminhos implementados.
