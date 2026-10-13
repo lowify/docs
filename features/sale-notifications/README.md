@@ -35,6 +35,10 @@ O código da feature já adiciona `sale_delivery_attempts`, regras de produto/af
 
 O endpoint administrativo de status de serviços retorna, para e-mail e WhatsApp Meta, o estado interno, estado de entrega, erro normalizado, datas, template e destinatário; e-mail inclui também o provedor. O dashboard não expõe os parâmetros/conteúdo personalizado da comunicação. Push permanece no painel resumido, sem modal de detalhes.
 
+## Operação e validação
+
+O Commerce V2 disponibiliza `sales-delivery:resend-failed-emails` para recuperar e-mails de entrega. O operador deve informar `--confirmed-from` no formato `YYYY-MM-DD HH:MM:SS`, sempre interpretado como `America/Sao_Paulo`; `--confirmed-until` restringe opcionalmente o fim do intervalo. O comando filtra `sales.status = paid` por `sales.confirmed_at`, que é uma coluna `DATETIME` sem offset, portanto usa o mesmo valor de relógio de São Paulo na consulta, sem conversão UTC. Ele só coloca na fila uma venda cuja última tentativa de e-mail esteja em `fail` e não tenha nenhum e-mail em `success`, `delivered` ou `read`. Sem `--execute`, é uma simulação; o reenvio efetivo é administrativo, gratuito e apenas pelo canal e-mail.
+
 ## Limitações e pendências
 
 - Definir administração de pacotes, expiração de créditos e estorno PIX.
@@ -48,4 +52,5 @@ O endpoint administrativo de status de serviços retorna, para e-mail e WhatsApp
 - [Plano de comunicações de venda](../../plans/sale-notifications/README.md)
 - [Auditoria de implementação e pendências](../../plans/sale-notifications/09_IMPLEMENTATION_AUDIT_AND_REMAINING_TASKS.md)
 - `services-commerce-v2/app/Application/UseCase/Sale/ProcessPaidSaleEventDeliveryUseCase.php`
+- `services-commerce-v2/app/Command/ResendFailedSaleDeliveryEmailsCommand.php`
 - `services-notification/app/Process/WhatsappMetaDeliveryStatusQueueProcess.php`
