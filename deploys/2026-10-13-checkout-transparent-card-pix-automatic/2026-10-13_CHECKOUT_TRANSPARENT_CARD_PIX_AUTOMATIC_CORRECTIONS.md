@@ -14,6 +14,7 @@ Base: branches `feat/checkout-transparent-card` e commits da [revisão original]
 - Só disponibilizar método após validação/aprovação; mostrar modal seguro enquanto integração não aprovada.
 - Centralizar regras comerciais de cartão no Commerce V2. Habilitar RisePay depois de fechar os requisitos técnicos e homologar.
 - Se cartão estiver disponível no checkout do seller, a configuração de cartão também deve aparecer em Editar Produto, respeitando elegibilidade do produto e as mesmas regras comerciais.
+- Mapear todos os caminhos de erro de cartão e retornar códigos/mensagens públicas genéricas e estáveis, seguindo o padrão de mapper de checkout do Banking V2, sem repassar textos brutos do provider.
 
 ## C01 — incluir dependências já implementadas no update
 
@@ -158,12 +159,48 @@ Disponibilidade da integração e preferência salva do produto são estados dis
 
 **Aceite:** seller com cartão CT aprovado e disponível vê a opção em Editar Produto; ativa/desativa e ajusta parcelas, salva e reabre com os valores preservados; o checkout reflete a configuração salva. Seller sem integração de cartão normal, mas com cartão CT disponível, também vê a opção. Alteração de campo não relacionado e falha temporária da consulta não zeram a preferência de cartão. Testar regressão do cartão normal e produtos não elegíveis.
 
+## C14 — mapear erros de cartão e padronizar retornos genéricos
+
+**Problema:** o CT tem falhas distintas de tokenização, validação, criação, consulta e execução assíncrona, sem um contrato público único equivalente ao mapper de checkout do Banking. Há mensagens técnicas/provider em exceptions e resultados; ocultar apenas o erro final na página não cobre respostas HTTP, SDK, polling e fila.
+
+**Referência confirmada no Banking V2 (`112062fc`):**
+
+- `app/Application/Service/CieloEcommerce/CieloEcommerceCheckoutErrorMapper.php`: converte status/códigos Cielo em `code`, `alert_title`, `alert_message`, `reason`, com fallback para código desconhecido.
+- `app/Application/Exception/CieloEcommerceCheckoutPaymentException.php`: transporta o contrato seguro separado do detalhe técnico.
+- `app/Application/UseCase/CieloEcommerce/ChargeCard/CreateChargeCardUseCase.php::throwCheckoutPaymentError`: aplica o mapper e registra a ocorrência separadamente.
+- `app/Http/Controller/ChargeCardController.php`: devolve o código normalizado com `checkout` no caminho da exception específica. O catch genérico ainda devolve `$e->getMessage()`; não copiar esse fallback como garantia de segurança.
+
+Essa referência está implementada especificamente no fluxo Cielo. Não presumir que todos os providers do Banking já têm cobertura equivalente. Reutilizar o padrão de contrato e os códigos aplicáveis, não copiar códigos de recusa Cielo como se fossem códigos MP/Pagar.me/Efí/RisePay.
+
+**Onde revisar no CT:** clients de cartão `MercadoPagoPaymentClient`, `PagarMePaymentClient`, `EfiBankPaymentClient` no worker; `CreateCardChargeAttemptUseCase`, `CreateRisePayCardAttemptUseCase`, `ChargeController`, `GatewayResultQueueProcess` e respostas de consulta no CT-API; `ProductController::createTransparentCardAttempt` na public-api; `views/checkout/form/methods/card.php`, tratamento de submit e `transparent_payment.php` no front. Incluir retornos de webhook e polling que atualizam as mesmas tentativas.
+
+**Correção sugerida:** criar/adaptar mapper de erro de checkout com adapters por provider e uma normalização comum. Mapear explicitamente os códigos conhecidos de cada API/SDK e erros locais; erro desconhecido sempre cai em mensagem segura. Não basear regra comercial somente em substring de mensagem livre. Preservar códigos técnicos necessários ao diagnóstico em registro interno sanitizado, com ID de correlação; comprador recebe somente campos públicos permitidos.
+
+Inventário obrigatório para o dev, por provider e etapa: origem do erro, status/código técnico, categoria normalizada, mensagem pública, resultado conhecido/desconhecido e possibilidade de retry. Cobrir MP, Pagar.me, Efí e RisePay; incluir legado/3DS quando compartilhar componentes alterados. Validar códigos com contratos oficiais e fixtures sintéticas/homologação; não afirmar lista completa de códigos externos somente a partir das falhas já observadas.
+
+| Família que deve ser coberta | Retorno público sugerido / comportamento |
+| --- | --- |
+| Dados inválidos, cartão vencido, token inválido/expirado, falha de tokenização | Mensagem controlada para conferir dados/refazer tokenização; nunca texto bruto do SDK, token ou CVV. Reaproveitar códigos Banking aplicáveis, como `card_payment_invalid_card`/`card_payment_expired_card`, apenas com classificação comprovada. |
+| Recusa do emissor, limite/saldo insuficiente, cartão restrito, análise de risco | Código normalizado e mensagem genérica segura, sem motivo interno de fraude: “Pagamento não autorizado. Utilize outro cartão ou meio de pagamento.” Orientação mais específica somente quando aprovada e respaldada pelo código do provider. |
+| 3DS: não autenticado, falha, abandono, indisponibilidade | Mensagem controlada de autenticação não concluída; não expor payload/credencial 3DS nem tratar autenticação como cobrança concluída. |
+| Credenciais, integração não aprovada, provider indisponível, rate limit | “Pagamento por cartão indisponível no momento. Utilize outro meio de pagamento.” Diagnóstico detalhado restrito à operação, sanitizado; não culpar dados do comprador. |
+| Falha antes de enviar, Redis/worker, exceção interna ou resposta malformada | Fallback seguro de processamento; preservar HTTP/estado apropriados. Retry só quando o resultado for comprovadamente conhecido e seguro. |
+| Timeout/falha após envio com resultado desconhecido | “Estamos verificando seu pagamento. Aguarde a confirmação.” Manter pendência/reconciliação e o mesmo nonce; não mostrar recusa definitiva nem incentivar outra cobrança imediata. |
+| Consulta de status falhou, mas tentativa ainda existe | Mensagem segura de consulta temporariamente indisponível; não transformar a tentativa em recusada por uma falha de polling. |
+| Pagamento explicitamente cancelado/abortado ou erro não catalogado | Código estável e mensagem permitida do catálogo; fallback genérico obrigatório. Não repassar `$exception->getMessage()`, `body.message` ou erro livre do provider ao checkout. |
+
+Aplicar a normalização no backend como fonte do retorno público; mapear também falhas de SDK que acontecem antes da chamada ao backend. Submit e consulta posterior da mesma tentativa devem exibir a mesma categoria/contrato, sem cada tela inventar seu texto a partir de erro técnico. Manter compatibilidade com o envelope HTTP existente e adicionar os campos normalizados de forma coordenada entre consumidores.
+
+Separar a mensagem pública do diagnóstico interno também no banco: relatório seller não deve acabar expondo resposta técnica bruta porque o checkout a ocultou. Diagnóstico não significa guardar a resposta completa ou PAN/CVV/credenciais; selecionar e sanitizar os campos (C12).
+
+**Aceite:** testes parametrizados para cada entrada catalogada e fallback desconhecido de todos os providers/etapas; criação síncrona, erro assíncrono, polling, webhook e tokenização exibem somente contratos seguros. Validar strings sintéticas com PAN/CVV/token/CPF/e-mail e ausência de vazamento no navegador/API/painel/logs. Timeout desconhecido mantém pendência e não provoca outra cobrança; sucesso não é convertido em erro por falha de consulta. O dev entrega o inventário de códigos e sua cobertura junto dos commits.
+
 ## Ordem e entrega esperada do dev
 
 1. Fechar contratos C02/C03/C06/C08/C10/C11 e incluir as dependências C01 na entrega.
 2. Corrigir credenciais, recuperação durável e calendário: C04/C05/C09.
 3. Integrar polling por conta, callbacks, cancelamento e billing: C06/C07/C08.
-4. Fechar painel/rotas, paridade da edição de produto e homologar RisePay: C10/C11/C12/C13.
+4. Fechar painel/rotas, paridade da edição de produto, retornos genéricos de cartão e homologar RisePay: C10/C11/C12/C13/C14.
 5. Executar os oito grupos do [roteiro funcional e de código](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo regressão do checkout legado, concorrência e falhas.
 
 Para schema necessário, criar migrations novas; não editar migrations já commitadas. Validar backfill com dados antigos e repetição, constraints/índices com consultas reais e compatibilidade de versões durante rollout. Preservar worktrees locais e correções de `main`; não limpar Redis nem apagar operações para fazer testes passarem.

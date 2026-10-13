@@ -14,6 +14,8 @@ Documento para encaminhar ao dev: [problemas, correções sugeridas e critérios
 
 Requisito adicional: cartão disponível no checkout do seller deve aparecer também em Editar Produto, com configuração e parcelas consistentes com Commerce V2, sem ativar automaticamente todos os produtos ou apagar preferências por indisponibilidade temporária. Ver C13 do documento para o dev.
 
+Retornos de erro de cartão devem ter catálogo/mapeamento por provider e etapa, mensagens públicas genéricas e fallback seguro. Referência confirmada: `CieloEcommerceCheckoutErrorMapper` do Banking V2, não o catch genérico que expõe mensagem de exception. Ver C14 do documento para o dev; inclui tokenização, 3DS, execução, polling e resultado desconhecido sem incentivar cobrança duplicada.
+
 A branch `feat/checkout-transparent-card` implementa cartão e amplia o CT para Pix Automático. A revisão de 2026-10-13 identificou dependências também em Commerce V2 e edge-webhook, além dos sete repositórios do plano original. Há bloqueios de segurança, consistência e recuperação; implementação em branch não significa disponibilidade em produção.
 
 Consultar o [roteiro de revisão de código, funcionalidade e banco](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md) para versões examinadas, achados e condições de liberação. As seções de viabilidade e fluxo proposto abaixo são a referência inicial de desenho, não uma homologação dos caminhos implementados.
