@@ -49,6 +49,10 @@ A preparação aplica os SQLs de `lowify` e `services-banking` antes de reconstr
 
 No `front-checkout`, o nome do titular aceita nomes compostos com iniciais intermediárias, como `LUCAS R PRADO`. A validação do titular no Commerce e Banking V2 limita presença, tipo e tamanho; não há restrição adicional por inicial.
 
+O Commerce V2 limita tentativas de cartão por IP para reduzir card testing: após cinco retornos de pagamento sem sucesso na janela de uma hora, novas tentativas de cartão são recusadas antes de acionar a adquirente. Pix e os demais métodos permanecem disponíveis.
+
+Para cartão, a taxa de plataforma é R$ 1,49 fixos mais o MDR percentual aplicável. A taxa configurada no seller não compõe pagamentos por cartão; Pix e outros métodos mantêm suas regras de taxa atuais.
+
 ## Limitações e pendências
 
 - 3DS permanece desabilitado até que todas as credenciais correspondentes sejam configuradas.

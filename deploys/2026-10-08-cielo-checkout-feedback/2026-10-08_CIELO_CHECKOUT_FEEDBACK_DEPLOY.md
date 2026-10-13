@@ -11,7 +11,7 @@ Também ajustar a taxa de cartão para somar a taxa fixa do seller (`taxa_seller
 | Repositório | Diretório na VPS | Branch de deploy | Entrega |
 | --- | --- | --- | --- |
 | `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `fix/cielo-integration` | Mapeia a falha Cielo, grava log ordinário e devolve referência segura para o Checkout. |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `fix/cielo-integration` | Propaga a referência segura e soma taxa fixa do seller ao MDR do cartão. |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `fix/cielo-integration` | Propaga a referência segura, soma a taxa fixa de R$ 1,49 ao MDR e limita falhas de cartão por IP. |
 | `front-checkout` | `/opt/lowify/front/front-checkout` | `fix/cielo-integration` | Exibe a mensagem segura devolvida pelo Checkout. |
 
 O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o campo `meta` entre Commerce e Checkout.
@@ -21,7 +21,8 @@ O `edge-gateway` não recebe alteração: o envelope de resposta já preserva o 
 1. Cartão Cielo recusado/falho retorna uma mensagem própria para situações como saldo insuficiente, cartão vencido, senha inválida, cartão restrito ou indisponibilidade temporária. Casos sem código detalhado recebem uma mensagem genérica segura.
 2. O retorno bruto da Cielo permanece em `charge_card_events`; falhas também registram um `ordinary_log` do tipo `cielo_payment_failure`, sem expor esses dados ao comprador.
 3. A referência percorre Banking → Commerce → Checkout em `meta.reference`. Pix e outros adquirentes não passam pelo novo mapeamento de mensagens Cielo.
-4. Para cartão, a tarifa de plataforma passa a ser `taxa_seller + percentual/MDR`. No split Cielo, os valores continuam enviados separadamente como taxa fixa e MDR.
+4. Para cartão, a tarifa de plataforma passa a ser `R$ 1,49 + percentual/MDR`. No split Cielo, os valores continuam enviados separadamente como taxa fixa e MDR.
+5. Após cinco pagamentos de cartão sem sucesso do mesmo IP, novas tentativas de cartão ficam pausadas por uma hora e não chegam à adquirente. Pix e os demais métodos de pagamento continuam disponíveis.
 
 ## Sequência de deploy
 
@@ -86,9 +87,10 @@ Publicar nesta ordem: Banking, Commerce e Checkout. Assim, o produtor da nova re
 
 1. Em ambiente de teste ou com uma cobrança controlada, provocar uma recusa Cielo conhecida, como saldo insuficiente. O Checkout deve mostrar mensagem compreensível ao comprador, sem `ReturnCode`, `ReturnMessage`, credenciais ou resposta bruta da adquirente.
 2. Fazer uma compra aprovada por cartão Cielo e confirmar a conclusão normal da venda, captura e split.
-3. Em uma cobrança de cartão de R$ 100,00 com `taxa_seller` de R$ 0,99 e MDR de 8%, conferir no split/registro financeiro que a taxa de plataforma é R$ 8,99 (R$ 0,99 + R$ 8,00).
+3. Em uma cobrança de cartão de R$ 100,00 com MDR de 8%, conferir no split/registro financeiro que a taxa de plataforma é R$ 9,49 (R$ 1,49 + R$ 8,00).
 4. Gerar um Pix de teste e concluir o fluxo usual, confirmando que não houve alteração no comportamento de Pix.
 5. Para uma falha Cielo, conferir internamente que existe evento em `charge_card_events` e um `ordinary_log` `cielo_payment_failure` associado à charge. Esses dados são apenas operacionais e não devem ser exibidos ao comprador.
+6. Em ambiente controlado, realizar cinco pagamentos de cartão recusados a partir do mesmo IP. A sexta tentativa de cartão deve receber uma mensagem genérica de falha, sem criar nova tentativa na adquirente; Pix deve continuar selecionável e processável pelo mesmo IP.
 
 ## Rollback
 
