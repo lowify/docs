@@ -13,6 +13,7 @@ Base: branches `feat/checkout-transparent-card` e commits da [revisão original]
 - Um gateway ativo por seller e por método; métodos diferentes podem usar gateways diferentes.
 - Só disponibilizar método após validação/aprovação; mostrar modal seguro enquanto integração não aprovada.
 - Centralizar regras comerciais de cartão no Commerce V2. Habilitar RisePay depois de fechar os requisitos técnicos e homologar.
+- Se cartão estiver disponível no checkout do seller, a configuração de cartão também deve aparecer em Editar Produto, respeitando elegibilidade do produto e as mesmas regras comerciais.
 
 ## C01 — incluir dependências já implementadas no update
 
@@ -145,12 +146,24 @@ Nos erros, usar códigos/mensagens públicas permitidas e payloads operacionais 
 
 **Aceite:** RisePay aprovada/recusada/pendente/timeout funciona sem repetição de cobrança; dados sintéticos de cartão/CVV/segredo não aparecem em logs, banco, fila ou painel; seller não lê erro de outra integração.
 
+## C13 — mostrar cartão também em Editar Produto
+
+**Requisito do produto:** quando cartão estiver disponível no checkout, a tela Editar Produto precisa exibir a configuração correspondente, incluindo habilitação e regras de parcelas existentes. Mostrar a configuração não significa ativar cartão automaticamente em todos os produtos.
+
+**Pontos confirmados para revisão:** `dashboard-seller/product_form.php` carrega `seller.payment_methods.credit_card.available`; `views/dashboard/products/form/_components/checkout.php` condiciona a seção a `$cardFeatureEnabled` e calcula `$creditCardEnabled` combinando disponibilidade com configuração salva. Revisar também `product_edit.php`, `views/dashboard/products/form/index.php` e o caminho de salvamento. A inclusão deste requisito não afirma que a falha visual foi reproduzida em ambiente.
+
+**Correção sugerida:** unificar a disponibilidade de cartão usada pelo checkout e pelo formulário de edição, considerando o método CT ativo/aprovado, não somente a integração de cartão do checkout normal. Propagar essa informação pelo contrato público/Commerce até o dashboard e ajustar as condições de renderização para permitir a edição quando o seller tem cartão disponível. Manter valor salvo, habilitação e limites de parcelas do produto sob as regras autoritativas do Commerce (C11).
+
+Disponibilidade da integração e preferência salva do produto são estados distintos. Se a integração ficar temporariamente indisponível, indicar isso sem apagar silenciosamente a configuração do produto ao salvar outra informação. Se o produto não for elegível para cartão, manter a regra de elegibilidade e explicar a restrição.
+
+**Aceite:** seller com cartão CT aprovado e disponível vê a opção em Editar Produto; ativa/desativa e ajusta parcelas, salva e reabre com os valores preservados; o checkout reflete a configuração salva. Seller sem integração de cartão normal, mas com cartão CT disponível, também vê a opção. Alteração de campo não relacionado e falha temporária da consulta não zeram a preferência de cartão. Testar regressão do cartão normal e produtos não elegíveis.
+
 ## Ordem e entrega esperada do dev
 
 1. Fechar contratos C02/C03/C06/C08/C10/C11 e incluir as dependências C01 na entrega.
 2. Corrigir credenciais, recuperação durável e calendário: C04/C05/C09.
 3. Integrar polling por conta, callbacks, cancelamento e billing: C06/C07/C08.
-4. Fechar painel/rotas e homologar RisePay: C10/C11/C12.
+4. Fechar painel/rotas, paridade da edição de produto e homologar RisePay: C10/C11/C12/C13.
 5. Executar os oito grupos do [roteiro funcional e de código](2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md), incluindo regressão do checkout legado, concorrência e falhas.
 
 Para schema necessário, criar migrations novas; não editar migrations já commitadas. Validar backfill com dados antigos e repetição, constraints/índices com consultas reais e compatibilidade de versões durante rollout. Preservar worktrees locais e correções de `main`; não limpar Redis nem apagar operações para fazer testes passarem.
