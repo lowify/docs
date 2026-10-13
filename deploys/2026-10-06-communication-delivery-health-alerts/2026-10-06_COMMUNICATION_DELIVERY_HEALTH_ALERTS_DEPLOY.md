@@ -24,9 +24,11 @@ Foram executados testes em homologação com cenário controlado: a detecção c
 | --- | --- | --- |
 | `services-account` | `feat/communication-delivery-health-alerts` | Endpoint interno idempotente e upsert das sysvars globais. |
 | `services-notification` | `feat/communication-delivery-health-alerts` | Processo a cada minuto, cursor Redis, migration, logs e notificações in-app. |
-| `dashboard-seller` | `feat/communication-delivery-health-alerts` | Banner prioritário, resolução local e roteamento das notificações. |
+| `edge-public-api` | `feat/communication-delivery-health-alerts` | Valida o JWT administrativo e encaminha a atualização do template padrão ao Notification. |
+| `edge-gateway` | `feat/communication-delivery-health-alerts` | Roteia a atualização administrativa do template padrão ao Public API. |
+| `dashboard-seller` | `feat/communication-delivery-health-alerts` | Banner prioritário, resolução local, roteamento das notificações e seleção do template padrão. |
 
-Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compartilhado fora da migration do Notification ou filas existentes.
+Não há mudança em Webhook, infraestrutura, banco compartilhado fora da migration do Notification ou filas existentes.
 
 ## Alterações incluídas
 
@@ -38,16 +40,8 @@ Não há mudança em Gateway, Public API, Webhook, infraestrutura, banco compart
 - A migration `2026_10_08_000061_add_default_type_to_whatsapp_meta_templates` adiciona o estado persistido do template padrão de recuperação de venda. O valor `default_type = 1` representa `SALE_RECOVERY` e inicia em `sale_recovering_ct_4`.
 - Quando o template padrão dessa família falha recorrentemente, o Notification não ativa a manutenção global nem o banner. Ele registra o evento, notifica administradores e muda `default_type = 1` para o próximo template. Em `_7`, não há rotação circular: a notificação pede ajuste manual.
 - A migration também classifica `sale_recovering_ct_3` a `_7` como `template_type = SALE_RECOVERY`. O overview existente carrega essas opções para o Dashboard, sem lista fixa no front-end.
-- Em **Configurações do sistema → WhatsApp Meta**, o Dashboard exibe a etapa **Recuperação de venda — etapa 1**, permite selecionar um template dessa classificação e o salva pela rota administrativa própria. O valor atual e as opções vêm da resposta já existente de `/admin/system/overview`.
-
-## Pré-requisitos e bloqueios de promoção
-
-1. As três branches devem existir no remoto e apontar para os commits da tabela acima, ou para commits aprovados posteriores da mesma feature.
-2. Confirmar que cada repositório produtivo está limpo antes de qualquer `fetch`, `switch` ou Docker. Se houver alteração local, parar; não usar stash, reset ou limpeza.
-3. Confirmar as URLs internas já existentes entre Notification e Account e a conectividade Redis. Não criar novos segredos nem copiar valores de `.env` para este documento.
-4. Confirmar em homologação, com um administrador de perfis 1, 2 ou 4, o banner vermelho, as ações **Detalhes** e **Resolvido**. A validação visual ficou pendente no ciclo de homologação de 2026-10-06 porque o diretório do Dashboard foi alternado concorrentemente para outra branch.
-5. Limpar e resolver o incidente sintético de homologação `delivery-health-hml-20261006205305` antes de qualquer promoção. Não transportar esse dado de teste para produção.
-6. Escolher uma janela de menor volume para a migration: ela cria índices em `whatsapp_meta` e `email_single`.
+- Em **Configurações do sistema → WhatsApp Meta**, o Dashboard exibe a etapa **Recuperação de venda — etapa 1**, permite selecionar um template dessa classificação e o salva por `PUT /admin/whatsapp-meta-templates/sale-recovery-default`.
+- O caminho da atualização manual é `Dashboard Seller → edge-gateway → edge-public-api → services-notification`. O Public API valida o JWT e os perfis administrativos antes de encaminhar a requisição; o Gateway somente roteia a rota administrativa correspondente.
 
 ## Banco de dados
 
@@ -112,7 +106,37 @@ docker compose logs --tail=80 services-notifications
 
 Resultado esperado: processo `delivery_health.0` iniciado, migrations marcadas como aplicadas, `sale_recovering_ct_4` com `default_type = 1` e nenhum erro de schema, Redis ou HTTP interno nos logs.
 
-### 3. `dashboard-seller`
+### 3. `edge-public-api`
+
+```bash
+cd /opt/lowify/edge/edge-public-api
+git fetch origin --prune
+git switch feat/communication-delivery-health-alerts
+git pull --ff-only origin feat/communication-delivery-health-alerts
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50
+```
+
+Resultado esperado: container `Up`, sem erro de inicialização e rota autenticada `PUT /admin/whatsapp-meta-templates/sale-recovery-default` disponível para o Gateway.
+
+### 4. `edge-gateway`
+
+```bash
+cd /opt/lowify/edge/edge-gateway
+git fetch origin --prune
+git switch feat/communication-delivery-health-alerts
+git pull --ff-only origin feat/communication-delivery-health-alerts
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=50
+```
+
+Resultado esperado: container `Up`, sem erro de inicialização e rota administrativa encaminhada ao Public API.
+
+### 5. `dashboard-seller`
 
 ```bash
 cd /opt/lowify/front/dashboard-seller
@@ -139,8 +163,9 @@ Para uma falha recorrente da família `sale_recovering_ct_*`, a confirmação é
 
 ## Rollback
 
-1. Primeiro interromper a geração de novos incidentes retornando `services-notification` à revisão anterior aprovada e reconstruindo apenas esse componente.
-2. Reverter `dashboard-seller` à revisão anterior aprovada e reconstruí-lo; o Dashboard deixa de exibir/permitir a resolução, mas os dados persistidos permanecem como evidência.
-3. Reverter `services-account` por último, somente após Notification não chamar mais o endpoint interno novo.
-4. Não reverter automaticamente a migration, índices, logs, notificações, sysvars, o `default_type` do template ativo ou chaves Redis. Avaliar qualquer remoção de dados em plano separado, após preservar evidências.
-5. Para encerrar um incidente legítimo durante rollback, usar o caminho administrativo **Resolvido** enquanto o Dashboard ainda estiver disponível; não apagar manualmente sysvars.
+1. Reverter `dashboard-seller` à revisão anterior aprovada; ele deixa de exibir/permitir a resolução e a troca manual do template, mas os dados persistidos permanecem como evidência.
+2. Reverter `edge-gateway` e depois `edge-public-api` às revisões anteriores aprovadas, reconstruindo cada componente. Isso remove a rota externa antes de retirar o endpoint administrativo do serviço.
+3. Primeiro interromper a geração de novos incidentes retornando `services-notification` à revisão anterior aprovada e reconstruindo apenas esse componente.
+4. Reverter `services-account` por último, somente após Notification não chamar mais o endpoint interno novo.
+5. Não reverter automaticamente a migration, índices, logs, notificações, sysvars, o `default_type` do template ativo ou chaves Redis. Avaliar qualquer remoção de dados em plano separado, após preservar evidências.
+6. Para encerrar um incidente legítimo durante rollback, usar o caminho administrativo **Resolvido** enquanto o Dashboard ainda estiver disponível; não apagar manualmente sysvars.
