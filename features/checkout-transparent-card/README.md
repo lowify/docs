@@ -1,12 +1,18 @@
 # Feature — cartão de crédito no Checkout Transparente
 
-> Status: planejada
-> Última atualização: 2026-09-15
+> Status: em implementação; liberação pendente de revisão
+> Última atualização: 2026-10-13
 > Confiança: confirmada no código e na documentação pública dos provedores
 
 ## Objetivo
 
 Permitir pagamento único por cartão no Checkout Transparente usando a conta do seller.
+
+## Estado da implementação
+
+A branch `feat/checkout-transparent-card` implementa cartão e amplia o CT para Pix Automático. A revisão de 2026-10-13 identificou dependências também em Commerce V2 e edge-webhook, além dos sete repositórios do plano original. Há bloqueios de segurança, consistência e recuperação; implementação em branch não significa disponibilidade em produção.
+
+Consultar o [roteiro de revisão de código, funcionalidade e banco](../../deploys/2026-10-13-checkout-transparent-card-pix-automatic/2026-10-13_CHECKOUT_TRANSPARENT_CARD_PIX_AUTOMATIC_REVIEW.md) para versões examinadas, achados e condições de liberação. As seções de viabilidade e fluxo proposto abaixo são a referência inicial de desenho, não uma homologação dos caminhos implementados.
 
 ## Viabilidade por provedor
 
