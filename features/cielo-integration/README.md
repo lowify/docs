@@ -1,12 +1,12 @@
 # Feature — integração Cielo
 
 > Status: em evolução
-> Última atualização: 2026-10-08
+> Última atualização: 2026-10-14
 > Confiança: parcialmente confirmada
 
 ## Objetivo
 
-Permitir onboarding de contas, cobrança por cartão, liquidação, disputas e webhooks pelos providers Cielo E-commerce e Pagar.me. A ativação efetiva de cada conta permanece condicionada à aprovação da conta bancária.
+Permitir onboarding de contas, cobrança por cartão, liquidação, disputas e webhooks pelos providers Cielo E-commerce e Pagar.me. A ativação efetiva de cada conta permanece condicionada à aprovação da conta bancária. Um seller só pode iniciar ou alterar o cadastro da conta de cartão com o cash-in ativo; se o cash-in for desativado depois do cadastro, a conta existente continua consultável, mas o Checkout Lowify não gera novas vendas.
 
 ## Fluxo principal
 
