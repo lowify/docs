@@ -82,27 +82,29 @@ O fluxo escolhido é:
 
 ### 7. Autorização do preview
 
-- Não foi criado um novo tipo de token: o JWT já utilizado pelo Dashboard Seller é reutilizado.
-- O dashboard copia temporariamente o JWT atual para um cookie `HttpOnly`, `Secure` e `SameSite=Lax`, com duração de 5 minutos e domínio configurável para o host compartilhado do checkout.
+- O `dashboard-seller` autoriza a prévia por uma chamada backend feita com `GatewayJwtClient`, reutilizando o JWT e o `refresh_token` do fluxo autenticado existente.
+- Após validar o JWT, rejeitar colaboradores e confirmar a propriedade no Commerce V2, o Public API emite uma autorização assinada, restrita ao produto e válida por 5 minutos.
+- A autorização de prévia usa o `APP_KEY` do Public API, não contém o JWT nem o `refresh_token` e não exige cookie compartilhado entre dashboard e checkout.
 - A flag `editor_preview=1` representa somente a intenção de abrir a prévia.
-- O `front-checkout` encaminha o JWT somente na consulta de contexto de preview.
-- O `edge-public-api` valida o JWT existente e rejeita colaboradores nesse fluxo.
+- O `front-checkout` encaminha somente a autorização curta na consulta de contexto da prévia.
 - O Public API propaga internamente o ID do usuário por uma chamada assinada ao Commerce V2.
 - O Commerce V2 libera o bypass de elegibilidade somente quando o usuário autenticado é o proprietário do produto.
-- Sem JWT, com JWT expirado, assinatura interna inválida ou propriedade divergente, a prévia retorna erro.
+- Sem autorização válida, com assinatura interna inválida ou propriedade divergente, a prévia retorna erro.
 - O contexto autenticado devolve `editor_preview=true`; o frontend não confia apenas na query string.
 - No preview, formulário, pixels, notificações de venda e fluxos de saída são desativados.
 - Requisições de pagamento marcadas como preview são recusadas também no backend.
 
 ## Contratos HTTP
 
-Rotas externas autenticadas, expostas pelo Gateway e Public API:
+Rotas externas envolvidas, expostas pelo Gateway e Public API:
 
 - `GET /admin/platform/overview`
 - `GET /admin/platform/metrics?range=24h|7d|30d`
 - `GET /admin/platform/backups?page=1`
 - `POST /admin/platform/live/activate`
 - `GET /admin/platform/live`
+- `POST /checkout/preview/session`: exige JWT e cria uma autorização de prévia de 5 minutos após validar a propriedade.
+- `GET /checkout/context/{short_code}`: permanece público no checkout normal e exige a autorização curta quando `editor_preview=1`.
 
 Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 
@@ -132,15 +134,7 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 - `COMMERCE_PREVIEW_SIGNATURE_SECRET`: mesmo valor configurado no Public API.
 - `COMMERCE_PREVIEW_SIGNATURE_MAX_AGE_SECONDS=60`
 
-### dashboard-seller
-
-- `CHECKOUT_PREVIEW_COOKIE_NAME=checkout_preview_jwt`
-- `CHECKOUT_PREVIEW_COOKIE_DOMAIN`: domínio compartilhado entre dashboard e checkout.
-- `CHECKOUT_PREVIEW_COOKIE_SECURE=true`
-
-### front-checkout
-
-- `CHECKOUT_PREVIEW_COOKIE_NAME=checkout_preview_jwt`
+O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou no `front-checkout`. A autorização curta é assinada com o `APP_KEY` já obrigatório no `edge-public-api`.
 
 ## Banco de dados
 
@@ -161,7 +155,7 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 
 1. Configurar segredos iguais nos dois lados de cada comunicação assinada.
 2. Configurar URL interna do `services-platform` no Public API.
-3. Confirmar o domínio compartilhado do cookie de preview.
+3. Confirmar que o `APP_KEY` do Public API está configurado e estável entre réplicas.
 4. Executar migrations de `services-platform` e `services-notification`.
 5. Publicar `services-notification`, `services-platform`, `services-commerce-v2`, `edge-public-api`, `edge-gateway`, `front-checkout` e `dashboard-seller`.
 6. Validar histórico, live mode, criação de alertas, backup/R2 e preview com proprietário/não proprietário.
