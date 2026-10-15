@@ -89,7 +89,7 @@ O fluxo escolhido é:
 - A flag `editor_preview=1` representa somente a intenção de abrir a prévia.
 - O `front-checkout` encaminha somente a autorização curta na consulta de contexto da prévia.
 - O Commerce V2 libera o bypass de elegibilidade somente quando a autorização temporária é válida para o proprietário daquele produto.
-- Sem autorização válida, com assinatura interna inválida ou propriedade divergente, a prévia retorna erro.
+- Sem autorização válida ou com propriedade divergente, a prévia retorna erro.
 - O contexto autenticado devolve `editor_preview=true`; o frontend não confia apenas na query string.
 - No preview, formulário, pixels, notificações de venda e fluxos de saída são desativados.
 - Requisições de pagamento marcadas como preview são recusadas também no backend.
@@ -115,7 +115,6 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 - `INTERNAL_HTTP_PLATFORM_URL`
 - `PLATFORM_SERVICE_SIGNATURE_SECRET`
 - `PLATFORM_SERVICE_TIMEOUT_SECONDS`
-- `COMMERCE_PREVIEW_SIGNATURE_SECRET`
 
 ### services-platform
 
@@ -131,11 +130,10 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 
 ### services-commerce-v2
 
-- `COMMERCE_PREVIEW_SIGNATURE_SECRET`: mesmo valor configurado no Public API.
-- `COMMERCE_PREVIEW_SIGNATURE_MAX_AGE_SECONDS=60`
+- `COMMERCE_PREVIEW_TOKEN_SECRET`: segredo local usado apenas para proteger o token temporário enviado ao navegador.
 - `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300`
 
-O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou no `front-checkout`. A autorização curta é assinada pelo Commerce V2 com o segredo interno de preview.
+O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller`, `front-checkout` ou `edge-public-api`. A autorização curta é assinada pelo Commerce V2 com um segredo local. A chamada interna do Public API usa a comunicação normal já existente com o Commerce V2.
 
 ## Banco de dados
 
@@ -157,7 +155,7 @@ O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou
 
 1. Configurar segredos iguais nos dois lados de cada comunicação assinada.
 2. Configurar URL interna do `services-platform` no Public API.
-3. Confirmar o mesmo `COMMERCE_PREVIEW_SIGNATURE_SECRET` no Public API e no Commerce V2.
+3. Configurar `COMMERCE_PREVIEW_TOKEN_SECRET` somente no Commerce V2.
 4. Executar migrations de `services-platform` e `services-notification`.
 5. Publicar `services-notification`, `services-platform`, `services-commerce-v2`, `edge-public-api`, `edge-gateway`, `front-checkout` e `dashboard-seller`.
 6. Validar histórico, live mode, criação de alertas, backup/R2 e preview com proprietário/não proprietário.
