@@ -83,12 +83,12 @@ O fluxo escolhido é:
 ### 7. Autorização do preview
 
 - O `dashboard-seller` autoriza a prévia por uma chamada backend feita com `GatewayJwtClient`, reutilizando o JWT e o `refresh_token` do fluxo autenticado existente.
-- Após validar o JWT, rejeitar colaboradores e confirmar a propriedade no Commerce V2, o Public API emite uma autorização assinada, restrita ao produto e válida por 5 minutos.
-- A autorização de prévia usa o `APP_KEY` do Public API, não contém o JWT nem o `refresh_token` e não exige cookie compartilhado entre dashboard e checkout.
+- O Public API valida o JWT, rejeita colaboradores e encaminha o ID do usuário ao Commerce V2 por chamada interna assinada.
+- O Commerce V2 confirma que o `short_code` pertence ao usuário e somente então emite uma autorização assinada, restrita ao produto e válida por 5 minutos.
+- A autorização de prévia é emitida e validada pelo Commerce V2, não contém o JWT nem o `refresh_token` e não exige cookie compartilhado entre dashboard e checkout.
 - A flag `editor_preview=1` representa somente a intenção de abrir a prévia.
 - O `front-checkout` encaminha somente a autorização curta na consulta de contexto da prévia.
-- O Public API propaga internamente o ID do usuário por uma chamada assinada ao Commerce V2.
-- O Commerce V2 libera o bypass de elegibilidade somente quando o usuário autenticado é o proprietário do produto.
+- O Commerce V2 libera o bypass de elegibilidade somente quando a autorização temporária é válida para o proprietário daquele produto.
 - Sem autorização válida, com assinatura interna inválida ou propriedade divergente, a prévia retorna erro.
 - O contexto autenticado devolve `editor_preview=true`; o frontend não confia apenas na query string.
 - No preview, formulário, pixels, notificações de venda e fluxos de saída são desativados.
@@ -133,8 +133,9 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 
 - `COMMERCE_PREVIEW_SIGNATURE_SECRET`: mesmo valor configurado no Public API.
 - `COMMERCE_PREVIEW_SIGNATURE_MAX_AGE_SECONDS=60`
+- `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300`
 
-O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou no `front-checkout`. A autorização curta é assinada com o `APP_KEY` já obrigatório no `edge-public-api`.
+O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou no `front-checkout`. A autorização curta é assinada pelo Commerce V2 com o segredo interno de preview.
 
 ## Banco de dados
 
@@ -145,17 +146,18 @@ O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller` ou
 
 - Sintaxe PHP validada em todos os arquivos alterados.
 - Rotas de plataforma e preview conferidas no Laravel.
-- Testes unitários do `edge-public-api`: 11 testes e 21 assertions.
+- Testes unitários do `edge-public-api`: 8 testes e 16 assertions.
+- Smoke test do emissor/validador de preview do Commerce V2 validou produto correto, produto divergente e token adulterado; o teste unitário correspondente foi adicionado ao repositório.
 - Imagem Docker do `services-platform` construída com sucesso.
 - Container isolado da imagem iniciou o console Hyperf e resolveu as dependências.
 - O comando de testes completo do `edge-public-api` continua com uma limitação anterior: o `phpunit.xml` referencia o diretório ausente `tests/Feature`; os testes de unidade foram executados diretamente.
-- Os testes do Commerce V2 não executam nesta máquina porque o binário `co-phpunit` não está instalado no repositório local.
+- A suíte PHPUnit do Commerce V2 não executa nesta máquina porque o binário `co-phpunit` não está instalado no repositório local.
 
 ## Implantação pendente em homologação
 
 1. Configurar segredos iguais nos dois lados de cada comunicação assinada.
 2. Configurar URL interna do `services-platform` no Public API.
-3. Confirmar que o `APP_KEY` do Public API está configurado e estável entre réplicas.
+3. Confirmar o mesmo `COMMERCE_PREVIEW_SIGNATURE_SECRET` no Public API e no Commerce V2.
 4. Executar migrations de `services-platform` e `services-notification`.
 5. Publicar `services-notification`, `services-platform`, `services-commerce-v2`, `edge-public-api`, `edge-gateway`, `front-checkout` e `dashboard-seller`.
 6. Validar histórico, live mode, criação de alertas, backup/R2 e preview com proprietário/não proprietário.
