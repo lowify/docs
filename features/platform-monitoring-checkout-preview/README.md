@@ -83,8 +83,8 @@ O fluxo escolhido é:
 ### 7. Autorização do preview
 
 - O `dashboard-seller` autoriza a prévia por uma chamada backend feita com `GatewayJwtClient`, reutilizando o JWT e o `refresh_token` do fluxo autenticado existente.
-- O Public API valida o JWT, rejeita colaboradores e encaminha o ID do usuário ao Commerce V2 por chamada interna assinada.
-- O Commerce V2 confirma que o `short_code` pertence ao usuário e somente então emite uma autorização assinada, restrita ao produto e válida por 5 minutos.
+- O Public API valida o JWT, rejeita colaboradores e encaminha o ID do usuário ao Commerce V2 pela comunicação interna normal entre esses serviços.
+- O Commerce V2 confirma que o `short_code` pertence ao usuário e somente então emite uma autorização aleatória, restrita ao produto, registrada no Redis e válida por 5 minutos.
 - A autorização de prévia é emitida e validada pelo Commerce V2, não contém o JWT nem o `refresh_token` e não exige cookie compartilhado entre dashboard e checkout.
 - A flag `editor_preview=1` representa somente a intenção de abrir a prévia.
 - O `front-checkout` encaminha somente a autorização curta na consulta de contexto da prévia.
@@ -130,10 +130,9 @@ Rotas internas equivalentes do `services-platform` usam o prefixo `/platform`.
 
 ### services-commerce-v2
 
-- `COMMERCE_PREVIEW_TOKEN_SECRET`: segredo local usado apenas para proteger o token temporário enviado ao navegador.
 - `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300`
 
-O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller`, `front-checkout` ou `edge-public-api`. A autorização curta é assinada pelo Commerce V2 com um segredo local. A chamada interna do Public API usa a comunicação normal já existente com o Commerce V2.
+O fluxo de prévia não adiciona segredos nem variáveis de ambiente no `dashboard-seller`, `front-checkout` ou `edge-public-api`. O token opaco é registrado no Redis já usado pelo Commerce V2 com `short_code`, ID do produto, proprietário e expiração; a chave expira automaticamente. A chamada interna do Public API usa a comunicação normal já existente com o Commerce V2.
 
 ## Banco de dados
 
@@ -145,7 +144,7 @@ O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller`, `
 - Sintaxe PHP validada em todos os arquivos alterados.
 - Rotas de plataforma e preview conferidas no Laravel.
 - Testes unitários do `edge-public-api`: 8 testes e 16 assertions.
-- Smoke test do emissor/validador de preview do Commerce V2 validou produto correto, produto divergente e token adulterado; o teste unitário correspondente foi adicionado ao repositório.
+- O teste do emissor/validador de preview do Commerce V2 cobre produto correto, produto divergente e token inexistente no Redis.
 - Imagem Docker do `services-platform` construída com sucesso.
 - Container isolado da imagem iniciou o console Hyperf e resolveu as dependências.
 - O comando de testes completo do `edge-public-api` continua com uma limitação anterior: o `phpunit.xml` referencia o diretório ausente `tests/Feature`; os testes de unidade foram executados diretamente.
@@ -155,7 +154,7 @@ O fluxo de prévia não adiciona variáveis de ambiente no `dashboard-seller`, `
 
 1. Configurar segredos iguais nos dois lados de cada comunicação assinada.
 2. Configurar URL interna do `services-platform` no Public API.
-3. Configurar `COMMERCE_PREVIEW_TOKEN_SECRET` somente no Commerce V2.
+3. Confirmar que o Commerce V2 está conectado ao Redis usado pelo serviço.
 4. Executar migrations de `services-platform` e `services-notification`.
 5. Publicar `services-notification`, `services-platform`, `services-commerce-v2`, `edge-public-api`, `edge-gateway`, `front-checkout` e `dashboard-seller`.
 6. Validar histórico, live mode, criação de alertas, backup/R2 e preview com proprietário/não proprietário.
