@@ -2,8 +2,8 @@
 
 ## Estado
 
-- Desenvolvimento local na branch `feat/service-monitoring-checkout-preview`.
-- Implantação em homologação deliberadamente pendente.
+- Desenvolvimento na branch `feat/service-monitoring-checkout-preview`.
+- Implantação validada em homologação; produção pendente conforme o documento de deploy vinculado ao final deste mapa.
 - O `services-platform` existente continua sendo a origem das métricas e dos backups.
 
 ## Decisões por etapa
@@ -91,7 +91,7 @@ O fluxo escolhido é:
 - O Commerce V2 libera o bypass de elegibilidade somente quando a autorização temporária é válida para o proprietário daquele produto.
 - Sem autorização válida ou com propriedade divergente, a prévia retorna erro.
 - O contexto autenticado devolve `editor_preview=true`; o frontend não confia apenas na query string.
-- No preview, formulário, pixels, notificações de venda e fluxos de saída são desativados.
+- No preview, o formulário e os meios de pagamento são exibidos apenas visualmente e ficam sem interação ou envio; pixels, notificações de venda e fluxos de saída são desativados.
 - Requisições de pagamento marcadas como preview são recusadas também no backend.
 
 ## Contratos HTTP
@@ -159,9 +159,14 @@ Executada em 15 de outubro de 2026 na branch `feat/service-monitoring-checkout-p
 - As migrations de `services-notification` e `services-platform` foram aplicadas.
 - O Public API e o Platform receberam o mesmo segredo de assinatura; Platform e Notifications receberam outro segredo compartilhado entre eles.
 - O clone do `services-platform` na VPS teve o refspec normalizado para rastrear branches além de `main`.
-- Durante a validação, as rotas do Platform foram corrigidas para callables compatíveis com Hyperf e os responses passaram a ser injetados pelo contrato HTTP no construtor. O commit final publicado do Platform é `5605af0`.
+- Durante a validação, as rotas do Platform foram corrigidas para callables compatíveis com Hyperf, os responses passaram a ser injetados pelo contrato HTTP no construtor e o histórico de load passou a usar a contagem conhecida de vCPUs em amostras antigas. O commit final publicado do Platform é `c444005`.
 - A rota do Platform retornou `401` sem assinatura e `200` com assinatura válida e contrato JSON.
 - A rota do Notifications aceitou a assinatura interna e retornou `422` para um payload vazio de teste, sem criar notificação.
 - A coleta histórica continuou produzindo métricas após o deploy.
 
-Permanecem como validação funcional manual: live mode pelo dashboard, criação real de alerta, backup/R2 e preview com proprietário e não proprietário.
+Permanecem como validação funcional de produção: modo ao vivo pelo Dashboard, criação real de alerta e preview com proprietário e não proprietário. Backup e R2 estão deliberadamente fora da primeira publicação.
+
+## Deploy de produção
+
+- [Deploy — Monitoramento de plataforma e prévia autorizada do checkout](../../deploys/2026-10-15-platform-monitoring-checkout-preview/2026-10-15_PLATFORM_MONITORING_CHECKOUT_PREVIEW_DEPLOY.md)
+- Na primeira publicação, o Platform será ativado somente para monitoramento e notificações internas; backup e R2 permanecerão desabilitados e sem credenciais.

@@ -1,0 +1,434 @@
+# Deploy — Monitoramento de plataforma e prévia autorizada do checkout
+
+## Objetivo
+
+Publicar em produção duas entregas da branch `feat/service-monitoring-checkout-preview`:
+
+1. monitoramento do host no Dashboard, com histórico de 45 dias, modo ao vivo e alertas internos de disco;
+2. prévia autorizada do checkout para o proprietário do produto, inclusive quando o produto não estiver disponível para compra.
+
+O novo `services-platform` será instalado em `/opt/services/services-platform` e entrará nesta etapa **somente para monitoramento**. Backup de bancos, dump local e Cloudflare R2 ficam desativados. Não cadastrar credenciais de banco para backup nem credenciais de storage.
+
+O fluxo de monitoramento será:
+
+`dashboard-seller -> edge-gateway -> edge-public-api -> services-platform`
+
+O fluxo de alerta será:
+
+`services-platform -> services-notifications -> notificação interna para administradores`
+
+O fluxo da prévia será:
+
+`dashboard-seller -> edge-gateway -> edge-public-api -> services-commerce-v2 -> Redis do Commerce V2 -> front-checkout`
+
+## Componentes e referências
+
+Todos os repositórios existentes devem estar sem alterações locais antes do deploy. A revisão curta deve coincidir com a tabela depois do `pull`.
+
+| Repositório | Diretório em produção | Branch | Commit | Ação |
+| --- | --- | --- | --- | --- |
+| `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `ebda9ff` | Configurar segredo, rebuild e migration |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `ee32f47` | Configurar TTL e rebuild |
+| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `c444005` | Clone novo, configuração, rebuild e migrations |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `59b1860` | Configurar comunicação e rebuild |
+| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `f8d2956` | Rebuild |
+| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/service-monitoring-checkout-preview` | `a2e205b` | Somente atualização Git |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/service-monitoring-checkout-preview` | `fc8b0188` | Somente atualização Git |
+
+O deploy é incremental e restrito a esses sete componentes. Não sincronizar nem reconstruir outros repositórios como efeito colateral.
+
+## Alterações incluídas
+
+### Monitoramento
+
+- Coleta persistida de disco, memória, inodes, load de 1/5/15 minutos e quantidade de vCPUs a cada 3 minutos.
+- Histórico retido por 45 dias e agregado no backend para consultas de 24 horas, 7 dias e 30 dias.
+- Modo ao vivo ativado sob demanda pelo Dashboard, com amostras a cada 5 segundos mantidas somente no Redis exclusivo do Platform.
+- Gráfico atualizado sem remontagem, preservando as séries ocultadas pelo usuário.
+- Load normalizado pela quantidade de vCPUs, inclusive para amostras históricas anteriores sem `cpu_cores`.
+- Alerta interno de disco em 80% e 90%, recuperação e cooldown de 6 horas.
+- Página **Infraestrutura** protegida pela permissão `admin_service_status`, disponível para perfis 1, 2 e 4.
+
+### Prévia do checkout
+
+- O Dashboard usa o JWT existente para solicitar a autorização da prévia.
+- O Public API extrai a identidade do JWT e rejeita colaboradores.
+- O Commerce V2 confirma que o produto pertence ao usuário e grava no Redis um token opaco, vinculado ao produto e válido por 5 minutos.
+- O Checkout aceita o token opaco e libera somente a renderização da prévia autorizada.
+- O formulário e os meios de pagamento aparecem visualmente, mas ficam sem interação e sem envio.
+- Pixels, reCAPTCHA, antifraude, notificações de venda, pagamentos e redirecionamentos comerciais não são executados na prévia.
+- Não há cookie novo nem segredo adicional para a prévia; o token temporário permanece no Redis já usado pelo Commerce V2.
+
+## Pré-requisitos
+
+1. Acesso administrativo ao servidor principal de produção e acesso SSH do host ao repositório `git@github.com:lowify/services-platform.git`.
+2. Docker, Docker Compose, Git e `openssl` disponíveis.
+3. A rede Docker externa `data_net` deve existir e conectar Public API, Platform e Notifications:
+
+   ```bash
+   docker network inspect data_net >/dev/null
+   ```
+
+4. A porta TCP `9515` deve estar livre antes de instalar o Platform:
+
+   ```bash
+   ss -ltnp | grep ':9515 '
+   ```
+
+   O resultado deve estar vazio. Se estiver ocupada, interromper o deploy e escolher uma porta aprovada antes de editar o `.env`; não parar o processo existente.
+
+5. Gerar dois segredos aleatórios fortes e independentes no gerenciador de segredos da operação:
+
+   - **segredo A — Public API/Platform**: mesmo valor em `PLATFORM_SERVICE_SIGNATURE_SECRET` no Public API e `PLATFORM_SIGNATURE_SECRET` no Platform;
+   - **segredo B — Platform/Notifications**: mesmo valor em `PLATFORM_NOTIFICATION_SECRET` no Platform e `INTERNAL_PLATFORM_NOTIFICATION_SECRET` no Notifications.
+
+   Não reutilizar JWT secret, senha de banco ou o mesmo valor nos dois pares. Não registrar os valores neste documento, em commit, ticket, histórico do shell ou evidência de deploy.
+
+6. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
+7. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
+8. Confirmar espaço suficiente para três volumes Docker novos. Não montar nem reutilizar banco ou Redis de outro serviço.
+
+## Variáveis de ambiente
+
+### `services-platform` — `/opt/services/services-platform/.env`
+
+Copiar `.env.example` e ajustar os itens abaixo. Os valores omitidos podem permanecer iguais ao exemplo versionado.
+
+| Variável | Valor ou regra |
+| --- | --- |
+| `APP_ENV` | `prod` |
+| `APP_TIMEZONE` | `America/Sao_Paulo` |
+| `PLATFORM_PORT` | `9515`, somente após confirmar que está livre |
+| `DB_HOST` | `platform-mariadb` |
+| `DB_DATABASE` | `operations` |
+| `DB_USERNAME` | `operations` |
+| `DB_PASSWORD` | senha forte exclusiva do banco interno |
+| `PLATFORM_MARIADB_ROOT_PASSWORD` | senha root forte e diferente da anterior |
+| `REDIS_HOST` | `platform-redis` |
+| `REDIS_PORT` | `6379` |
+| `REDIS_AUTH` | vazio; Redis não é publicado e permanece somente na `data_net` |
+| `PLATFORM_METRICS_INTERVAL_SECONDS` | `180` |
+| `PLATFORM_DISK_WARNING_PERCENT` | `80` |
+| `PLATFORM_DISK_CRITICAL_PERCENT` | `90` |
+| `PLATFORM_DISK_ALERT_COOLDOWN_SECONDS` | `21600` |
+| `PLATFORM_RETENTION_DAYS` | `45` |
+| `PLATFORM_LIVE_ENABLED` | `true` |
+| `PLATFORM_LIVE_INTERVAL_SECONDS` | `5` |
+| `PLATFORM_LIVE_TTL_SECONDS` | `60` |
+| `PLATFORM_SIGNATURE_SECRET` | segredo A |
+| `PLATFORM_SIGNATURE_MAX_AGE_SECONDS` | `60` |
+| `PLATFORM_NOTIFICATIONS_ENABLED` | `true` |
+| `PLATFORM_NOTIFICATION_URL` | `http://services-notifications:9501/internal/in-app-notifications` |
+| `PLATFORM_NOTIFICATION_SECRET` | segredo B |
+| `PLATFORM_NOTIFICATION_TIMEOUT_SECONDS` | `5` |
+| `BACKUP_ENABLED` | `false` |
+| `BACKUP_MARIADB_USERNAME` | vazio |
+| `BACKUP_MARIADB_PASSWORD` | vazio |
+| `BACKUP_MARIADB_DATABASES` | vazio |
+| `R2_ENDPOINT` | vazio |
+| `R2_BUCKET` | vazio |
+| `R2_ACCESS_KEY_ID` | vazio |
+| `R2_SECRET_ACCESS_KEY` | vazio |
+
+`BACKUP_SCHEDULE` e `BACKUP_LOCAL_DIR` podem permanecer com os valores do exemplo, pois `BACKUP_ENABLED=false` impede a geração de dumps. Não criar bucket, token R2, usuário de backup ou permissão de leitura nos bancos nesta etapa.
+
+### `edge-public-api` — `/opt/lowify/edge/edge-public-api/.env`
+
+| Variável | Valor ou regra |
+| --- | --- |
+| `INTERNAL_HTTP_PLATFORM_URL` | `http://services-platform:9501/` |
+| `PLATFORM_SERVICE_SIGNATURE_SECRET` | segredo A |
+| `PLATFORM_SERVICE_TIMEOUT_SECONDS` | `8` |
+
+### `services-notification` — `/opt/lowify/services/services-notifications/.env`
+
+| Variável | Valor ou regra |
+| --- | --- |
+| `INTERNAL_PLATFORM_NOTIFICATION_SECRET` | segredo B |
+
+### `services-commerce-v2` — `/opt/lowify/services/service-commerce-v2/.env`
+
+| Variável | Valor |
+| --- | --- |
+| `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS` | `300` |
+
+Não há variável nova em `edge-gateway`, `front-checkout` ou `dashboard-seller`.
+
+## Banco de dados
+
+### Platform
+
+Como a instalação é nova, aplicar as três migrations no banco `operations` local do container:
+
+| Migration | Efeito |
+| --- | --- |
+| `2026_10_14_000001_create_platform_tables.php` | Cria métricas, execuções de backup, incidentes e outbox de notificações |
+| `2026_10_15_000002_add_backup_queue.php` | Cria a fila durável de upload; permanecerá inativa com backup desligado |
+| `2026_10_15_000003_add_cpu_cores_to_host_metrics.php` | Registra vCPUs para normalizar o load |
+
+Embora as tabelas de backup sejam criadas, nenhuma rotina de backup será ativada e nenhum storage será configurado.
+
+### Notifications
+
+Aplicar `2026_10_15_000062_seed_platform_in_app_templates.php`. A migration adiciona os templates internos de alerta de disco e também templates de backup. Os templates de backup permanecerão sem uso enquanto `BACKUP_ENABLED=false`.
+
+Commerce V2, Public API, Gateway, Front Checkout e Dashboard não possuem migration nesta entrega.
+
+## Sequência de deploy
+
+### 1. Pré-checar os repositórios existentes
+
+Executar em cada diretório abaixo antes de qualquer `fetch`, edição de `.env` ou rebuild:
+
+```bash
+cd /opt/lowify/services/services-notifications
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+
+cd /opt/lowify/services/service-commerce-v2
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+
+cd /opt/lowify/edge/edge-public-api
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+
+cd /opt/lowify/edge/edge-gateway
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+
+cd /opt/lowify/front/front-checkout
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+
+cd /opt/lowify/front/dashboard-seller
+git status --porcelain=v1
+git branch --show-current
+git remote get-url origin
+git rev-parse --short HEAD
+```
+
+Se houver qualquer saída no `git status`, origem inesperada ou diretório ausente, interromper antes de alterar qualquer componente.
+
+### 2. Publicar Notifications e aplicar o template
+
+Editar o `.env` com o segredo B antes do rebuild, sem imprimir o valor:
+
+```bash
+cd /opt/lowify/services/services-notifications
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose exec -T services-notifications php bin/hyperf.php migrate --force --path=migrations/2026_10_15_000062_seed_platform_in_app_templates.php
+docker compose exec -T services-notifications php bin/hyperf.php migrate:status
+docker compose ps
+docker compose logs --tail=100 services-notifications
+```
+
+O commit deve ser `ebda9ff`. Não continuar se a migration ou o container falhar.
+
+### 3. Publicar Commerce V2
+
+Editar `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300` antes do rebuild:
+
+```bash
+cd /opt/lowify/services/service-commerce-v2
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 service-commerce-v2
+```
+
+O commit deve ser `ee32f47`.
+
+### 4. Instalar o novo `services-platform`
+
+O diretório não deve existir antes do primeiro clone. Se existir, interromper e identificar seu conteúdo; não apagar nem sobrescrever.
+
+```bash
+mkdir -p /opt/services
+cd /opt/services
+git clone --branch feat/service-monitoring-checkout-preview git@github.com:lowify/services-platform.git services-platform
+cd /opt/services/services-platform
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+cp .env.example .env
+chmod 600 .env
+```
+
+O commit deve ser `c444005`. Editar o `.env` conforme a tabela deste documento antes de continuar.
+
+Criar somente os volumes exclusivos declarados pelo Compose e confirmar a rede compartilhada:
+
+```bash
+docker network inspect data_net >/dev/null
+docker volume inspect services-operations_operations_runtime >/dev/null 2>&1 || docker volume create services-operations_operations_runtime
+docker volume inspect services-operations_operations_mariadb_data >/dev/null 2>&1 || docker volume create services-operations_operations_mariadb_data
+docker volume inspect services-operations_operations_redis_data >/dev/null 2>&1 || docker volume create services-operations_operations_redis_data
+```
+
+Subir o serviço, aplicar todas as migrations e conferir o estado:
+
+```bash
+cd /opt/services/services-platform
+docker compose up -d --build
+docker compose exec -T services-platform php bin/hyperf.php migrate --force
+docker compose exec -T services-platform php bin/hyperf.php migrate:status
+docker compose ps
+docker compose logs --tail=100 services-platform
+curl --fail --silent --show-error http://127.0.0.1:9515/health
+```
+
+O health check deve retornar `{"status":"ok"}`. Confirmar nos logs que a coleta não apresenta erro de tabela, MariaDB ou Redis. Não cadastrar variáveis `R2_*` nem `BACKUP_MARIADB_*` depois dessa etapa.
+
+### 5. Publicar o Public API
+
+Editar no `.env` a URL interna, o segredo A e o timeout antes do rebuild:
+
+```bash
+cd /opt/lowify/edge/edge-public-api
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 edge-public-api
+```
+
+O commit deve ser `59b1860`. A partir do container do Public API, o nome `services-platform` deve resolver na `data_net`; se não resolver, interromper e corrigir a associação de rede, sem substituir a URL por IP efêmero de container.
+
+### 6. Publicar o Gateway
+
+```bash
+cd /opt/lowify/edge/edge-gateway
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 edge-gateway
+```
+
+O commit deve ser `f8d2956`.
+
+### 7. Atualizar Front Checkout e Dashboard
+
+Esses dois repositórios recebem somente atualização Git neste ambiente:
+
+```bash
+cd /opt/lowify/front/front-checkout
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+
+cd /opt/lowify/front/dashboard-seller
+git fetch origin --prune
+git switch feat/service-monitoring-checkout-preview
+git pull --ff-only origin feat/service-monitoring-checkout-preview
+git rev-parse --short HEAD
+```
+
+Os commits devem ser, respectivamente, `a2e205b` e `fc8b0188`.
+
+## Validação pós-deploy
+
+### Monitoramento
+
+1. Faça login no Dashboard com um usuário administrativo de perfil 1, 2 ou 4.
+2. Abra **Infraestrutura**. Os cards de disco, memória, inodes e load devem mostrar valores do servidor, e não traços ou erro de indisponibilidade.
+3. Selecione 24 horas, 7 dias e 30 dias. O gráfico deve carregar sem apresentar picos artificiais de load causados por uma única CPU.
+4. Clique em **Acompanhar em tempo real**. Em até 5 segundos, o gráfico deve mostrar disco, memória, inodes e load. Ao ocultar uma série pela legenda, ela deve continuar oculta nos ticks seguintes e o gráfico não deve repetir a animação de montagem.
+5. Mantenha o modal aberto por mais de 1 minuto. A coleta deve continuar; ao fechá-lo, deve parar sem persistir as amostras rápidas no histórico.
+6. A tabela de backups deve permanecer vazia. Não deve surgir dump em `/var/lib/platform/backups`, job de upload ou tentativa de R2.
+7. Não provocar artificialmente 80% de uso de disco em produção. O alerta interno será validado quando ocorrer uma condição real; a conferência técnica opcional pode verificar que Platform e Notifications estão saudáveis e usam o mesmo segredo B, sem imprimir o segredo.
+
+Se a página informar indisponibilidade, interromper a validação funcional e conferir, nesta ordem, Public API, resolução DNS de `services-platform`, assinatura A, health do Platform, MariaDB e Redis próprios.
+
+### Prévia do checkout
+
+1. Entre como o proprietário de um produto e abra **Personalizar aparência**.
+2. A prévia deve carregar mesmo quando o produto estiver inativo ou indisponível para uma compra normal.
+3. Confirme que banner, textos, preço, depoimentos, formulário e meios de pagamento aparecem.
+4. O formulário deve ser apenas visual: campos, botões e pagamento não podem executar compra, validação externa ou redirecionamento.
+5. Aguarde mais de 5 minutos e reabra o editor. Uma nova autorização deve ser criada e a prévia deve voltar a abrir normalmente.
+6. Tente abrir o editor de um produto que não pertence ao usuário autenticado. A autorização deve ser recusada.
+7. Abra o checkout normal do mesmo produto sem `editor_preview=1`. As regras normais de disponibilidade e pagamento devem continuar inalteradas.
+
+## Conferência técnica opcional
+
+Sem exibir segredos ou payloads sensíveis:
+
+```bash
+cd /opt/services/services-platform
+docker compose ps
+docker compose logs --tail=100 services-platform
+docker compose exec -T services-platform php bin/hyperf.php migrate:status
+
+cd /opt/lowify/services/services-notifications
+docker compose ps
+docker compose exec -T services-notifications php bin/hyperf.php migrate:status
+
+cd /opt/lowify/services/service-commerce-v2
+docker compose ps
+
+cd /opt/lowify/edge/edge-public-api
+docker compose ps
+
+cd /opt/lowify/edge/edge-gateway
+docker compose ps
+```
+
+Todos os containers devem permanecer em execução, sem ciclo de restart. Não listar o ambiente completo dos containers e não incluir tokens de prévia ou assinaturas nas evidências.
+
+## Rollback
+
+1. Retirar primeiro as interfaces: retornar `dashboard-seller` e `front-checkout` às branches e commits registrados na pré-checagem. O Front Checkout normal continua funcionando sem o modo de prévia.
+2. Retornar `edge-gateway` e `edge-public-api` às referências anteriores e reconstruir seus containers. Remover do Public API as três variáveis do Platform somente depois que a versão anterior estiver ativa.
+3. Retornar `services-commerce-v2` à referência anterior e reconstruí-lo. Não limpar Redis: os tokens de prévia expiram sozinhos em até 5 minutos.
+4. No Platform, definir `PLATFORM_NOTIFICATIONS_ENABLED=false` e reconstruir antes de retirar a rota de Notifications. Isso impede novas tentativas de alerta durante a reversão.
+5. Retornar `services-notification` à referência anterior e reconstruir. Manter a migration `2026_10_15_000062` aplicada; os templates são aditivos e não causam envio sem o chamador.
+6. Se o Platform precisar ser retirado, parar apenas a aplicação:
+
+   ```bash
+   cd /opt/services/services-platform
+   docker compose stop services-platform
+   ```
+
+7. Não executar `docker compose down -v`, não remover os três volumes, não apagar o banco `operations`, o Redis, incidentes, outbox ou histórico coletado. Não apagar `/opt/services/services-platform` até a investigação e a decisão de retenção dos dados.
+8. Os segredos A e B podem permanecer sem uso após o rollback. Rotacioná-los se houver qualquer suspeita de exposição; nunca recuperá-los de logs ou commits.
+
+## Limites desta publicação
+
+- `BACKUP_ENABLED=false` é obrigatório.
+- Nenhum banco de aplicação será lido pelo Platform.
+- Nenhum dump será criado.
+- Nenhuma conta, token ou bucket do Cloudflare R2 será configurado.
+- Somente alertas internos são habilitados; não há e-mail de infraestrutura.
+- Memória e inodes permanecem apenas no histórico. O único alerta de recurso nesta etapa é uso de disco.
+
+## Referências
+
+- `features/platform-monitoring-checkout-preview/README.md`
+- `services-platform/.env.example`
+- `services-platform/README.md`
+- `services-notification/migrations/2026_10_15_000062_seed_platform_in_app_templates.php`
