@@ -22,7 +22,7 @@ O dashboard não acessa serviços internos diretamente. O caminho das consultas 
 ### 2. Coleta e histórico
 
 - A coleta persistida permanece a cada 3 minutos.
-- A retenção permanece em 30 dias, com exclusão em lotes.
+- A retenção é de 45 dias, com exclusão em lotes, para preservar a janela necessária aos relatórios.
 - Cada amostra contém disco, memória, inodes, load de 1/5/15 minutos e quantidade de vCPUs.
 - O load é mostrado também como percentual da capacidade: `load de 1 minuto / vCPUs`.
 - O endpoint histórico agrega no servidor para não enviar todas as amostras ao navegador:
