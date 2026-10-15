@@ -150,11 +150,18 @@ O fluxo de prévia não adiciona segredos nem variáveis de ambiente no `dashboa
 - O comando de testes completo do `edge-public-api` continua com uma limitação anterior: o `phpunit.xml` referencia o diretório ausente `tests/Feature`; os testes de unidade foram executados diretamente.
 - A suíte PHPUnit do Commerce V2 não executa nesta máquina porque o binário `co-phpunit` não está instalado no repositório local.
 
-## Implantação pendente em homologação
+## Implantação em homologação
 
-1. Configurar segredos iguais nos dois lados de cada comunicação assinada.
-2. Configurar URL interna do `services-platform` no Public API.
-3. Confirmar que o Commerce V2 está conectado ao Redis usado pelo serviço.
-4. Executar migrations de `services-platform` e `services-notification`.
-5. Publicar `services-notification`, `services-platform`, `services-commerce-v2`, `edge-public-api`, `edge-gateway`, `front-checkout` e `dashboard-seller`.
-6. Validar histórico, live mode, criação de alertas, backup/R2 e preview com proprietário/não proprietário.
+Executada em 15 de outubro de 2026 na branch `feat/service-monitoring-checkout-preview`:
+
+- `dashboard-seller` e `front-checkout` foram atualizados somente por Git, sem rebuild.
+- `edge-gateway`, `edge-public-api`, `services-commerce-v2`, `services-notification` e `services-platform` foram reconstruídos por Docker Compose.
+- As migrations de `services-notification` e `services-platform` foram aplicadas.
+- O Public API e o Platform receberam o mesmo segredo de assinatura; Platform e Notifications receberam outro segredo compartilhado entre eles.
+- O clone do `services-platform` na VPS teve o refspec normalizado para rastrear branches além de `main`.
+- Durante a validação, as rotas do Platform foram corrigidas para callables compatíveis com Hyperf e os responses passaram a ser injetados pelo contrato HTTP no construtor. O commit final publicado do Platform é `5605af0`.
+- A rota do Platform retornou `401` sem assinatura e `200` com assinatura válida e contrato JSON.
+- A rota do Notifications aceitou a assinatura interna e retornou `422` para um payload vazio de teste, sem criar notificação.
+- A coleta histórica continuou produzindo métricas após o deploy.
+
+Permanecem como validação funcional manual: live mode pelo dashboard, criação real de alerta, backup/R2 e preview com proprietário e não proprietário.
