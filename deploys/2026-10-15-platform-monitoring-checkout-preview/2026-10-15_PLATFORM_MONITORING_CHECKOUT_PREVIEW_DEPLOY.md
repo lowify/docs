@@ -95,65 +95,19 @@ Não há consumo de dumps ou de R2 nesta etapa: `BACKUP_ENABLED=false` impede a 
 
 ### `services-platform` — `/opt/services/services-platform/.env`
 
-O arquivo `services-platform/.env.production.example` é a fonte única das variáveis do novo serviço. Copiá-lo para `.env` e substituir todos os placeholders `REPLACE_ME`; o próprio arquivo define o tamanho e o conjunto de caracteres de cada segredo. Os valores omitidos podem permanecer iguais ao template versionado.
+O arquivo `services-platform/.env.production.example` é a fonte única das variáveis do novo serviço. Copiá-lo para `.env` e alterar somente os cinco placeholders `REPLACE_ME`:
 
-| Variável | Valor ou regra |
-| --- | --- |
-| `APP_ENV` | `prod` |
-| `APP_TIMEZONE` | `America/Sao_Paulo` |
-| `PLATFORM_PORT` | `9515` |
-| `DB_HOST` | `platform-mariadb` |
-| `DB_DATABASE` | `operations` |
-| `DB_USERNAME` | `operations` |
-| `DB_PASSWORD` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]` |
-| `PLATFORM_MARIADB_ROOT_PASSWORD` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]`, diferente de `DB_PASSWORD` |
-| `REDIS_HOST` | `platform-redis` |
-| `REDIS_PORT` | `6379` |
-| `REDIS_AUTH` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]`, diferente das duas senhas da MariaDB; obrigatório mesmo com Redis restrito à `data_net` |
-| `PLATFORM_METRICS_INTERVAL_SECONDS` | `180` |
-| `PLATFORM_DISK_WARNING_PERCENT` | `80` |
-| `PLATFORM_DISK_CRITICAL_PERCENT` | `90` |
-| `PLATFORM_DISK_ALERT_COOLDOWN_SECONDS` | `21600` |
-| `PLATFORM_RETENTION_DAYS` | `45` |
-| `PLATFORM_LIVE_ENABLED` | `true` |
-| `PLATFORM_LIVE_INTERVAL_SECONDS` | `5` |
-| `PLATFORM_LIVE_TTL_SECONDS` | `60` |
-| `PLATFORM_SIGNATURE_SECRET` | segredo A: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), equivalentes a 32 bytes aleatórios |
-| `PLATFORM_SIGNATURE_MAX_AGE_SECONDS` | `60` |
-| `PLATFORM_NOTIFICATIONS_ENABLED` | `true` |
-| `PLATFORM_NOTIFICATION_URL` | `http://services-notifications:9501/internal/in-app-notifications` |
-| `PLATFORM_NOTIFICATION_SECRET` | segredo B: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), diferente do segredo A |
-| `PLATFORM_NOTIFICATION_TIMEOUT_SECONDS` | `5` |
-| `BACKUP_ENABLED` | `false` |
-| `BACKUP_MARIADB_USERNAME` | vazio |
-| `BACKUP_MARIADB_PASSWORD` | vazio |
-| `BACKUP_MARIADB_DATABASES` | vazio |
-| `R2_ENDPOINT` | vazio |
-| `R2_BUCKET` | vazio |
-| `R2_ACCESS_KEY_ID` | vazio |
-| `R2_SECRET_ACCESS_KEY` | vazio |
+- `DB_PASSWORD`, `PLATFORM_MARIADB_ROOT_PASSWORD` e `REDIS_AUTH`: 48 caracteres aleatórios em `[A-Za-z0-9_-]`, todos diferentes entre si;
+- `PLATFORM_SIGNATURE_SECRET`: segredo A, com 64 caracteres `[0-9a-f]`;
+- `PLATFORM_NOTIFICATION_SECRET`: segredo B, também com 64 caracteres `[0-9a-f]` e diferente do segredo A.
 
-`BACKUP_SCHEDULE` e `BACKUP_LOCAL_DIR` podem permanecer com os valores do exemplo, pois `BACKUP_ENABLED=false` impede a geração de dumps. Não criar bucket, token R2, usuário de backup ou permissão de leitura nos bancos nesta etapa.
+As demais variáveis devem permanecer exatamente como estão no template, incluindo `BACKUP_ENABLED=false`, R2 sem credenciais, retenção de 45 dias, porta `9515` e a URL interna de Notifications.
 
-### `edge-public-api` — `/opt/lowify/edge/edge-public-api/.env`
+### Variáveis a adicionar ou alterar nos serviços existentes
 
-| Variável | Valor ou regra |
-| --- | --- |
-| `INTERNAL_HTTP_PLATFORM_URL` | `http://services-platform:9501/` |
-| `PLATFORM_SERVICE_SIGNATURE_SECRET` | segredo A |
-| `PLATFORM_SERVICE_TIMEOUT_SECONDS` | `8` |
-
-### `services-notification` — `/opt/lowify/services/services-notifications/.env`
-
-| Variável | Valor ou regra |
-| --- | --- |
-| `INTERNAL_PLATFORM_NOTIFICATION_SECRET` | segredo B |
-
-### `services-commerce-v2` — `/opt/lowify/services/service-commerce-v2/.env`
-
-| Variável | Valor |
-| --- | --- |
-| `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS` | `300` |
+- Em `edge-public-api/.env`: `INTERNAL_HTTP_PLATFORM_URL=http://services-platform:9501/`, `PLATFORM_SERVICE_SIGNATURE_SECRET` com o segredo A e `PLATFORM_SERVICE_TIMEOUT_SECONDS=8`.
+- Em `services-notifications/.env`: `INTERNAL_PLATFORM_NOTIFICATION_SECRET` com o segredo B.
+- Em `services-commerce-v2/.env`: `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300`.
 
 Não há variável nova em `edge-gateway`, `front-checkout` ou `dashboard-seller`.
 
