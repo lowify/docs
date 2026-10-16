@@ -2,10 +2,11 @@
 
 ## Objetivo
 
-Publicar em produção duas entregas da branch `feat/service-monitoring-checkout-preview`:
+Publicar em produção três entregas da branch `feat/service-monitoring-checkout-preview`:
 
 1. monitoramento do host no Dashboard, com histórico de 45 dias, modo ao vivo e alertas internos de disco;
 2. prévia autorizada do checkout para o proprietário do produto, inclusive quando o produto não estiver disponível para compra.
+3. resumo do extrato de comunicações com investimento, vendas comunicadas, eficiência e recuperação de vendas.
 
 O novo `services-platform` será instalado em `/opt/services/services-platform` e entrará nesta etapa **somente para monitoramento**. Backup de bancos, dump local e Cloudflare R2 ficam desativados. Não cadastrar credenciais de banco para backup nem credenciais de storage.
 
@@ -21,6 +22,10 @@ O fluxo da prévia será:
 
 `dashboard-seller -> edge-gateway -> edge-public-api -> services-commerce-v2 -> Redis do Commerce V2 -> front-checkout`
 
+O fluxo do resumo do extrato será:
+
+`dashboard-seller -> edge-gateway -> edge-public-api -> services-commerce-v2`
+
 ## Estado desejado
 
 A revisão curta final de cada repositório deve coincidir com esta tabela.
@@ -28,7 +33,7 @@ A revisão curta final de cada repositório deve coincidir com esta tabela.
 | Repositório | Diretório em produção | Branch | Ação |
 | --- | --- | --- | --- |
 | `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `pull + build + migration` |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `pull + build` |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `pull + SQL manual + build` |
 | `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `clone + build + migration` |
 | `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `pull + build` |
 | `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `pull + build` |
@@ -58,6 +63,14 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
 - O formulário e os meios de pagamento aparecem visualmente, mas ficam sem interação e sem envio.
 - Pixels, reCAPTCHA, antifraude, notificações de venda, pagamentos e redirecionamentos comerciais não são executados na prévia.
 - Não há cookie novo nem segredo adicional para a prévia; o token temporário permanece no Redis já usado pelo Commerce V2.
+
+### Resumo do extrato de comunicações
+
+- O extrato renderiza quatro cards com `StatCard`/`StatCardGrid`, mantendo skeleton enquanto o resumo é carregado em paralelo à lista.
+- A paginação atualiza somente a lista; ao alterar filtros de tipo, canal, status ou período, lista e cards recebem a mesma seleção.
+- O Public API extrai a identidade do JWT e preserva a autorização existente do extrato, inclusive para colaboradores; o navegador não escolhe o vendedor consultado.
+- O Commerce V2 considera gasto apenas quando `funding_status = consumed`. Vendas comunicadas excluem itens somente agendados, cancelados ou ignorados.
+- A recuperação considera dispatches enviados (`sent`, `sent_to_provider` ou `confirmed`) e vendas pagas depois da criação do dispatch. O valor mostrado é receita recuperada, não lucro líquido.
 
 ## Pré-requisitos
 
@@ -128,6 +141,22 @@ Aplicar `2026_10_15_000062_seed_platform_in_app_templates.php`. A migration adic
 
 Commerce V2, Public API, Gateway, Front Checkout e Dashboard não possuem migration nesta entrega.
 
+### Commerce V2 — índices do resumo de comunicações
+
+Não executar migration automática para o resumo. Aplicar manualmente, uma única vez, o arquivo [sql/commerce-v2/DEPLOY.sql](sql/commerce-v2/DEPLOY.sql) no banco do Commerce V2. Ele adiciona somente índices por proprietário e período em `sales_delivery` e `sale_recovery_dispatches`; não modifica dados, créditos ou mensagens.
+
+Antes de executar, conferir se os índices ainda não existem:
+
+```sql
+SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND INDEX_NAME IN ('idx_sales_delivery_owner_created', 'idx_sale_recovery_owner_created')
+ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX;
+```
+
+Na primeira execução, o resultado deve estar vazio. Se algum índice já existir, não repetir a instrução correspondente; validar a composição das colunas e registrar o estado. Após aplicar o SQL, repetir a consulta e confirmar três colunas por índice, na ordem `owner_user_id`, `created_at`, `id`.
+
 ## Sequência de deploy
 
 ### 1. Publicar Notifications e aplicar o template
@@ -162,7 +191,9 @@ docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-O commit deve ser `ee32f47`.
+O commit deve ser `5918ecc`. Antes de reconstruir, executar uma única vez o conteúdo de [sql/commerce-v2/DEPLOY.sql](sql/commerce-v2/DEPLOY.sql) no banco do Commerce V2, após o precheck da seção **Commerce V2 — índices do resumo de comunicações**. Não executar `php bin/hyperf.php migrate`, `migrate --force` ou outro comando de migration para esse ajuste manual.
+
+Após o rebuild, confirmar que a rota interna `GET /sale-notifications/summary` está disponível para o Public API.
 
 ### 3. Instalar o novo `services-platform`
 
@@ -245,7 +276,7 @@ docker compose ps
 docker compose logs --tail=100 edge-public-api
 ```
 
-O commit deve ser `59b1860`. A partir do container do Public API, o nome `services-platform` deve resolver na `data_net`; se não resolver, interromper e corrigir a associação de rede, sem substituir a URL por IP efêmero de container.
+O commit deve ser `0cec9bb`. A partir do container do Public API, o nome `services-platform` deve resolver na `data_net`; se não resolver, interromper e corrigir a associação de rede, sem substituir a URL por IP efêmero de container. Confirmar também que a rota autenticada `GET /sale-notifications/summary` encaminha o contexto JWT ao Commerce V2.
 
 ### 5. Publicar o Gateway
 
@@ -260,7 +291,7 @@ docker compose ps
 docker compose logs --tail=100 edge-gateway
 ```
 
-O commit deve ser `f8d2956`.
+O commit deve ser `d073baf`. Confirmar também que o Gateway encaminha `GET /sale-notifications/summary` ao Public API.
 
 ### 6. Atualizar Front Checkout e Dashboard
 
@@ -280,7 +311,7 @@ git pull --ff-only origin feat/service-monitoring-checkout-preview
 git rev-parse --short HEAD
 ```
 
-Os commits devem ser, respectivamente, `a2e205b` e `fc8b0188`.
+Os commits devem ser, respectivamente, `a2e205b` e `c787f405`. No Dashboard, abrir o extrato após a atualização e confirmar que os cards do resumo são exibidos.
 
 ## Validação pós-deploy
 
@@ -306,11 +337,21 @@ Se a página informar indisponibilidade, interromper a validação funcional e c
 6. Tente abrir o editor de um produto que não pertence ao usuário autenticado. A autorização deve ser recusada.
 7. Abra o checkout normal do mesmo produto sem `editor_preview=1`. As regras normais de disponibilidade e pagamento devem continuar inalteradas.
 
+### Resumo do extrato de comunicações
+
+1. Faça login no Dashboard Seller com uma conta que possua comunicações de entrega ou recuperação e abra **Créditos de comunicação → Extrato**.
+2. Confirme que a tabela começa a carregar sem aguardar os cards, que os quatro cards exibem skeleton e, em seguida, valores para investimento, vendas comunicadas, eficiência e recuperação.
+3. Filtre por período, canal e tipo. Confirme que a tabela e os cards refletem a mesma seleção.
+4. Vá para a próxima página da tabela. Confirme que apenas a lista é atualizada e os cards permanecem visíveis.
+5. Em período sem comunicações, confirme números zerados e `—` quando não houver divisor para calcular custo médio, sem erro na tela.
+6. Se os cards não carregarem, confirme que a lista continua utilizável. Registrar horário, usuário de teste e filtros usados; não limpar filas, Redis ou dados para forçar resultado.
+
 ## Rollback
 
 1. Retirar primeiro as interfaces: retornar `dashboard-seller` e `front-checkout` às branches e commits registrados na pré-checagem. O Front Checkout normal continua funcionando sem o modo de prévia.
 2. Retornar `edge-gateway` e `edge-public-api` às referências anteriores e reconstruir seus containers. Remover do Public API as três variáveis do Platform somente depois que a versão anterior estiver ativa.
 3. Retornar `services-commerce-v2` à referência anterior e reconstruí-lo. Não limpar Redis: os tokens de prévia expiram sozinhos em até 5 minutos.
+   Os índices do resumo de comunicações devem permanecer: são compatíveis com a versão anterior e não alteram dados. Não removê-los no rollback normal.
 4. No Platform, definir `PLATFORM_NOTIFICATIONS_ENABLED=false` e reconstruir antes de retirar a rota de Notifications. Isso impede novas tentativas de alerta durante a reversão.
 5. Retornar `services-notification` à referência anterior e reconstruir. Manter a migration `2026_10_15_000062` aplicada; os templates são aditivos e não causam envio sem o chamador.
 6. Se o Platform precisar ser retirado, parar apenas a aplicação:
@@ -339,3 +380,4 @@ Se a página informar indisponibilidade, interromper a validação funcional e c
 - `services-platform/.env.production.example`
 - `services-platform/README.md`
 - `services-notification/migrations/2026_10_15_000062_seed_platform_in_app_templates.php`
+- `sql/commerce-v2/DEPLOY.sql`
