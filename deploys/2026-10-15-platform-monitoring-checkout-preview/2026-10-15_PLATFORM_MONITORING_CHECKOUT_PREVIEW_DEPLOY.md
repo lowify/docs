@@ -81,8 +81,6 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
    ```bash
    openssl rand -base64 36 | tr '+/' '-_'
    ```
-3. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
-
 ## Espaço em disco
 
 Reservar pelo menos **5 GB livres** no filesystem usado pelo Docker antes da instalação; **10 GB livres** é a margem recomendada para acomodar build, cache e logs sem pressão no host.
@@ -132,51 +130,7 @@ Commerce V2, Public API, Gateway, Front Checkout e Dashboard não possuem migrat
 
 ## Sequência de deploy
 
-### 1. Pré-checar os repositórios existentes
-
-Executar em cada diretório abaixo antes de qualquer `fetch`, edição de `.env` ou rebuild:
-
-```bash
-cd /opt/lowify/services/services-notifications
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-
-cd /opt/lowify/services/service-commerce-v2
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-
-cd /opt/lowify/edge/edge-public-api
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-
-cd /opt/lowify/edge/edge-gateway
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-
-cd /opt/lowify/front/front-checkout
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-
-cd /opt/lowify/front/dashboard-seller
-git status --porcelain=v1
-git branch --show-current
-git remote get-url origin
-git rev-parse --short HEAD
-```
-
-Se houver qualquer saída no `git status`, origem inesperada ou diretório ausente, interromper antes de alterar qualquer componente.
-
-### 2. Publicar Notifications e aplicar o template
+### 1. Publicar Notifications e aplicar o template
 
 Editar o `.env` com o segredo B antes do rebuild, sem imprimir o valor:
 
@@ -195,7 +149,7 @@ docker compose logs --tail=100 services-notifications
 
 O commit deve ser `ebda9ff`. Não continuar se a migration ou o container falhar.
 
-### 3. Publicar Commerce V2
+### 2. Publicar Commerce V2
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
@@ -210,12 +164,11 @@ docker compose logs --tail=100 service-commerce-v2
 
 O commit deve ser `ee32f47`.
 
-### 4. Instalar o novo `services-platform`
+### 3. Instalar o novo `services-platform`
 
-O diretório não deve existir antes do primeiro clone. Se existir, interromper e identificar seu conteúdo; não apagar nem sobrescrever.
+O diretório `/opt/services` já existe. O subdiretório `/opt/services/services-platform` não deve existir antes do primeiro clone; se existir, interromper e identificar seu conteúdo; não apagar nem sobrescrever.
 
 ```bash
-mkdir -p /opt/services
 cd /opt/services
 git clone --branch feat/service-monitoring-checkout-preview git@github.com:lowify/services-platform.git services-platform
 cd /opt/services/services-platform
@@ -278,9 +231,9 @@ curl --fail --silent --show-error http://127.0.0.1:9515/health
 
 O health check deve retornar `{"status":"ok"}`. Confirmar nos logs que a coleta não apresenta erro de tabela, MariaDB ou Redis. Não cadastrar variáveis `R2_*` nem `BACKUP_MARIADB_*` depois dessa etapa.
 
-### 5. Publicar o Public API
+### 4. Publicar o Public API
 
-Editar no `.env` a URL interna, o segredo A e o timeout antes do rebuild:
+Editar no `.env` somente `PLATFORM_SERVICE_SIGNATURE_SECRET` com o segredo A antes do rebuild:
 
 ```bash
 cd /opt/lowify/edge/edge-public-api
@@ -295,7 +248,7 @@ docker compose logs --tail=100 edge-public-api
 
 O commit deve ser `59b1860`. A partir do container do Public API, o nome `services-platform` deve resolver na `data_net`; se não resolver, interromper e corrigir a associação de rede, sem substituir a URL por IP efêmero de container.
 
-### 6. Publicar o Gateway
+### 5. Publicar o Gateway
 
 ```bash
 cd /opt/lowify/edge/edge-gateway
@@ -310,7 +263,7 @@ docker compose logs --tail=100 edge-gateway
 
 O commit deve ser `f8d2956`.
 
-### 7. Atualizar Front Checkout e Dashboard
+### 6. Atualizar Front Checkout e Dashboard
 
 Esses dois repositórios recebem somente atualização Git neste ambiente:
 
