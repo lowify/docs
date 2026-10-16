@@ -105,9 +105,8 @@ As demais variáveis devem permanecer exatamente como estão no template, inclui
 
 ### Variáveis a adicionar ou alterar nos serviços existentes
 
-- Em `edge-public-api/.env`: `INTERNAL_HTTP_PLATFORM_URL=http://services-platform:9501/`, `PLATFORM_SERVICE_SIGNATURE_SECRET` com o segredo A e `PLATFORM_SERVICE_TIMEOUT_SECONDS=8`.
+- Em `edge-public-api/.env`: `PLATFORM_SERVICE_SIGNATURE_SECRET` com o segredo A.
 - Em `services-notifications/.env`: `INTERNAL_PLATFORM_NOTIFICATION_SECRET` com o segredo B.
-- Em `services-commerce-v2/.env`: `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300`.
 
 Não há variável nova em `edge-gateway`, `front-checkout` ou `dashboard-seller`.
 
@@ -197,8 +196,6 @@ docker compose logs --tail=100 services-notifications
 O commit deve ser `ebda9ff`. Não continuar se a migration ou o container falhar.
 
 ### 3. Publicar Commerce V2
-
-Editar `COMMERCE_PREVIEW_TOKEN_TTL_SECONDS=300` antes do rebuild:
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
