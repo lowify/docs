@@ -1,7 +1,7 @@
 # Feature — comunicações de venda
 
 > Status: em evolução
-> Última atualização: 2026-10-13
+> Última atualização: 2026-10-16
 > Confiança: parcialmente confirmada
 
 ## Objetivo
@@ -27,13 +27,15 @@ Recarga PIX → Banking V2 → Wallet credita carteira
 | Banking V2 | Cobrança PIX de pacotes e crédito idempotente após pagamento. |
 | Notification | WhatsApp Meta, e-mail, templates, callback e fila de resultados. O e-mail de RDC (`sale/recovery_dispatch`) usa o layout base compartilhado da plataforma e direciona para `/rdc?cod={order}`. |
 | Gateway / Public API | Caminho autenticado entre Dashboard e serviços. |
-| Dashboard Seller | Configuração, recargas, saldo, histórico e reenvios. Para administradores, o status de serviços mostra os 500 registros mais recentes de cada canal e abre os detalhes de e-mail/WhatsApp. |
+| Dashboard Seller | Configuração, recargas, saldo, histórico e reenvios. O extrato de comunicações mostra lista paginada e cards filtráveis de investimento, vendas comunicadas, eficiência e recuperação. Para administradores, o status de serviços mostra os 500 registros mais recentes de cada canal e abre os detalhes de e-mail/WhatsApp. |
 
 ## Dados e filas
 
 O código da feature já adiciona `sale_delivery_attempts`, regras de produto/afiliação, créditos de comunicação, recarga PIX, outcomes genéricos e callbacks Meta. A aplicação do SQL manual da Wallet e a validação integrada ainda não foram comprovadas.
 
 O endpoint administrativo de status de serviços retorna, para e-mail e WhatsApp Meta, o estado interno, estado de entrega, erro normalizado, datas, template e destinatário; e-mail inclui também o provedor. O dashboard não expõe os parâmetros/conteúdo personalizado da comunicação. Push permanece no painel resumido, sem modal de detalhes.
+
+O extrato do seller consulta a lista em `GET /sale-notifications` e, em paralelo, o resumo em `GET /sale-notifications/summary`, ambos pelo caminho Dashboard Seller → Gateway → Public API → Commerce V2. O resumo usa o mesmo escopo de autorização e filtros da lista. Soma custo apenas de registros com `funding_status = consumed`; vendas comunicadas excluem itens só agendados, cancelados ou ignorados. A receita de recuperação corresponde a vendas pagas depois de um dispatch de recuperação enviado; não representa lucro líquido. Dois índices por `owner_user_id`, `created_at` e `id` nas tabelas de entrega e dispatch de recuperação devem ser aplicados por SQL manual conforme o documento de deploy de 2026-10-16.
 
 ## Operação e validação
 
