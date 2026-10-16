@@ -21,19 +21,19 @@ O fluxo da prévia será:
 
 `dashboard-seller -> edge-gateway -> edge-public-api -> services-commerce-v2 -> Redis do Commerce V2 -> front-checkout`
 
-## Componentes e referências
+## Estado desejado
 
-Todos os repositórios existentes devem estar sem alterações locais antes do deploy. A revisão curta deve coincidir com a tabela depois do `pull`.
+A revisão curta final de cada repositório deve coincidir com esta tabela.
 
-| Repositório | Diretório em produção | Branch | Commit | Ação |
-| --- | --- | --- | --- | --- |
-| `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `ebda9ff` | Configurar segredo, rebuild e migration |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `ee32f47` | Configurar TTL e rebuild |
-| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `d6962db` | Clone novo, configuração, rebuild e migrations |
-| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `59b1860` | Configurar comunicação e rebuild |
-| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `f8d2956` | Rebuild |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/service-monitoring-checkout-preview` | `a2e205b` | Somente atualização Git |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/service-monitoring-checkout-preview` | `fc8b0188` | Somente atualização Git |
+| Repositório | Diretório em produção | Branch | Ação |
+| --- | --- | --- | --- |
+| `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `pull + build + migration` |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `pull + build` |
+| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `clone + build + migration` |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `pull + build` |
+| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `pull + build` |
+| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/service-monitoring-checkout-preview` | `pull + sem rebuild` |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/service-monitoring-checkout-preview` | `pull + sem rebuild` |
 
 O deploy é incremental e restrito a esses sete componentes. Não sincronizar nem reconstruir outros repositórios como efeito colateral.
 
@@ -99,7 +99,7 @@ O arquivo `services-platform/.env.production.example` é a fonte única das vari
 - `PLATFORM_SIGNATURE_SECRET`: segredo A, com 64 caracteres `[0-9a-f]`;
 - `PLATFORM_NOTIFICATION_SECRET`: segredo B, também com 64 caracteres `[0-9a-f]` e diferente do segredo A.
 
-As demais variáveis devem permanecer exatamente como estão no template, incluindo `BACKUP_ENABLED=false`, R2 sem credenciais, retenção de 45 dias, porta `9515` e a URL interna de Notifications.
+As demais variáveis devem permanecer exatamente como estão no template, incluindo `BACKUP_ENABLED=false`, R2 sem credenciais, retenção de 45 dias e a URL interna de Notifications.
 
 ### Variáveis a adicionar ou alterar nos serviços existentes
 
@@ -225,7 +225,7 @@ docker compose exec -T services-platform php bin/hyperf.php migrate --force
 docker compose exec -T services-platform php bin/hyperf.php migrate:status
 docker compose ps
 docker compose logs --tail=100 services-platform
-curl --fail --silent --show-error http://127.0.0.1:9515/health
+docker compose exec -T services-platform php -r 'exit(@fsockopen("127.0.0.1", 9501) ? 0 : 1);'
 ```
 
 O health check deve retornar `{"status":"ok"}`. Confirmar nos logs que a coleta não apresenta erro de tabela, MariaDB ou Redis. Não cadastrar variáveis `R2_*` nem `BACKUP_MARIADB_*` depois dessa etapa.
@@ -305,32 +305,6 @@ Se a página informar indisponibilidade, interromper a validação funcional e c
 5. Aguarde mais de 5 minutos e reabra o editor. Uma nova autorização deve ser criada e a prévia deve voltar a abrir normalmente.
 6. Tente abrir o editor de um produto que não pertence ao usuário autenticado. A autorização deve ser recusada.
 7. Abra o checkout normal do mesmo produto sem `editor_preview=1`. As regras normais de disponibilidade e pagamento devem continuar inalteradas.
-
-## Conferência técnica opcional
-
-Sem exibir segredos ou payloads sensíveis:
-
-```bash
-cd /opt/services/services-platform
-docker compose ps
-docker compose logs --tail=100 services-platform
-docker compose exec -T services-platform php bin/hyperf.php migrate:status
-
-cd /opt/lowify/services/services-notifications
-docker compose ps
-docker compose exec -T services-notifications php bin/hyperf.php migrate:status
-
-cd /opt/lowify/services/service-commerce-v2
-docker compose ps
-
-cd /opt/lowify/edge/edge-public-api
-docker compose ps
-
-cd /opt/lowify/edge/edge-gateway
-docker compose ps
-```
-
-Todos os containers devem permanecer em execução, sem ciclo de restart. Não listar o ambiente completo dos containers e não incluir tokens de prévia ou assinaturas nas evidências.
 
 ## Rollback
 
