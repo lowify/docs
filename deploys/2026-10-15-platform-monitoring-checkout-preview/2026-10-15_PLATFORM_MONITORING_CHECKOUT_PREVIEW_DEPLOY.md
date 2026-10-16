@@ -61,15 +61,7 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
 
 ## Pré-requisitos
 
-1. Docker, Docker Compose, Git e `openssl` disponíveis.
-2. A rede Docker externa `data_net` deve existir e conectar Public API, Platform e Notifications:
-
-   ```bash
-   docker network inspect data_net >/dev/null
-   ```
-
-3. A porta TCP `9515` já foi confirmada livre e é a porta definida para o Platform nesta publicação.
-4. Gerar dois segredos aleatórios fortes e independentes no gerenciador de segredos da operação:
+1. Gerar dois segredos aleatórios fortes e independentes no gerenciador de segredos da operação:
 
    - **segredo A — Public API/Platform**: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), com o mesmo valor em `PLATFORM_SERVICE_SIGNATURE_SECRET` no Public API e `PLATFORM_SIGNATURE_SECRET` no Platform;
    - **segredo B — Platform/Notifications**: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), com o mesmo valor em `PLATFORM_NOTIFICATION_SECRET` no Platform e `INTERNAL_PLATFORM_NOTIFICATION_SECRET` no Notifications.
@@ -82,27 +74,34 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
    openssl rand -hex 32
    ```
 
-5. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Cada uma deve ter exatamente 48 caracteres aleatórios do conjunto `A-Z`, `a-z`, `0-9`, `_` e `-`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
+2. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Cada uma deve ter exatamente 48 caracteres aleatórios do conjunto `A-Z`, `a-z`, `0-9`, `_` e `-`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
 
    Cada senha pode ser gerada individualmente com:
 
    ```bash
    openssl rand -base64 36 | tr '+/' '-_'
    ```
-6. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
-7. Confirmar espaço suficiente para três volumes Docker novos. Não montar nem reutilizar banco ou Redis de outro serviço.
+3. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
+
+## Espaço em disco
+
+Reservar pelo menos **5 GB livres** no filesystem usado pelo Docker antes da instalação; **10 GB livres** é a margem recomendada para acomodar build, cache e logs sem pressão no host.
+
+Como referência da homologação, as três imagens necessárias ocupam aproximadamente 1,1 GB (`services-platform`, MariaDB e Redis), e os três volumes exclusivos começaram em aproximadamente 203 MB após horas de coleta. O histórico de 45 dias tende a crescer pouco, pois guarda somente métricas agregáveis, mas logs e cache de build do Docker justificam a margem adicional.
+
+Não há consumo de dumps ou de R2 nesta etapa: `BACKUP_ENABLED=false` impede a criação de arquivos de backup.
 
 ## Variáveis de ambiente
 
 ### `services-platform` — `/opt/services/services-platform/.env`
 
-Copiar `.env.production.example` e substituir todos os placeholders `REPLACE_ME`. O próprio arquivo descreve o tamanho e o conjunto de caracteres de cada segredo. Os valores omitidos podem permanecer iguais ao template versionado.
+O arquivo `services-platform/.env.production.example` é a fonte única das variáveis do novo serviço. Copiá-lo para `.env` e substituir todos os placeholders `REPLACE_ME`; o próprio arquivo define o tamanho e o conjunto de caracteres de cada segredo. Os valores omitidos podem permanecer iguais ao template versionado.
 
 | Variável | Valor ou regra |
 | --- | --- |
 | `APP_ENV` | `prod` |
 | `APP_TIMEZONE` | `America/Sao_Paulo` |
-| `PLATFORM_PORT` | `9515`, somente após confirmar que está livre |
+| `PLATFORM_PORT` | `9515` |
 | `DB_HOST` | `platform-mariadb` |
 | `DB_DATABASE` | `operations` |
 | `DB_USERNAME` | `operations` |
