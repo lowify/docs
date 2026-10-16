@@ -29,7 +29,7 @@ Todos os repositórios existentes devem estar sem alterações locais antes do d
 | --- | --- | --- | --- | --- |
 | `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `ebda9ff` | Configurar segredo, rebuild e migration |
 | `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `ee32f47` | Configurar TTL e rebuild |
-| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `c444005` | Clone novo, configuração, rebuild e migrations |
+| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `d536a49` | Clone novo, configuração, rebuild e migrations |
 | `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `59b1860` | Configurar comunicação e rebuild |
 | `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `f8d2956` | Rebuild |
 | `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/service-monitoring-checkout-preview` | `a2e205b` | Somente atualização Git |
@@ -61,38 +61,42 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
 
 ## Pré-requisitos
 
-1. Acesso administrativo ao servidor principal de produção e acesso SSH do host ao repositório `git@github.com:lowify/services-platform.git`.
-2. Docker, Docker Compose, Git e `openssl` disponíveis.
-3. A rede Docker externa `data_net` deve existir e conectar Public API, Platform e Notifications:
+1. Docker, Docker Compose, Git e `openssl` disponíveis.
+2. A rede Docker externa `data_net` deve existir e conectar Public API, Platform e Notifications:
 
    ```bash
    docker network inspect data_net >/dev/null
    ```
 
-4. A porta TCP `9515` deve estar livre antes de instalar o Platform:
+3. A porta TCP `9515` já foi confirmada livre e é a porta definida para o Platform nesta publicação.
+4. Gerar dois segredos aleatórios fortes e independentes no gerenciador de segredos da operação:
 
-   ```bash
-   ss -ltnp | grep ':9515 '
-   ```
-
-   O resultado deve estar vazio. Se estiver ocupada, interromper o deploy e escolher uma porta aprovada antes de editar o `.env`; não parar o processo existente.
-
-5. Gerar dois segredos aleatórios fortes e independentes no gerenciador de segredos da operação:
-
-   - **segredo A — Public API/Platform**: mesmo valor em `PLATFORM_SERVICE_SIGNATURE_SECRET` no Public API e `PLATFORM_SIGNATURE_SECRET` no Platform;
-   - **segredo B — Platform/Notifications**: mesmo valor em `PLATFORM_NOTIFICATION_SECRET` no Platform e `INTERNAL_PLATFORM_NOTIFICATION_SECRET` no Notifications.
+   - **segredo A — Public API/Platform**: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), com o mesmo valor em `PLATFORM_SERVICE_SIGNATURE_SECRET` no Public API e `PLATFORM_SIGNATURE_SECRET` no Platform;
+   - **segredo B — Platform/Notifications**: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), com o mesmo valor em `PLATFORM_NOTIFICATION_SECRET` no Platform e `INTERNAL_PLATFORM_NOTIFICATION_SECRET` no Notifications.
 
    Não reutilizar JWT secret, senha de banco ou o mesmo valor nos dois pares. Não registrar os valores neste documento, em commit, ticket, histórico do shell ou evidência de deploy.
 
-6. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
-7. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
-8. Confirmar espaço suficiente para três volumes Docker novos. Não montar nem reutilizar banco ou Redis de outro serviço.
+   Em uma sessão privada, cada segredo de comunicação pode ser gerado individualmente com:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+5. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Cada uma deve ter exatamente 48 caracteres aleatórios do conjunto `A-Z`, `a-z`, `0-9`, `_` e `-`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
+
+   Cada senha pode ser gerada individualmente com:
+
+   ```bash
+   openssl rand -base64 36 | tr '+/' '-_'
+   ```
+6. Registrar branch e commit anteriores dos seis repositórios já instalados para permitir rollback. Se qualquer `git status --porcelain=v1` produzir saída, interromper toda a operação.
+7. Confirmar espaço suficiente para três volumes Docker novos. Não montar nem reutilizar banco ou Redis de outro serviço.
 
 ## Variáveis de ambiente
 
 ### `services-platform` — `/opt/services/services-platform/.env`
 
-Copiar `.env.example` e ajustar os itens abaixo. Os valores omitidos podem permanecer iguais ao exemplo versionado.
+Copiar `.env.production.example` e substituir todos os placeholders `REPLACE_ME`. O próprio arquivo descreve o tamanho e o conjunto de caracteres de cada segredo. Os valores omitidos podem permanecer iguais ao template versionado.
 
 | Variável | Valor ou regra |
 | --- | --- |
@@ -102,8 +106,8 @@ Copiar `.env.example` e ajustar os itens abaixo. Os valores omitidos podem perma
 | `DB_HOST` | `platform-mariadb` |
 | `DB_DATABASE` | `operations` |
 | `DB_USERNAME` | `operations` |
-| `DB_PASSWORD` | senha forte exclusiva do banco interno |
-| `PLATFORM_MARIADB_ROOT_PASSWORD` | senha root forte e diferente da anterior |
+| `DB_PASSWORD` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]` |
+| `PLATFORM_MARIADB_ROOT_PASSWORD` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]`, diferente de `DB_PASSWORD` |
 | `REDIS_HOST` | `platform-redis` |
 | `REDIS_PORT` | `6379` |
 | `REDIS_AUTH` | vazio; Redis não é publicado e permanece somente na `data_net` |
@@ -115,11 +119,11 @@ Copiar `.env.example` e ajustar os itens abaixo. Os valores omitidos podem perma
 | `PLATFORM_LIVE_ENABLED` | `true` |
 | `PLATFORM_LIVE_INTERVAL_SECONDS` | `5` |
 | `PLATFORM_LIVE_TTL_SECONDS` | `60` |
-| `PLATFORM_SIGNATURE_SECRET` | segredo A |
+| `PLATFORM_SIGNATURE_SECRET` | segredo A: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), equivalentes a 32 bytes aleatórios |
 | `PLATFORM_SIGNATURE_MAX_AGE_SECONDS` | `60` |
 | `PLATFORM_NOTIFICATIONS_ENABLED` | `true` |
 | `PLATFORM_NOTIFICATION_URL` | `http://services-notifications:9501/internal/in-app-notifications` |
-| `PLATFORM_NOTIFICATION_SECRET` | segredo B |
+| `PLATFORM_NOTIFICATION_SECRET` | segredo B: exatamente 64 caracteres hexadecimais minúsculos (`[0-9a-f]`), diferente do segredo A |
 | `PLATFORM_NOTIFICATION_TIMEOUT_SECONDS` | `5` |
 | `BACKUP_ENABLED` | `false` |
 | `BACKUP_MARIADB_USERNAME` | vazio |
@@ -269,11 +273,33 @@ git fetch origin --prune
 git switch feat/service-monitoring-checkout-preview
 git pull --ff-only origin feat/service-monitoring-checkout-preview
 git rev-parse --short HEAD
-cp .env.example .env
+cp .env.production.example .env
 chmod 600 .env
 ```
 
-O commit deve ser `c444005`. Editar o `.env` conforme a tabela deste documento antes de continuar.
+O commit deve ser `d536a49`. Editar o `.env` conforme a tabela deste documento antes de continuar. Antes de criar volumes ou containers, confirmar que nenhum placeholder permaneceu:
+
+```bash
+cd /opt/services/services-platform
+if grep -q 'REPLACE_ME' .env; then
+  echo 'ERRO: substitua todos os placeholders REPLACE_ME do .env.' >&2
+  exit 1
+fi
+
+platform_db_password=$(sed -n 's/^DB_PASSWORD=//p' .env)
+platform_db_root_password=$(sed -n 's/^PLATFORM_MARIADB_ROOT_PASSWORD=//p' .env)
+platform_api_secret=$(sed -n 's/^PLATFORM_SIGNATURE_SECRET=//p' .env)
+platform_notification_secret=$(sed -n 's/^PLATFORM_NOTIFICATION_SECRET=//p' .env)
+
+[[ $platform_db_password =~ ^[A-Za-z0-9_-]{48}$ ]] || exit 1
+[[ $platform_db_root_password =~ ^[A-Za-z0-9_-]{48}$ ]] || exit 1
+[[ $platform_db_password != "$platform_db_root_password" ]] || exit 1
+[[ $platform_api_secret =~ ^[0-9a-f]{64}$ ]] || exit 1
+[[ $platform_notification_secret =~ ^[0-9a-f]{64}$ ]] || exit 1
+[[ $platform_api_secret != "$platform_notification_secret" ]] || exit 1
+
+unset platform_db_password platform_db_root_password platform_api_secret platform_notification_secret
+```
 
 Criar somente os volumes exclusivos declarados pelo Compose e confirmar a rede compartilhada:
 
@@ -430,5 +456,6 @@ Todos os containers devem permanecer em execução, sem ciclo de restart. Não l
 
 - `features/platform-monitoring-checkout-preview/README.md`
 - `services-platform/.env.example`
+- `services-platform/.env.production.example`
 - `services-platform/README.md`
 - `services-notification/migrations/2026_10_15_000062_seed_platform_in_app_templates.php`
