@@ -29,7 +29,7 @@ Todos os repositórios existentes devem estar sem alterações locais antes do d
 | --- | --- | --- | --- | --- |
 | `services-notification` | `/opt/lowify/services/services-notifications` | `feat/service-monitoring-checkout-preview` | `ebda9ff` | Configurar segredo, rebuild e migration |
 | `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/service-monitoring-checkout-preview` | `ee32f47` | Configurar TTL e rebuild |
-| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `d536a49` | Clone novo, configuração, rebuild e migrations |
+| `services-platform` | `/opt/services/services-platform` | `feat/service-monitoring-checkout-preview` | `d6962db` | Clone novo, configuração, rebuild e migrations |
 | `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/service-monitoring-checkout-preview` | `59b1860` | Configurar comunicação e rebuild |
 | `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/service-monitoring-checkout-preview` | `f8d2956` | Rebuild |
 | `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/service-monitoring-checkout-preview` | `a2e205b` | Somente atualização Git |
@@ -74,7 +74,7 @@ O deploy é incremental e restrito a esses sete componentes. Não sincronizar ne
    openssl rand -hex 32
    ```
 
-2. Gerar senhas próprias e fortes para `DB_PASSWORD` e `PLATFORM_MARIADB_ROOT_PASSWORD`. Cada uma deve ter exatamente 48 caracteres aleatórios do conjunto `A-Z`, `a-z`, `0-9`, `_` e `-`. Elas protegem apenas a MariaDB interna do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
+2. Gerar senhas próprias e fortes para `DB_PASSWORD`, `PLATFORM_MARIADB_ROOT_PASSWORD` e `REDIS_AUTH`. Cada uma deve ter exatamente 48 caracteres aleatórios do conjunto `A-Z`, `a-z`, `0-9`, `_` e `-`. Elas protegem somente os componentes locais do Platform e não devem ser iguais entre si nem compartilhadas com outros serviços.
 
    Cada senha pode ser gerada individualmente com:
 
@@ -109,7 +109,7 @@ O arquivo `services-platform/.env.production.example` é a fonte única das vari
 | `PLATFORM_MARIADB_ROOT_PASSWORD` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]`, diferente de `DB_PASSWORD` |
 | `REDIS_HOST` | `platform-redis` |
 | `REDIS_PORT` | `6379` |
-| `REDIS_AUTH` | vazio; Redis não é publicado e permanece somente na `data_net` |
+| `REDIS_AUTH` | exatamente 48 caracteres aleatórios em `[A-Za-z0-9_-]`, diferente das duas senhas da MariaDB; obrigatório mesmo com Redis restrito à `data_net` |
 | `PLATFORM_METRICS_INTERVAL_SECONDS` | `180` |
 | `PLATFORM_DISK_WARNING_PERCENT` | `80` |
 | `PLATFORM_DISK_CRITICAL_PERCENT` | `90` |
@@ -276,7 +276,7 @@ cp .env.production.example .env
 chmod 600 .env
 ```
 
-O commit deve ser `d536a49`. Editar o `.env` conforme a tabela deste documento antes de continuar. Antes de criar volumes ou containers, confirmar que nenhum placeholder permaneceu:
+O commit deve ser `d6962db`. Editar o `.env` conforme a tabela deste documento antes de continuar. Antes de criar volumes ou containers, confirmar que nenhum placeholder permaneceu:
 
 ```bash
 cd /opt/services/services-platform
@@ -287,17 +287,21 @@ fi
 
 platform_db_password=$(sed -n 's/^DB_PASSWORD=//p' .env)
 platform_db_root_password=$(sed -n 's/^PLATFORM_MARIADB_ROOT_PASSWORD=//p' .env)
+platform_redis_password=$(sed -n 's/^REDIS_AUTH=//p' .env)
 platform_api_secret=$(sed -n 's/^PLATFORM_SIGNATURE_SECRET=//p' .env)
 platform_notification_secret=$(sed -n 's/^PLATFORM_NOTIFICATION_SECRET=//p' .env)
 
 [[ $platform_db_password =~ ^[A-Za-z0-9_-]{48}$ ]] || exit 1
 [[ $platform_db_root_password =~ ^[A-Za-z0-9_-]{48}$ ]] || exit 1
+[[ $platform_redis_password =~ ^[A-Za-z0-9_-]{48}$ ]] || exit 1
 [[ $platform_db_password != "$platform_db_root_password" ]] || exit 1
+[[ $platform_db_password != "$platform_redis_password" ]] || exit 1
+[[ $platform_db_root_password != "$platform_redis_password" ]] || exit 1
 [[ $platform_api_secret =~ ^[0-9a-f]{64}$ ]] || exit 1
 [[ $platform_notification_secret =~ ^[0-9a-f]{64}$ ]] || exit 1
 [[ $platform_api_secret != "$platform_notification_secret" ]] || exit 1
 
-unset platform_db_password platform_db_root_password platform_api_secret platform_notification_secret
+unset platform_db_password platform_db_root_password platform_redis_password platform_api_secret platform_notification_secret
 ```
 
 Criar somente os volumes exclusivos declarados pelo Compose e confirmar a rede compartilhada:
