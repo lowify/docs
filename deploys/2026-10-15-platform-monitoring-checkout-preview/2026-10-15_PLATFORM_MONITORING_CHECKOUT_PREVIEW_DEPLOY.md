@@ -208,10 +208,9 @@ platform_notification_secret=$(sed -n 's/^PLATFORM_NOTIFICATION_SECRET=//p' .env
 unset platform_db_password platform_db_root_password platform_redis_password platform_api_secret platform_notification_secret
 ```
 
-Criar somente os volumes exclusivos declarados pelo Compose e confirmar a rede compartilhada:
+Criar somente os volumes exclusivos declarados pelo Compose. A rede `data_net` já é a rede compartilhada do projeto:
 
 ```bash
-docker network inspect data_net >/dev/null
 docker volume inspect services-operations_operations_runtime >/dev/null 2>&1 || docker volume create services-operations_operations_runtime
 docker volume inspect services-operations_operations_mariadb_data >/dev/null 2>&1 || docker volume create services-operations_operations_mariadb_data
 docker volume inspect services-operations_operations_redis_data >/dev/null 2>&1 || docker volume create services-operations_operations_redis_data
