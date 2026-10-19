@@ -38,9 +38,11 @@ Cielo ChangeType 2
 -> edge-webhook grava raw e envia banking:charge:events
 -> Banking V2 consulta /1/sales/{PaymentId}
 -> persiste parcela e executa/recupera Split pós-transacional
--> publica sales:subscriptions:actions
+-> publica commerce:cielo:subscriptions:actions
 -> Commerce V2 processa assinatura e venda
 ```
+
+`commerce:cielo:subscriptions:actions` é exclusiva desta feature. Não usar `sales:subscriptions:actions`, publicada pelo Banking V1, nem reutilizar uma fila genérica sem um consumidor Cielo separado. O envelope permanece um evento JSON por mensagem, com versão/`event` explícitos, para que o consumidor possa rejeitar dados fora do contrato sem tocar em venda ou financeiro.
 
 O evento interno de parcela paga mantém o formato consolidado:
 

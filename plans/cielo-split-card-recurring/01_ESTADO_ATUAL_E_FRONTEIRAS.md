@@ -38,6 +38,18 @@ O parcelamento atual é uma única venda paga em parcelas pelo comprador. Ele n�
 
 O padrão reutilizável é a compensação de assinatura no Commerce V2: uma primeira parcela aprova a venda inicial; parcelas posteriores geram/localizam uma venda recorrente e executam o fluxo normal de venda paga. Não se reutiliza o protocolo Pix nem se cria uma nova cobrança Cielo mensalmente.
 
+## Isolamento de filas
+
+Há fluxos de assinatura anteriores em produção. Em especial, o Banking V1 publica em `sales:subscriptions:actions`; há também filas genéricas já usadas pelos componentes V2. A recorrência Cielo não deve compartilhar nenhuma delas durante o primeiro corte.
+
+O contrato proposto é exclusivo:
+
+```text
+services-banking-v2 -> commerce:cielo:subscriptions:actions -> services-commerce-v2
+```
+
+O Banking V2 terá um publicador Cielo próprio e o Commerce V2 um processo consumidor Cielo próprio, ambos configurados por variáveis específicas. Isso evita que um payload novo seja lido por worker antigo, ou que uma mensagem legada seja interpretada pelo fluxo Cielo.
+
 ## Estado dos dados e eventos
 
 O Banking V2 já possui `subscriptions` com `provider_id`, `correlation_id`, valor, frequência, vencimento e conta; `subscriptions_charge` relaciona uma cobrança individual à assinatura por `identifier_id`. O Commerce V2 já tem `subscriptions`, `subscriptions_installments`, `sales.subscription_id` e `ProcessSubscriptionChargePaidUseCase`.
@@ -60,6 +72,7 @@ O último uso precisa ser confirmado na implementação: o nome `end_to_end_id` 
 4. Não há consulta de recorrência por `RecurrentPaymentId`, cancelamento da recorrência ou reconciliação de recorrências Cielo.
 5. Não há adaptador de Split pós-transacional para cada parcela recorrente.
 6. O token de pagamento usado hoje no checkout não pode ser presumido como `CardToken` reutilizável da Cielo.
+7. A fila atual de assinatura não é uma fronteira segura para esse corte: há worker Banking V1 em produção e contratos legados associados a ela.
 
 ## Riscos e limites externos
 

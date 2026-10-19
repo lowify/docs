@@ -14,7 +14,15 @@
 2. Criar migrations estritamente aditivas para estado/evidência do Split recorrente ou chave de transação Cielo, apenas se os campos existentes não preservarem a semântica corretamente.
 3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás de uma flag e apenas para `cielo_ecommerce` elegível.
 4. Criar validação de integração: conta ativa/aprovada, credenciais presentes e habilitações exigidas confirmadas.
-5. Preparar logs, métricas, retry e DLQ antes de publicar eventos financeiros novos.
+5. Criar uma configuração e um processo exclusivos no Commerce V2, inicialmente desligados:
+
+```text
+CIELO_SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=false
+CIELO_SUBSCRIPTION_ACTIONS_QUEUE=commerce:cielo:subscriptions:actions
+```
+
+6. Criar no Banking V2 um publicador Cielo que escreva somente nessa fila e não em `sales:subscriptions:actions` ou outra fila de assinatura existente.
+7. Preparar logs, métricas, retry e DLQ antes de publicar eventos financeiros novos.
 
 ## Fase 2 — criação e processamento da série
 
@@ -22,8 +30,8 @@
 2. Persistir a assinatura provisoriamente, criar a série de forma idempotente e salvar `RecurrentPaymentId`/estado retornado.
 3. Incluir `ChangeType: 2` no Edge, preservando a deduplicação de webhook e encaminhando o evento para Banking.
 4. No Banking, consultar o `PaymentId`, persistir a parcela e aplicar o Split pós-transacional idempotente.
-5. Publicar `subscription.charge.paid` somente uma vez para parcela efetivamente paga e com o estado financeiro aprovado.
-6. No Commerce V2, reutilizar `ProcessSubscriptionChargePaidUseCase` e `ProcessPaidSaleEventUseCase`; não duplicar entrega, integração, notificação, saldo ou comissão.
+5. Publicar `subscription.charge.paid` somente uma vez para a fila exclusiva, quando a parcela estiver efetivamente paga e com o estado financeiro aprovado.
+6. No consumidor exclusivo do Commerce V2, reutilizar `ProcessSubscriptionChargePaidUseCase` e `ProcessPaidSaleEventUseCase`; não duplicar entrega, integração, notificação, saldo ou comissão.
 
 ## Fase 3 — ciclo de vida e recuperação
 
@@ -51,6 +59,7 @@
 | Primeira parcela paga | Registra uma parcela, aprova a venda original e executa seus efeitos uma vez. |
 | Parcela futura paga | Registra uma parcela, cria/localiza uma venda recorrente e executa seus efeitos uma vez. |
 | Reentrega de `ChangeType: 2` | Não duplica Split, parcela, venda, saldo, entrega, comissão ou notificação. |
+| Isolamento de fila | O publicador Cielo escreve somente em `commerce:cielo:subscriptions:actions`; workers Banking V1 não recebem a mensagem e o consumidor Cielo não lê filas antigas. |
 | Webhook perdido | Reconciliação localiza a cobrança e produz o mesmo resultado idempotente. |
 | Split pós-transacional falha | Estado fica observável e recuperável; não há repasse duplicado. |
 | Cancelamento | Impede próximas cobranças, preserva histórico e não reverte parcelas anteriores. |
