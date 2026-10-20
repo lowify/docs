@@ -1,7 +1,7 @@
 # Plano — assinaturas por cartão Cielo Split
 
 > Status: proposta; depende de confirmação comercial e técnica da Cielo
-> Última atualização: 2026-10-19
+> Última atualização: 2026-10-20
 > Público: Direção, Produto, Operações e Engenharia
 
 ## Objetivo
@@ -21,6 +21,8 @@ A Cielo documenta recorrência para o mesmo produto que usamos — **Split de Pa
 1. [Estado atual e fronteiras](01_ESTADO_ATUAL_E_FRONTEIRAS.md)
 2. [Contrato, dados e eventos](02_CONTRATO_DADOS_E_EVENTOS.md)
 3. [Implementação, rollout e aceite](03_IMPLEMENTACAO_ROLLOUT_E_ACEITE.md)
+4. [Dashboard e travas de configuração](04_DASHBOARD_E_TRAVAS_DE_CONFIGURACAO.md)
+5. [Backlog executável de desenvolvimento](05_TAREFAS_DE_DESENVOLVIMENTO.md)
 
 ## Decisões propostas
 
@@ -34,12 +36,16 @@ A Cielo documenta recorrência para o mesmo produto que usamos — **Split de Pa
 | Notificação | Receber `ChangeType: 2`, consultar o pagamento por `PaymentId` e processar o resultado de maneira idempotente. |
 | Fila | Usar uma fila exclusiva Cielo entre Banking V2 e Commerce V2; não publicar nem consumir as filas de assinatura já usadas pelo Banking V1. |
 | Cartão | Não guardar PAN nem CVV. Confirmar com a Cielo a habilitação de Recorrência e Cartão Protegido/tokenização. |
-| Produto Lowify | Habilitar `card` para `SUBSCRIPTION` somente depois da homologação completa da Cielo. |
+| Elegibilidade do seller | A chave opcional `user_system_vars.cielo_split_card_recurring_enabled` é uma liberação explícita por seller. Ausência é `null` e nega a feature; `1` permite a avaliação; `0` nega explicitamente. Não há fallback global. |
+| Produto Lowify | Habilitar `card` para `SUBSCRIPTION` somente depois da homologação completa da Cielo, para seller explicitamente liberado, com Cielo aprovada e somente em `1x`. |
 
 ## Fluxo alvo
 
 ```text
-Checkout -> Banking V2 cria a recorrência Cielo
+Admin -> define a elegibilidade por seller (`user_system_vars`)
+      -> Dashboard exibe cartão em `SUBSCRIPTION` somente ao seller elegível
+Checkout -> Commerce V2 revalida flag, Cielo e `1x`
+         -> Banking V2 cria a recorrência Cielo
          -> Lowify grava RecurrentPaymentId e a primeira venda pendente
          -> Cielo cobra cada ciclo
          -> webhook ChangeType 2 -> Edge -> Banking V2 consulta PaymentId

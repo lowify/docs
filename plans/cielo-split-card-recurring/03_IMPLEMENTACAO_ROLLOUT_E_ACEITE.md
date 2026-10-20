@@ -12,17 +12,18 @@
 
 1. Mapear e ajustar o vínculo entre as assinaturas Banking e Commerce V2 para o `RecurrentPaymentId`.
 2. Criar migrations estritamente aditivas para estado/evidência do Split recorrente ou chave de transação Cielo, apenas se os campos existentes não preservarem a semântica corretamente.
-3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás de uma flag e apenas para `cielo_ecommerce` elegível.
-4. Criar validação de integração: conta ativa/aprovada, credenciais presentes e habilitações exigidas confirmadas.
-5. Criar uma configuração e um processo exclusivos no Commerce V2, inicialmente desligados:
+3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás da chave por seller `cielo_split_card_recurring_enabled`, apenas para `cielo_ecommerce` elegível e sempre em `1x`.
+4. Criar no Dashboard a edição triestado da chave: `1` liberado, `0` negado explicitamente e ausência da linha como `null`/não configurado; os dois últimos estados não habilitam a feature.
+5. Criar validação de integração: conta ativa/aprovada, credenciais presentes e habilitações exigidas confirmadas.
+6. Criar uma configuração e um processo exclusivos no Commerce V2, inicialmente desligados:
 
 ```text
 CIELO_SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=false
 CIELO_SUBSCRIPTION_ACTIONS_QUEUE=commerce:cielo:subscriptions:actions
 ```
 
-6. Criar no Banking V2 um publicador Cielo que escreva somente nessa fila e não em `sales:subscriptions:actions` ou outra fila de assinatura existente.
-7. Preparar logs, métricas, retry e DLQ antes de publicar eventos financeiros novos.
+7. Criar no Banking V2 um publicador Cielo que escreva somente nessa fila e não em `sales:subscriptions:actions` ou outra fila de assinatura existente.
+8. Preparar logs, métricas, retry e DLQ antes de publicar eventos financeiros novos.
 
 ## Fase 2 — criação e processamento da série
 
@@ -55,6 +56,8 @@ CIELO_SUBSCRIPTION_ACTIONS_QUEUE=commerce:cielo:subscriptions:actions
 | --- | --- |
 | Produto avulso Cielo | Continua criando cartão parcelado/à vista sem campos de recorrência. |
 | Produto `SUBSCRIPTION` elegível | Exibe cartão apenas quando a integração Cielo estiver aprovada e a flag ativa. |
+| Produto `SUBSCRIPTION` com flag `null` ou `0` | Não exibe nem aceita cartão, mesmo que o request seja adulterado. |
+| Assinatura com parcelas maiores que `1` | Dashboard não oferece parcelamento; Commerce V2 rejeita a gravação e o checkout rejeita a tentativa. |
 | Criação inicial | Cria uma única série Cielo e persiste um único `RecurrentPaymentId`. |
 | Primeira parcela paga | Registra uma parcela, aprova a venda original e executa seus efeitos uma vez. |
 | Parcela futura paga | Registra uma parcela, cria/localiza uma venda recorrente e executa seus efeitos uma vez. |
