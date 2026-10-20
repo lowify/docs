@@ -30,7 +30,7 @@ O controle é um toggle **Liga/Desliga**, iniciado desligado quando a chave esti
 - Autorizar a edição com a permission key já aplicada a restrições de sellers, `admin_sellers_restrictions_edit`.
 - Derivar o valor recebido exclusivamente do toggle: `1` para marcado e `0` para desmarcado.
 - Para ambos os valores, atualizar a última linha existente ou inserir uma nova, preservando o padrão já usado por outras `user_system_vars`.
-- Na edição de produto, resolver a chave diretamente pelo `id_usuario` dono do produto. Isso é obrigatório quando um administrador edita produto alheio; a identidade da sessão não é a do seller.
+- Na edição de produto, resolver a chave pelo `UserSystemVarsService` e pelo `id_usuario` dono do produto. Isso é obrigatório quando um administrador edita produto alheio; a identidade da sessão não é a do seller.
 - Exibir o card de cartão em assinatura somente quando a chave for `1` **e** o form-data do Commerce V2 disser que o cartão Cielo está disponível.
 - Se o produto estiver configurado para usar somente Checkout Transparente, ocultar o card de cartão de crédito para assinatura. O Checkout Transparente não implementa cartão recorrente nesta entrega.
 - Fixar `credit_card_installments=1` em assinatura: esconder seletor, aviso e modal de regras de parcelamento; o campo enviado deve ser hidden com valor `1`.
