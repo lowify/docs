@@ -41,6 +41,24 @@ CIELO_SUBSCRIPTION_ACTIONS_QUEUE=commerce:cielo:subscriptions:actions
 3. Implementar recuperação de Split pendente e uma visão operacional para parcelas que exigem ação.
 4. Manter refund por `PaymentId`; testar refund de primeira e de parcela posterior sem cancelar indevidamente a série.
 
+A reconciliação inicia automaticamente no Banking e só processa séries Cielo recorrentes já existentes. Ela não habilita cartão para todos os sellers: a permissão de criar novas séries continua sendo exclusivamente `cielo_recurring_card_enabled=1` no seller. Antes de liberar o primeiro seller em produção, o consumidor exclusivo do Commerce precisa estar habilitado.
+
+### Limites identificados na implementação
+
+- A Cielo confirmou a consulta por `RecurrentPaymentId`: a lista `RecurrentTransactions` traz o `TransactionId`, que é o `PaymentId` de cada cobrança recorrente. A recuperação consulta cada um deles e, para uma parcela paga, executa o Split pós-transacional pelo `PaymentId`. A API mantém consulta por até três meses; após isso, a fonte operacional é o histórico local e o portal Cielo.
+- No Commerce V2, a mensagem é reservada no Redis até a confirmação. Reservas expiradas voltam para a fila; parcela e tarefa de venda são persistidas juntas, e as etapas concluídas da venda não voltam a ser executadas.
+- Cada etapa concluída fica registrada. Se o worker parar, o evento volta automaticamente para `pending`, retoma apenas da etapa incompleta e aplica espera crescente quando houver falha. Transferência, recompensa, acesso, entrega, contador e push usam as chaves idempotentes já existentes ou adicionadas para que essa retomada não replique o efeito local.
+
+### Evidência de homologação — 2026-10-20
+
+- Compra manual feita no checkout público de homologação `pay.statuslive.site`, para produto `SUBSCRIPTION` Cielo habilitado por flag de seller.
+- O mock HTTP local retornou uma série Cielo válida; Banking persistiu cobrança de cartão paga, `RecurrentPaymentId`, assinatura ativa e parcela inicial pendente.
+- A reconciliação pelo `RecurrentPaymentId` localizou o `PaymentId`, aplicou o Split pós-transacional e publicou a ação na fila exclusiva.
+- Commerce V2 marcou a venda como paga, manteve a assinatura ativa e concluiu o evento durável com as nove etapas registradas, sem erro.
+- Uma segunda cobrança futura simulada para a mesma série produziu uma parcela `2` paga, um novo Split aplicado e uma nova venda recorrente paga, preservando a assinatura original.
+- Com a reconciliação periódica habilitada em homologação, uma terceira cobrança futura foi localizada automaticamente, sem executar comando manual; a parcela `3`, o Split, a venda recorrente e o evento durável também concluíram com sucesso.
+- Limite do teste: o mock não dispara `ChangeType: 2` automaticamente. O caminho exercitado foi a recuperação por reconciliação, não a entrega HTTP do webhook. O aceite antes de produção ainda exige testar o callback real da Cielo e as credenciais/habilitações da conta Master.
+
 ## Rollout e rollback
 
 1. Publicar schema e consumidores com a flag desligada.

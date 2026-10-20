@@ -1,6 +1,6 @@
 # Plano — assinaturas por cartão Cielo Split
 
-> Status: proposta; depende de confirmação comercial e técnica da Cielo
+> Status: implementação em homologação; depende de confirmação comercial e técnica da Cielo para produção
 > Última atualização: 2026-10-20
 > Público: Direção, Produto, Operações e Engenharia
 
@@ -14,7 +14,9 @@ Nesta proposta, a Cielo cria e cobra a recorrência; a Lowify registra a assinat
 
 Hoje a Cielo Split está integrada somente para cartão avulso. O checkout aceita cartão para `ONE_TIME`, cria `SplittedCreditCard` em `POST /1/sales` e faz a divisão na própria cobrança. Produto `SUBSCRIPTION` aceita apenas `pix_automatic`.
 
-A Cielo documenta recorrência para o mesmo produto que usamos — **Split de Pagamento com API E-commerce Cielo** — mas exige habilitação comercial da conta Master e informa que o Split de uma cobrança recorrente é pós-transacional. Portanto, recorrência existe no produto contratado, porém ainda não está entregue pela Lowify.
+A Cielo documenta recorrência para o mesmo produto que usamos — **Split de Pagamento com API E-commerce Cielo** — mas exige habilitação comercial da conta Master e informa que o Split de uma cobrança recorrente é pós-transacional. A implementação está atrás de flag por seller, com fila exclusiva e recuperação durável; a liberação continua condicionada à homologação da conta Master.
+
+Em 2026-10-20, uma compra manual pelo checkout de homologação `pay.statuslive.site` percorreu criação da série, persistência de `RecurrentPaymentId`, reconciliação, Split, fila exclusiva e efeitos da venda. A Cielo foi simulada localmente neste teste; o mock não emite webhook por conta própria, portanto a reconciliação foi o caminho exercitado para a confirmação.
 
 ## Documentos
 
