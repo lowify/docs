@@ -8,7 +8,7 @@ A recorrência Cielo não é habilitada globalmente nem inferida de a conta já 
 | --- | --- | --- |
 | `cielo_recurring_card_enabled` | `1` | Seller pode configurar cartão em produto `SUBSCRIPTION`, desde que os demais requisitos sejam verdadeiros. |
 | `cielo_recurring_card_enabled` | `0` | Negação explícita; não mostra nem aceita cartão recorrente. |
-| sem linha | `null`; estado padrão | Não configurado e negado. A ação administrativa remove a linha para voltar a este estado. |
+| sem linha | `null`; legado/ausência | Não configurado e negado. Ao salvar pelas telas administrativas, o estado desligado passa a ser persistido como `0`. |
 
 Não usar `getCustomVar()` para esta chave: ele consulta `system_vars` quando não encontra override do usuário. Para esta feature, ausência não pode herdar valor global.
 
@@ -21,15 +21,15 @@ Existem duas interfaces administrativas para a mesma ação e ambas devem perman
 
 As duas submetem para `actions/admin/user/restrictions.php`. A página de lista precisa receber o estado atual junto com seus dados assíncronos; a visão geral pode carregá-lo diretamente para o seller exibido.
 
-O controle precisa ser um seletor explícito de três opções — **Não configurado**, **Liberado** e **Bloqueado** — e não um checkbox. Um checkbox não permite distinguir uma negação deliberada da ausência de configuração.
+O controle é um toggle **Liga/Desliga**, iniciado desligado quando a chave estiver ausente ou for `0`. Ao salvar, o Dashboard sempre persiste `1` para ligado ou `0` para desligado. A ausência (`null`) é mantida apenas como interpretação de dados legados.
 
 ## Responsabilidades por componente
 
 ### Dashboard Seller
 
 - Autorizar a edição com a permission key já aplicada a restrições de sellers, `admin_sellers_restrictions_edit`.
-- Validar o valor recebido como `null`, `0` ou `1`; nunca aceitar uma chave/valor arbitrário do POST.
-- Para `null`, apagar somente a linha do seller e dessa chave. Para `0`/`1`, atualizar a última linha existente ou inserir uma nova, preservando o padrão já usado por outras `user_system_vars`.
+- Derivar o valor recebido exclusivamente do toggle: `1` para marcado e `0` para desmarcado.
+- Para ambos os valores, atualizar a última linha existente ou inserir uma nova, preservando o padrão já usado por outras `user_system_vars`.
 - Na edição de produto, resolver a chave diretamente pelo `id_usuario` dono do produto. Isso é obrigatório quando um administrador edita produto alheio; a identidade da sessão não é a do seller.
 - Exibir o card de cartão em assinatura somente quando a chave for `1` **e** o form-data do Commerce V2 disser que o cartão Cielo está disponível.
 - Se o produto estiver configurado para usar somente Checkout Transparente, ocultar o card de cartão de crédito para assinatura. O Checkout Transparente não implementa cartão recorrente nesta entrega.
