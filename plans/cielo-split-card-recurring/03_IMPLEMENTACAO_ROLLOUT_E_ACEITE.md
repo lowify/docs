@@ -12,7 +12,7 @@
 
 1. Mapear e ajustar o vínculo entre as assinaturas Banking e Commerce V2 para o `RecurrentPaymentId`.
 2. Criar migrations estritamente aditivas para estado/evidência do Split recorrente ou chave de transação Cielo, apenas se os campos existentes não preservarem a semântica corretamente.
-3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás da chave por seller `cielo_split_card_recurring_enabled`, apenas para `cielo_ecommerce` elegível e sempre em `1x`.
+3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás da chave por seller `cielo_recurring_card_enabled`, apenas para `cielo_ecommerce` elegível e sempre em `1x`.
 4. Criar no Dashboard a edição triestado da chave: `1` liberado, `0` negado explicitamente e ausência da linha como `null`/não configurado; os dois últimos estados não habilitam a feature.
 5. Criar validação de integração: conta ativa/aprovada, credenciais presentes e habilitações exigidas confirmadas.
 6. Criar uma configuração e um processo exclusivos no Commerce V2, inicialmente desligados:
@@ -57,6 +57,8 @@ A reconciliação inicia automaticamente no Banking e só processa séries Cielo
 - Commerce V2 marcou a venda como paga, manteve a assinatura ativa e concluiu o evento durável com as nove etapas registradas, sem erro.
 - Uma segunda cobrança futura simulada para a mesma série produziu uma parcela `2` paga, um novo Split aplicado e uma nova venda recorrente paga, preservando a assinatura original.
 - Com a reconciliação periódica habilitada em homologação, uma terceira cobrança futura foi localizada automaticamente, sem executar comando manual; a parcela `3`, o Split, a venda recorrente e o evento durável também concluíram com sucesso.
+- O `PUT /subscription/pix/cancel` chamou a desativação da série no mock com `RecurrentPaymentId`, gravou `canceled_seller` localmente e uma nova tentativa de gerar parcela foi recusada pelo mock. Cobranças já criadas antes do cancelamento continuaram recuperáveis, preservando o histórico.
+- No cenário de resposta perdida, o mock aplicou o Split e encerrou a conexão antes da resposta. A cobrança permaneceu `pending` com Split `processing` e sem venda; a reconciliação consultou a evidência remota, reconheceu o Split aplicado e concluiu uma única parcela/venda, sem repetir a divisão.
 - Limite do teste: o mock não dispara `ChangeType: 2` automaticamente. O caminho exercitado foi a recuperação por reconciliação, não a entrega HTTP do webhook. O aceite antes de produção ainda exige testar o callback real da Cielo e as credenciais/habilitações da conta Master.
 
 ## Rollout e rollback

@@ -37,7 +37,7 @@ Em 2026-10-20, uma compra manual pelo checkout de homologação `pay.statuslive.
 | Notificação | Receber `ChangeType: 2`, consultar o pagamento por `PaymentId` e processar o resultado de maneira idempotente. |
 | Fila | Usar uma fila exclusiva Cielo entre Banking V2 e Commerce V2; não publicar nem consumir as filas de assinatura já usadas pelo Banking V1. |
 | Cartão | Não guardar PAN nem CVV. Confirmar com a Cielo a habilitação de Recorrência e Cartão Protegido/tokenização. |
-| Elegibilidade do seller | A chave opcional `user_system_vars.cielo_split_card_recurring_enabled` é uma liberação explícita por seller. Ausência é `null` e nega a feature; `1` permite a avaliação; `0` nega explicitamente. Não há fallback global. |
+| Elegibilidade do seller | A chave opcional `user_system_vars.cielo_recurring_card_enabled` é uma liberação explícita por seller. Ausência é `null` e nega a feature; `1` permite a avaliação; `0` nega explicitamente. Não há fallback global. |
 | Produto Lowify | Habilitar `card` para `SUBSCRIPTION` somente depois da homologação completa da Cielo, para seller explicitamente liberado, com Cielo aprovada e somente em `1x`. |
 
 ## Fluxo alvo
