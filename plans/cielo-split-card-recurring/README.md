@@ -22,7 +22,6 @@ A Cielo documenta recorrência para o mesmo produto que usamos — **Split de Pa
 2. [Contrato, dados e eventos](02_CONTRATO_DADOS_E_EVENTOS.md)
 3. [Implementação, rollout e aceite](03_IMPLEMENTACAO_ROLLOUT_E_ACEITE.md)
 4. [Dashboard e travas de configuração](04_DASHBOARD_E_TRAVAS_DE_CONFIGURACAO.md)
-5. [Backlog executável de desenvolvimento](05_TAREFAS_DE_DESENVOLVIMENTO.md)
 
 ## Decisões propostas
 
