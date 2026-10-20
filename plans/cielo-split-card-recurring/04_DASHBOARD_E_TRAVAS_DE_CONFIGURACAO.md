@@ -32,6 +32,7 @@ O controle precisa ser um seletor explícito de três opções — **Não config
 - Para `null`, apagar somente a linha do seller e dessa chave. Para `0`/`1`, atualizar a última linha existente ou inserir uma nova, preservando o padrão já usado por outras `user_system_vars`.
 - Na edição de produto, resolver a chave diretamente pelo `id_usuario` dono do produto. Isso é obrigatório quando um administrador edita produto alheio; a identidade da sessão não é a do seller.
 - Exibir o card de cartão em assinatura somente quando a chave for `1` **e** o form-data do Commerce V2 disser que o cartão Cielo está disponível.
+- Se o produto estiver configurado para usar somente Checkout Transparente, ocultar o card de cartão de crédito para assinatura. O Checkout Transparente não implementa cartão recorrente nesta entrega.
 - Fixar `credit_card_installments=1` em assinatura: esconder seletor, aviso e modal de regras de parcelamento; o campo enviado deve ser hidden com valor `1`.
 - Manter a tela de `ONE_TIME` intacta, incluindo seleção e regras existentes de parcelas.
 
@@ -45,6 +46,7 @@ O serviço já persiste produtos em `tbl_produtos` e já contém `App\\Model\\Us
 - `ResolveCheckoutPaymentMethodsUseCase` deve continuar retornando só `pix_automatic` para assinatura sem elegibilidade e retornar `card` apenas na combinação permitida, sempre com máximo de `1` parcela.
 - `ProcessProductCheckoutRequest` deve aceitar `card` para `SUBSCRIPTION` somente após consultar a mesma regra de elegibilidade, e rejeitar tentativa de `installments > 1`.
 - `GetProductByShortCodeUseCase` e a resposta pública de opções de checkout precisam anunciar `card` somente quando o produto for elegível. Não basta aceitar o POST, pois o checkout precisa saber quais meios renderizar.
+- A elegibilidade de cartão recorrente deve ser falsa para Checkout Transparente, inclusive se um request tentar ativar o cartão diretamente. Essa limitação não altera o cartão `ONE_TIME` já suportado pelo Checkout Transparente.
 - `ProcessProductCheckoutUseCase` deve escolher a criação de recorrência Cielo para assinatura/cartão; não pode cair no atual `createCardPayment`, que representa cobrança avulsa.
 
 ### Banking V2, Edge Webhook e Commerce V2 assíncrono
@@ -59,10 +61,11 @@ Esses componentes implementam a cobrança recorrente real, conforme os documento
 | `SUBSCRIPTION` | `null` ou `0` | qualquer | cartão não disponível | rejeitar cartão |
 | `SUBSCRIPTION` | `1` | não elegível ou gateway diferente | cartão não disponível | rejeitar cartão |
 | `SUBSCRIPTION` | `1` | Cielo elegível | toggle de cartão; sem parcelas; `1x` fixo | aceitar somente cartão recorrente Cielo em `1x` |
+| `SUBSCRIPTION` em Checkout Transparente | qualquer | qualquer | cartão não disponível | rejeitar cartão recorrente |
 
 ## Segurança e compatibilidade
 
 - O browser não é fronteira de autorização. Requests adulterados para ativar cartão ou enviar mais parcelas devem falhar no Commerce V2.
 - Não retornar PAN, CVV, token, segredo ou estado sensível de Cielo no form-data, logs ou eventos.
-- A chave não autoriza `ONE_TIME` novo, Pagar.me, Checkout Transparente nem outros provedores.
+- A chave não autoriza `ONE_TIME` novo, Pagar.me, cartão recorrente no Checkout Transparente nem outros provedores.
 - Ao desligar ou remover a chave, bloquear novas adesões; não cancelar automaticamente séries existentes. Cancelamento é uma operação explícita por `RecurrentPaymentId`.

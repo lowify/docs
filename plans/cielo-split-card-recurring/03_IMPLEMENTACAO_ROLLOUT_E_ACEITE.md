@@ -57,6 +57,7 @@ CIELO_SUBSCRIPTION_ACTIONS_QUEUE=commerce:cielo:subscriptions:actions
 | Produto avulso Cielo | Continua criando cartão parcelado/à vista sem campos de recorrência. |
 | Produto `SUBSCRIPTION` elegível | Exibe cartão apenas quando a integração Cielo estiver aprovada e a flag ativa. |
 | Produto `SUBSCRIPTION` com flag `null` ou `0` | Não exibe nem aceita cartão, mesmo que o request seja adulterado. |
+| Produto `SUBSCRIPTION` somente em Checkout Transparente | Não exibe nem aceita cartão recorrente; o suporte atual a cartão avulso no Checkout Transparente não é alterado. |
 | Assinatura com parcelas maiores que `1` | Dashboard não oferece parcelamento; Commerce V2 rejeita a gravação e o checkout rejeita a tentativa. |
 | Criação inicial | Cria uma única série Cielo e persiste um único `RecurrentPaymentId`. |
 | Primeira parcela paga | Registra uma parcela, aprova a venda original e executa seus efeitos uma vez. |
