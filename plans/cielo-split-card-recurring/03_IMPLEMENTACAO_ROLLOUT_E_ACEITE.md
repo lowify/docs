@@ -12,7 +12,7 @@
 
 1. Mapear e ajustar o vínculo entre as assinaturas Banking e Commerce V2 para o `RecurrentPaymentId`.
 2. Criar migrations estritamente aditivas para estado/evidência do Split recorrente ou chave de transação Cielo, apenas se os campos existentes não preservarem a semântica corretamente.
-3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás da chave por seller `cielo_split_card_recurring_enabled`, apenas para `cielo_ecommerce` elegível e sempre em `1x`.
+3. Disponibilizar `card` para produto `SUBSCRIPTION` somente atrás da chave por seller `cielo_recurring_card_enabled`, apenas para `cielo_ecommerce` elegível e sempre em `1x`.
 4. Criar no Dashboard a edição triestado da chave: `1` liberado, `0` negado explicitamente e ausência da linha como `null`/não configurado; os dois últimos estados não habilitam a feature.
 5. Criar validação de integração: conta ativa/aprovada, credenciais presentes e habilitações exigidas confirmadas.
 6. Criar uma configuração e um processo exclusivos no Commerce V2, inicialmente desligados:

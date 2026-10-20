@@ -6,8 +6,8 @@ A recorrência Cielo não é habilitada globalmente nem inferida de a conta já 
 
 | Chave | Valores | Efeito |
 | --- | --- | --- |
-| `cielo_split_card_recurring_enabled` | `1` | Seller pode configurar cartão em produto `SUBSCRIPTION`, desde que os demais requisitos sejam verdadeiros. |
-| `cielo_split_card_recurring_enabled` | `0` | Negação explícita; não mostra nem aceita cartão recorrente. |
+| `cielo_recurring_card_enabled` | `1` | Seller pode configurar cartão em produto `SUBSCRIPTION`, desde que os demais requisitos sejam verdadeiros. |
+| `cielo_recurring_card_enabled` | `0` | Negação explícita; não mostra nem aceita cartão recorrente. |
 | sem linha | `null`; estado padrão | Não configurado e negado. A ação administrativa remove a linha para voltar a este estado. |
 
 Não usar `getCustomVar()` para esta chave: ele consulta `system_vars` quando não encontra override do usuário. Para esta feature, ausência não pode herdar valor global.
