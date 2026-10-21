@@ -44,11 +44,13 @@ O crédito do seller e o faturamento de taxa CT são efeitos distintos: no fluxo
 
 **Problema confirmado.** O caminho normal do Commerce V2 aplica `CheckoutCardFailureRateLimitService` antes de criar pagamento e registra falhas de cartão. O caminho CT novo não preserva esse mesmo ciclo: a tentativa é executada no CT, mas a recusa do provedor não alimenta o limitador comercial do Commerce V2.
 
-**Correção necessária.** Definir uma identidade segura da tentativa (seller/cliente/produto ou a chave comercial já adotada) e registrar a recusa CT no mecanismo que bloqueia novas tentativas. O bloqueio deve ocorrer antes de uma nova tentativa e não pode usar PAN, CVV ou o envelope de cartão como chave ou histórico.
+**Correção necessária.** Definir uma identidade segura da tentativa (seller/cliente/produto ou a chave comercial já adotada) e registrar a recusa CT no mecanismo que bloqueia novas tentativas. Manter também o rate limit por IP: a Public API deve resolver o IP real do comprador na borda confiável e encaminhá-lo ao CT API no contrato interno da tentativa; o CT API aplica o limite antes de chamar o provedor. O CT API não deve confiar em `X-Forwarded-For` ou cabeçalho equivalente enviado diretamente pelo navegador. Nenhum dos limites pode usar PAN, CVV ou o envelope de cartão como chave ou histórico.
 
 **Aceite mínimo.**
 
 - Recusas sucessivas CT alcançam o limite e uma tentativa adicional é bloqueada antes de chamar o provedor.
+- Muitas tentativas de IPs distintos para o mesmo contexto comercial atingem o limite comercial; muitas tentativas de um mesmo IP também atingem o limite de IP.
+- O IP efetivo é resolvido pela Public API a partir de proxy confiável e chega ao CT API no payload interno; um cabeçalho forjado pelo navegador não muda a chave de limitação.
 - Uma aprovação e as regras de expiração/reabilitação seguem a política já usada pelo checkout normal.
 - Nenhum dado sensível de cartão é persistido ou enviado entre filas para suportar o limite.
 
