@@ -18,6 +18,7 @@ Na Efí, a Jornada 3 cria a cobrança inicial e a autorização; o Checkout Tran
 2. [Contrato, dados e eventos](02_CONTRATO_DADOS_E_EVENTOS.md)
 3. [Implementação e aceite](03_IMPLEMENTACAO_E_ACEITE.md)
 4. [Recuperação automática de operações incertas](04_RECUPERACAO_DE_OPERACOES_INCERTAS.md)
+5. [Correções CT + Commerce V2 para desenvolvimento](05_CORRECOES_CT_COMMERCE_PARA_DEV.md)
 
 ## Decisões propostas
 
