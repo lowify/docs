@@ -64,7 +64,7 @@ O crédito do seller e o faturamento de taxa CT são efeitos distintos: no fluxo
 
 - Dois submits simultâneos da mesma intenção resultam em uma venda local, uma assinatura local e uma autorização/cobrança no provedor.
 - Um timeout após sucesso pode ser repetido e devolve o resultado já criado.
-- Falha antes da criação no CT não deixa pendência sem reconciliação; a recuperação a conclui ou a expira de forma rastreável.
+- Falha antes da criação no CT deixa a pendência rastreável, sem criar uma segunda assinatura.
 
 ### RC05 — garantir consistência entre venda recorrente e item de billing CT
 
