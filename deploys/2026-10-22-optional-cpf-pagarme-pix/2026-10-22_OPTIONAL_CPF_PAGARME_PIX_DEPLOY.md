@@ -8,12 +8,12 @@ Quando o CPF não vier no fluxo Pagar.me, o Banking V2 ou o worker do CT fornece
 
 ## Componentes e referências
 
-| Repositório | Diretório de produção | Branch de deploy | Commit obrigatório | Alteração |
-| --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/optional-cpf-pagarme-pix` | `29cdb32` | Fallback de CPF no adaptador de Pix Pagar.me PSP. |
-| `services-checkout-transparent-worker` | `/opt/lowify-ct/services/services-checkout-transparent-worker` | `feat/optional-cpf-pagarme-pix` | `2a8dbc8` | Fallback de CPF antes de criar pedido Pix Pagar.me no CT. |
-| `services-checkout-transparent-api` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `feat/optional-cpf-pagarme-pix` | `a4c4767` | Pagar.me deixa de anunciar `document` como campo obrigatório no contexto do CT. |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/optional-cpf-pagarme-pix` | `d149dda` | Contexto do Pix deixa de exigir documento por provider e a validação respeita somente o flag explícito do produto. |
+| Repositório | Host | Diretório de produção | Branch de deploy | Commit obrigatório | Alteração |
+| --- | --- | --- | --- | --- | --- |
+| `services-banking-v2` | `144.126.149.57` | `/opt/lowify/services/services-banking-v2` | `feat/optional-cpf-pagarme-pix` | `29cdb32` | Fallback de CPF no adaptador de Pix Pagar.me PSP. |
+| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/optional-cpf-pagarme-pix` | `d149dda` | Contexto do Pix deixa de exigir documento por provider e a validação respeita somente o flag explícito do produto. |
+| `services-checkout-transparent-worker` | `80.190.72.241` | `/opt/lowify-ct/services/services-checkout-transparent-worker` | `feat/optional-cpf-pagarme-pix` | `2a8dbc8` | Fallback de CPF antes de criar pedido Pix Pagar.me no CT. |
+| `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `feat/optional-cpf-pagarme-pix` | `a4c4767` | Pagar.me deixa de anunciar `document` como campo obrigatório no contexto do CT. |
 
 Os commits acima partem de `main`. As branches devem ser enviadas ao `origin` antes deste deploy; este roteiro não autoriza `push` no servidor.
 
@@ -39,7 +39,9 @@ Não há migration, DDL, DML nem alteração de dados a aplicar.
 
 ## Sequência de deploy
 
-Modo de rebuild: incremental. Antes de cada etapa, interrompa a operação se o repositório estiver sujo, se a branch remota não existir ou se o commit final não corresponder à tabela.
+Modo de rebuild: incremental. Execute as etapas na ordem dos hosts abaixo e não retorne a um host já concluído. Antes de cada etapa, interrompa a operação se o repositório estiver sujo, se a branch remota não existir ou se o commit final não corresponder à tabela.
+
+### Host `144.126.149.57`
 
 1. Publicar o `services-banking-v2` primeiro. Isso garante o fallback antes de o Commerce aceitar venda padrão sem CPF.
 
@@ -54,7 +56,22 @@ Modo de rebuild: incremental. Antes de cada etapa, interrompa a operação se o 
    docker compose ps
    ```
 
-2. Publicar o `services-checkout-transparent-worker` antes de remover a exigência de documento no CT API.
+2. Ainda no mesmo host, publicar o `services-commerce-v2`. A partir deste ponto o checkout padrão deixa de exigir CPF por ser Pagar.me PSP.
+
+   ```bash
+   cd /opt/lowify/services/service-commerce-v2
+   git status --porcelain=v1
+   git fetch origin --prune
+   git switch feat/optional-cpf-pagarme-pix
+   git pull --ff-only origin feat/optional-cpf-pagarme-pix
+   git rev-parse --short HEAD
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+### Host `80.190.72.241`
+
+3. Publicar o `services-checkout-transparent-worker` antes de remover a exigência de documento no CT API.
 
    ```bash
    cd /opt/lowify-ct/services/services-checkout-transparent-worker
@@ -67,23 +84,12 @@ Modo de rebuild: incremental. Antes de cada etapa, interrompa a operação se o 
    docker compose ps
    ```
 
-3. Publicar o `services-checkout-transparent-api`.
+### Host `80.190.72.228`
+
+4. Publicar o `services-checkout-transparent-api` por último. A partir deste ponto Pagar.me deixa de anunciar `document` como obrigatório no CT.
 
    ```bash
    cd /opt/lowify-ct/services/services-checkout-transparent-api
-   git status --porcelain=v1
-   git fetch origin --prune
-   git switch feat/optional-cpf-pagarme-pix
-   git pull --ff-only origin feat/optional-cpf-pagarme-pix
-   git rev-parse --short HEAD
-   docker compose up -d --build
-   docker compose ps
-   ```
-
-4. Publicar o `services-commerce-v2` por último; a partir deste ponto o checkout padrão deixa de exigir CPF por ser Pagar.me PSP.
-
-   ```bash
-   cd /opt/lowify/services/service-commerce-v2
    git status --porcelain=v1
    git fetch origin --prune
    git switch feat/optional-cpf-pagarme-pix
