@@ -31,6 +31,12 @@ Foram testadas imagens oficiais Hyperf em homologação e produção:
 
 Até a publicação de uma imagem Hyperf que execute PHP 8.2.35 ou superior, as medidas abaixo reduzem exposição, mas não corrigem integralmente a vulnerabilidade.
 
+## Decisão de contenção
+
+No momento, não existe uma imagem oficial Hyperf validada para este gateway que execute PHP 8.2.35 ou superior. A atualização direta da tag atualmente utilizada não corrige o runtime: as imagens testadas continuam em versões vulneráveis.
+
+Enquanto o patch não estiver disponível na imagem Hyperf adotada, o objetivo é impedir que vetores conhecidos alcancem o PHP e limitar o tamanho de requisições que chegam ao gateway. Isso **reduz materialmente o risco**, mas não permite afirmar que a vulnerabilidade se tornou impossível de reproduzir. A atualização para PHP 8.2.35 ou superior permanece obrigatória assim que houver uma imagem validada.
+
 ## Escopo analisado
 
 No fluxo `edge-gateway` → `edge-public-api`, não foram identificadas rotas PHP que processem upload de arquivo, `multipart/form-data`, `UploadedFile` ou `getUploadedFiles()`.
@@ -54,6 +60,8 @@ Criar uma regra em **Security rules → Custom rules**:
 | Expressão | `http.host eq "gateway.lowify.com.br" and any(http.request.headers["content-type"][*] matches "(?i).*multipart/form-data.*")` |
 
 Validar que `GET /health`, login e checkout JSON continuam funcionando. Uma requisição multipart ao gateway deve ser recusada no edge e não alcançar o Traefik/PHP.
+
+Referência para criar a regra no Cloudflare: [Custom rules — Cloudflare WAF](https://developers.cloudflare.com/waf/custom-rules/create-dashboard/).
 
 ### 2. Traefik — limitar tamanho do request body
 
