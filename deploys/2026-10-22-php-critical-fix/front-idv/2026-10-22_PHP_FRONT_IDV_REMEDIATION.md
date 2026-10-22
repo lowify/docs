@@ -79,8 +79,6 @@ docker compose up -d --no-deps --force-recreate front-idv-app front-idv
 
 docker exec front-idv-app php -v
 docker compose ps
-docker image prune -f
-docker system df
 ```
 
 Prosseguir somente se o commit for `6c1ab0c`, `php -v` informar PHP 8.4.27 e `front-idv-app` e `front-idv` estiverem `Up`.

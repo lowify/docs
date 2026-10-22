@@ -89,8 +89,6 @@ docker compose up -d --no-deps --force-recreate edge-checkout-transparent-webhoo
 
 docker exec lowify-edge-checkout-transparent-webhook php -v
 docker compose ps
-docker image prune -f
-docker system df
 ```
 
 Prosseguir somente se o commit for `c1faaaf`, `php -v` informar PHP 8.3.36 e o container estiver `Up`. Não há migration, alteração de banco, volume, cache ou fila neste ajuste de runtime.
