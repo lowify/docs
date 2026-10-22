@@ -11,7 +11,7 @@ Quando o CPF não vier no fluxo Pagar.me, o Banking V2 ou o worker do CT fornece
 | Repositório | Host | Diretório de produção | Branch de deploy | Commit obrigatório | Alteração |
 | --- | --- | --- | --- | --- | --- |
 | `services-banking-v2` | `144.126.149.57` | `/opt/lowify/services/services-banking-v2` | `feat/optional-cpf-pagarme-pix` | `29cdb32` | Fallback de CPF no adaptador de Pix Pagar.me PSP. |
-| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/optional-cpf-pagarme-pix` | `d149dda` | Contexto do Pix deixa de exigir documento por provider e a validação respeita somente o flag explícito do produto. |
+| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/optional-cpf-pagarme-pix` | `b12c73b` | Contexto do Pix deixa de exigir documento por provider, a validação respeita somente o flag explícito do produto e a recuperação de venda verifica o código PIX apenas no disparo. |
 | `services-checkout-transparent-worker` | `80.190.72.241` | `/opt/lowify-ct/services/services-checkout-transparent-worker` | `feat/optional-cpf-pagarme-pix` | `2a8dbc8` | Fallback de CPF antes de criar pedido Pix Pagar.me no CT. |
 | `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `feat/optional-cpf-pagarme-pix` | `a4c4767` | Pagar.me deixa de anunciar `document` como campo obrigatório no contexto do CT. |
 
@@ -22,6 +22,7 @@ Os commits acima partem de `main`. As branches devem ser enviadas ao `origin` an
 - No checkout padrão, `checkout_options.pix.requires_customer_document` passa a ser `false`; o front já interpreta esse contrato e não força o campo CPF por provider.
 - O Commerce V2 continua obrigando CPF somente quando o produto tiver `checkout_campo_cpf = 1`.
 - O Banking V2 normaliza o documento do comprador e usa `DocumentGenerator::cpf()` apenas se ele estiver vazio antes de chamar Pagar.me PSP.
+- A recuperação de venda não descarta a venda pendente na criação quando o código PIX ainda não estiver persistido. A validação ocorre no disparo; se continuar ausente, o dispatch fica como `skipped` com motivo `missing_pix_code` e libera eventual crédito retido.
 - No CT, a lista genérica de campos obrigatórios é preservada, mas Pagar.me não inclui mais `document` nela.
 - O CT API publica a instrução sem documento quando ele não foi informado; o worker Pagar.me aplica `DocumentGenerator::cpf()` antes do `POST /orders` ao gateway.
 - Não há alteração de rota, JWT, schema de banco, migration, variável de ambiente, credencial, nem nome de fila. O CT continua usando `checkout-transparent:gateway:instructions` com a ação `payment.create`.
