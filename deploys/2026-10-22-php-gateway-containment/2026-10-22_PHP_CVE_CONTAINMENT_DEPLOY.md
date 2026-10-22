@@ -2,7 +2,7 @@
 
 ## Estado do deploy
 
-**Em preparação.** Nenhuma alteração de Cloudflare, Traefik, imagem Docker ou container foi aplicada por esta documentação.
+**Homologação concluída; produção pendente.** As contenções de Traefik e PHP foram aplicadas e validadas no `edge-gateway` de homologação em 22/10/2026. A regra de Cloudflare ainda não foi criada e nenhuma alteração foi aplicada em produção.
 
 ## Objetivo
 
@@ -16,7 +16,7 @@ O escopo inicial contém somente o container HTTP do `edge-gateway`. Os demais c
 
 | Container/serviço | Exposição confirmada | PHP verificado | Decisão atual | Documento específico |
 | --- | --- | --- | --- | --- |
-| `edge-gateway-edge-gateway-1` / `edge-gateway` | `gateway.lowify.com.br` via Traefik TLS | 8.2.26 | Aplicar contenções de borda e aguardar imagem Hyperf com PHP 8.2.35+ validado | [Decisão do edge-gateway](2026-10-22_PHP_GATEWAY_CONTAINMENT_PENDING.md) |
+| `edge-gateway-edge-gateway-1` / `edge-gateway` | `gateway.lowify.com.br` via Traefik TLS | 8.2.26 | Contenção validada em homologação; aplicar em produção e criar WAF Cloudflare; aguardar imagem Hyperf com PHP 8.2.35+ validado | [Decisão do edge-gateway](2026-10-22_PHP_GATEWAY_CONTAINMENT_PENDING.md) |
 
 ## Decisão de runtime
 
@@ -37,11 +37,12 @@ Prosseguir somente se retornar PHP 8.2.35 ou superior.
 
 ## Ordem de execução
 
-1. Aplicar e validar em homologação as contenções descritas no documento do `edge-gateway`.
-2. Publicar a mesma decisão em produção, após aprovação operacional.
-3. Monitorar novas imagens Hyperf e validar o PHP interno antes de alterar o runtime.
-4. Quando houver imagem corrigida, reconstruir e recriar `edge-gateway` e `edge-gateway-worker`.
-5. Inventariar o próximo container exposto e criar seu documento de decisão antes de qualquer alteração.
+1. Criar a regra WAF Cloudflare pendente para bloquear `multipart/form-data` em `gateway.lowify.com.br` e restringir o acesso direto à origem, se aplicável.
+2. Publicar em produção as mesmas alterações validadas em homologação, após aprovação operacional.
+3. Validar health, login, checkout JSON e a recusa `413` para body acima de 2 MiB.
+4. Monitorar novas imagens Hyperf e validar o PHP interno antes de alterar o runtime.
+5. Quando houver imagem corrigida, reconstruir e recriar `edge-gateway` e `edge-gateway-worker`.
+6. Inventariar o próximo container exposto e criar seu documento de decisão antes de qualquer alteração.
 
 ## Critério de conclusão
 
