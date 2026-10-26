@@ -2,9 +2,7 @@
 
 ## Objetivo
 
-Publicar as correções do checkout Cielo para impedir o envio de uma autenticação 3DS 2.x sem `Xid` e delegar à Cielo/Cybersource a captura ou o void conforme a análise de risco.
-
-O deploy não habilita o 3DS em produção. `CIELO_3DS_ENABLED` deve permanecer com o valor atual até existir uma transação controlada e credenciais MPI confirmadas.
+Publicar as correções do checkout Cielo para impedir o envio de uma autenticação 3DS 2.x sem `Xid` e delegar à Cielo/Cybersource a captura ou o void conforme a análise de risco. Depois de atualizar os componentes, habilitar o 3DS no Banking V2, reconstruir seu container e executar uma transação controlada.
 
 ## Componentes e referências
 
@@ -32,7 +30,7 @@ Front Checkout (MPI) -> Commerce V2 (FraudAnalysis) -> Banking V2 (validação e
 
 1. Publicar os três commits da tabela em suas respectivas `main`. O PR do Commerce V2 deve estar mergeado e o commit `5921535` deve ser ancestral da `origin/main` antes de iniciar a operação.
 2. Confirmar que cada repositório está limpo antes da atualização. Na VPS, o Commerce V2 possui o arquivo não rastreado `.env.bak-pre-cielo-recurring`; não apagar, limpar ou versionar esse arquivo como parte deste deploy.
-3. Confirmar que `CIELO_3DS_ENABLED` continua desabilitado. Esta entrega corrige o contrato, mas não autoriza a ativação do 3DS.
+3. Antes de iniciar, confirmar que as credenciais MPI de produção já estão configuradas no Banking V2. Não registrar seus valores no terminal, documentos ou logs.
 4. Registrar os commits atuais na pré-checagem para rollback. No estado observado antes deste deploy: Banking V2 `e737cb4`, Commerce V2 `feat/optional-cpf-pagarme-pix` em `b12c73b` e Front Checkout `412486b`.
 
 ## Banco de dados
@@ -93,12 +91,31 @@ git merge-base --is-ancestor c86a45c HEAD
 git rev-parse --short HEAD
 ```
 
+## Ativação do 3DS
+
+Com os três componentes atualizados, alterar somente no ambiente do Banking V2:
+
+```text
+CIELO_3DS_ENABLED=true
+```
+
+Não alterar nem expor as credenciais MPI. Em seguida, reconstruir o Banking V2 para carregar a configuração:
+
+```bash
+cd /opt/lowify/services/services-banking-v2
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100
+```
+
+Se o container não permanecer saudável ou se a configuração MPI falhar, retorne `CIELO_3DS_ENABLED` ao valor anterior e reconstrua o Banking V2 antes de investigar.
+
 ## Validação pós-deploy
 
 1. Abra um checkout Cielo de teste com fingerprint de antifraude disponível e conclua uma tentativa de cartão autorizada. Confirme que a compra aprovada continua chegando à confirmação normal.
 2. Em cenário Cielo controlado de alto risco, confirme que a venda não libera o produto. Não force uma rejeição com cartão real em produção.
 3. Se uma venda for para revisão, ela pode permanecer pendente até a decisão da Cielo. Confirme que somente `Paid` libera a venda; `Voided` não libera.
-4. Mantenha o 3DS desabilitado nesta validação. Quando for autorizado ativá-lo, faça uma transação controlada de 3DS 2.x e confirme que uma resposta sem `Xid` é recusada antes da autorização; não registrar PAN, CVV, CAVV ou XID em logs.
+4. Com o 3DS ativado, faça uma transação controlada de 3DS 2.x. Confirme que a autenticação retorna `Xid` e que a compra segue a autorização normal. Uma resposta sem `Xid` deve ser recusada antes da autorização; não registrar PAN, CVV, CAVV ou XID em logs.
 5. Como conferência técnica opcional, verificar que o payload de fraude contém `AuthorizeFirst`, `CaptureOnLowRisk` e `VoidOnHighRisk`, e que o Banking envia captura diferida. Não limpar Redis, filas, cobranças ou webhooks durante a validação.
 
 ## Rollback
@@ -106,7 +123,7 @@ git rev-parse --short HEAD
 1. Interromper novas tentativas de teste se houver erro de autorização ou liberação indevida.
 2. Retornar primeiro o Front Checkout ao commit registrado antes do deploy (`412486b`) e reconstruir o container.
 3. Retornar o Commerce V2 à referência registrada na pré-checagem — no estado conhecido, `feat/optional-cpf-pagarme-pix` em `b12c73b` — e reconstruir o container. Preservar `.env.bak-pre-cielo-recurring`.
-4. Retornar o Banking V2 ao commit registrado antes do deploy (`e737cb4`) e reconstruir o container.
+4. Desabilitar novamente `CIELO_3DS_ENABLED` no ambiente do Banking V2 e reconstruir o container. Em seguida, retornar o Banking V2 ao commit registrado antes do deploy (`e737cb4`) e reconstruir novamente.
 5. Não apagar ou alterar vendas, cobranças, registros de antifraude, webhooks, filas ou chaves Redis criados durante a janela. O rollback é somente de código; estados persistidos devem ser avaliados caso a caso.
 
 ## Testes de compatibilidade em homologação
