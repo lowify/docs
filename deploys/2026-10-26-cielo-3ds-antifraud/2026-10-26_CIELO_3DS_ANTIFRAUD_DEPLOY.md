@@ -81,6 +81,8 @@ Essa etapa migra o repositório atualmente em `feat/optional-cpf-pagarme-pix` pa
 
 ### 3. Front Checkout
 
+O Front Checkout usa o código atualizado diretamente; não executar rebuild ou restart de container nesta etapa.
+
 ```bash
 cd /opt/lowify/front/front-checkout
 git status --porcelain=v1
@@ -89,9 +91,6 @@ git switch main
 git pull --ff-only origin main
 git merge-base --is-ancestor c86a45c HEAD
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100
 ```
 
 ## Validação pós-deploy
