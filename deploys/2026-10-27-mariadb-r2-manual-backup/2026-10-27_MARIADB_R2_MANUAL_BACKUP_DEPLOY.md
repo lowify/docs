@@ -30,7 +30,34 @@ O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência
 - `aws`, `docker`, `gzip`, `mkdir` e `rmdir` disponíveis no host.
 - O container MariaDB em execução com o nome `data-layer-mariadb`.
 - Bucket R2 existente e uma credencial S3 com permissão limitada de leitura/escrita ao bucket necessário.
-- Definição segura dos valores de `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` e, opcionalmente, `R2_OBJECT_KEY` em `/opt/lowify/data_layer/mariabd/.env-upload-bkp`. Nunca registrar os valores em terminal compartilhado, Git, ticket ou este documento.
+
+## Configuração do ambiente R2
+
+Execute esta etapa como `root`. O uploader lê exclusivamente o arquivo:
+
+```text
+/opt/lowify/data_layer/mariabd/.env-upload-bkp
+```
+
+O arquivo não é versionado pelo Git e deve ter permissão `600`. Crie-o somente se ainda não existir; não sobrescreva uma configuração já ativa:
+
+```bash
+test -e /opt/lowify/data_layer/mariabd/.env-upload-bkp || install -m 600 /dev/null /opt/lowify/data_layer/mariabd/.env-upload-bkp
+chmod 600 /opt/lowify/data_layer/mariabd/.env-upload-bkp
+editor /opt/lowify/data_layer/mariabd/.env-upload-bkp
+```
+
+No editor seguro, informe os valores fornecidos pelo responsável pelas credenciais:
+
+```dotenv
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=
+R2_OBJECT_KEY=mariadb/latest.sql.gz
+```
+
+Nunca registrar valores de credenciais em terminal compartilhado, Git, ticket ou este documento. Ao concluir a edição, salve o arquivo e mantenha a sessão `root` para os passos de validação e envio.
 
 ## Banco de dados
 
@@ -95,15 +122,7 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 
    O resultado deve indicar diretório pertencente a `root` e permissão `700`. Se o diretório não existir ou tiver permissão diferente, pare e encaminhe ao responsável pela infraestrutura; não corrija permissões nem recrie backups durante este deploy.
 
-4. Crie, se ainda não existir, `/opt/lowify/data_layer/mariabd/.env-upload-bkp` com permissão `600` e preencha apenas as variáveis R2 previstas. Não copie valores para o histórico do shell:
-
-   ```bash
-   test -e /opt/lowify/data_layer/mariabd/.env-upload-bkp || install -m 600 /dev/null /opt/lowify/data_layer/mariabd/.env-upload-bkp
-   chmod 600 /opt/lowify/data_layer/mariabd/.env-upload-bkp
-   editor /opt/lowify/data_layer/mariabd/.env-upload-bkp
-   ```
-
-5. Confirme a presença do uploader e valide o backup mais recente, já gerado pelo processo de backup existente. Não execute `backup_mariadb.sh` neste deploy:
+4. Depois de concluir a seção **Configuração do ambiente R2**, confirme a presença do uploader e valide o backup mais recente, já gerado pelo processo de backup existente. Não execute `backup_mariadb.sh` neste deploy:
 
    ```bash
    test -x mariabd/upload_latest_backup_r2.sh
@@ -111,7 +130,7 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
    gzip -t /data/backup/db/bkp.0.sql.gz
    ```
 
-6. Envie o backup validado para R2. Não reinicie containers e não instale cron:
+5. Envie o backup validado para R2. Não reinicie containers e não instale cron:
 
    ```bash
    bash mariabd/upload_latest_backup_r2.sh
