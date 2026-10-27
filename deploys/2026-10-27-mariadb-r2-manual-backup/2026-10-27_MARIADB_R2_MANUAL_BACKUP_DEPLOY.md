@@ -1,0 +1,111 @@
+# Deploy — Backup manual do MariaDB para Cloudflare R2
+
+## Objetivo
+
+Disponibilizar no `data_layer` um fluxo manual para gerar o backup compactado do MariaDB e enviá-lo ao Cloudflare R2. O envio não é agendado: cada execução depende de uma ação explícita do operador.
+
+O escopo também limita a retenção local a três arquivos de backup (`bkp.0.sql.gz`, `bkp.1.sql.gz` e `bkp.2.sql.gz`) e mantém os arquivos gerados fora do repositório Git.
+
+Não há alteração em front, edge, JWT, filas, Docker Compose, banco de dados, Redis ou cron.
+
+## Componentes e referências
+
+| Repositório | Diretório de produção | Branch | Commit de referência | Entrega |
+| --- | --- | --- | --- | --- |
+| `data_layer` | `/opt/lowify/data_layer` | `main` | `b07254eb8a202ba8118b13aa632f0c626b853866` | Uploader manual para R2, configuração externa e retenção de três backups. |
+
+O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência imediata.
+
+## Alterações incluídas
+
+- `mariabd/backup_mariadb.sh` passa a gravar backups em `/var/lib/lowify/mariadb-backups` e mantém três gerações.
+- `mariabd/upload_latest_backup_r2.sh` valida o arquivo gzip e faz upload para R2 via AWS CLI, usando região `auto`.
+- A configuração R2 é lida exclusivamente de `/etc/lowify/mariadb-r2-backup.env`, fora do repositório.
+- `.env-upload-bkp.example` documenta somente os nomes das variáveis; não contém valores secretos.
+
+## Pré-requisitos
+
+- Acesso administrativo à VPS de produção e ao repositório `/opt/lowify/data_layer`.
+- `aws`, `docker`, `gzip`, `mkdir` e `rmdir` disponíveis no host.
+- O container MariaDB em execução com o nome `data-layer-mariadb`.
+- Bucket R2 existente e uma credencial S3 com permissão limitada de leitura/escrita ao bucket necessário.
+- Definição segura dos valores de `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` e, opcionalmente, `R2_OBJECT_KEY` em `/etc/lowify/mariadb-r2-backup.env`. Nunca registrar os valores em terminal compartilhado, Git, ticket ou este documento.
+
+## Banco de dados
+
+Não há migration, DDL ou DML.
+
+O script executa um dump consistente de todos os bancos com `mariadb-dump --single-transaction`; ele não altera tabelas nem reinicia o container. O backup local anterior somente é rotacionado depois que um novo gzip íntegro é gerado.
+
+## Sequência de deploy
+
+1. Verifique que o repositório está limpo e que a referência remota esperada existe:
+
+   ```bash
+   cd /opt/lowify/data_layer
+   git status --porcelain=v1
+   git fetch origin --prune
+   git show-ref --verify --quiet refs/remotes/origin/main
+   git show origin/main --format='%H %s' --no-patch
+   ```
+
+   Se `git status` retornar qualquer arquivo, pare e peça orientação; não use `stash`, `reset` ou limpeza automática.
+
+2. Atualize a branch `main` sem criar merge automático e confira o commit final:
+
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   git rev-parse HEAD
+   ```
+
+   O resultado precisa conter `b07254eb8a202ba8118b13aa632f0c626b853866` ou um descendente aprovado.
+
+3. Crie os diretórios externos com acesso restrito. Não crie arquivos de backup dentro do repositório:
+
+   ```bash
+   install -d -m 700 /var/lib/lowify/mariadb-backups
+   install -d -m 700 /etc/lowify
+   ```
+
+4. Crie `/etc/lowify/mariadb-r2-backup.env` em editor seguro, com permissão `600`, e preencha apenas as variáveis R2 previstas. Não copie valores para o histórico do shell:
+
+   ```bash
+   install -m 600 /dev/null /etc/lowify/mariadb-r2-backup.env
+   editor /etc/lowify/mariadb-r2-backup.env
+   ```
+
+5. Confirme a presença dos scripts e faça a primeira geração manual do backup. Esse comando pode levar alguns minutos, conforme o tamanho do banco:
+
+   ```bash
+   test -x mariabd/backup_mariadb.sh
+   test -x mariabd/upload_latest_backup_r2.sh
+   bash mariabd/backup_mariadb.sh
+   gzip -t /var/lib/lowify/mariadb-backups/bkp.0.sql.gz
+   ```
+
+6. Envie o backup validado para R2. Não reinicie containers e não instale cron:
+
+   ```bash
+   bash mariabd/upload_latest_backup_r2.sh
+   ```
+
+## Validação pós-deploy
+
+1. Peça ao operador para confirmar que os dois comandos manuais terminaram com sucesso, sem exibir credenciais.
+2. Confira que existe um arquivo recente em `/var/lib/lowify/mariadb-backups/bkp.0.sql.gz` e que a validação `gzip -t` termina sem mensagem de erro.
+3. No painel Cloudflare R2, abra o bucket configurado e confirme que o objeto `mariadb/latest.sql.gz` tem data/hora compatível com a execução e tamanho maior que zero.
+4. Confirme que a aplicação permanece acessível normalmente e que o container MariaDB não foi reiniciado.
+5. Não execute restauração de banco como parte desta validação.
+
+## Rollback
+
+1. Pare de executar `mariabd/upload_latest_backup_r2.sh`; não apague o objeto já enviado ao R2 nem os backups locais existentes.
+2. Mantenha `/etc/lowify/mariadb-r2-backup.env` protegido até a decisão de segurança sobre revogação das credenciais. Não o versione ou copie para o repositório.
+3. Para restaurar o código anterior, crie e publique uma reversão revisada dos commits `b07254e…` e `60aba3b…` no repositório de origem; em produção, atualize `main` pelo mesmo procedimento de `git fetch`, `git switch main` e `git pull --ff-only`.
+4. Antes de voltar a gerar backups após a reversão, confirme o diretório de destino do script restaurado. Não apague `/var/lib/lowify/mariadb-backups` como parte do rollback.
+
+## Referências
+
+- `data_layer` — commits `60aba3bd8fa5e3726b9ecdca65cd31b071610165` e `b07254eb8a202ba8118b13aa632f0c626b853866`.
+- `docs/plans/mariadb-r2-backup.md` — intenção inicial; o comportamento efetivamente publicado pelos commits prevalece quando houver divergência de caminho.
