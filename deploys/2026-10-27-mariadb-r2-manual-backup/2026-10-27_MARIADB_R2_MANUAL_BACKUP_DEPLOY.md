@@ -103,12 +103,12 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
    editor /opt/lowify/data_layer/mariabd/.env-upload-bkp
    ```
 
-5. Confirme a presença dos scripts e faça a primeira geração manual do backup. Esse comando pode levar alguns minutos, conforme o tamanho do banco:
+5. Confirme a presença dos scripts e valide o backup mais recente, já gerado pelo processo de backup existente. Não execute `backup_mariadb.sh` neste deploy:
 
    ```bash
    test -x mariabd/backup_mariadb.sh
    test -x mariabd/upload_latest_backup_r2.sh
-   bash mariabd/backup_mariadb.sh
+   test -s /var/lib/lowify/mariadb-backups/bkp.0.sql.gz
    gzip -t /var/lib/lowify/mariadb-backups/bkp.0.sql.gz
    ```
 
