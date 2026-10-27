@@ -12,7 +12,7 @@ Não há alteração em front, edge, JWT, filas, Docker Compose, banco de dados,
 
 | Repositório | Diretório de produção | Branch | Commit de referência | Entrega |
 | --- | --- | --- | --- | --- |
-| `data_layer` | `/opt/lowify/data_layer` | `main` | `d6cd2d0d21fa2ba89e751753c1035fea6c5ea1db` | Uploader manual para R2, configuração externa no diretório do repositório e retenção de três backups. |
+| `data_layer` | `/opt/lowify/data_layer` | `main` | `17ab23851c6e8d72777d8968921b6567e2fad609` | Uploader manual para R2, configuração externa junto ao script e retenção de três backups. |
 
 O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência imediata.
 
@@ -20,7 +20,7 @@ O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência
 
 - `mariabd/backup_mariadb.sh` passa a gravar backups em `/var/lib/lowify/mariadb-backups` e mantém três gerações.
 - `mariabd/upload_latest_backup_r2.sh` valida o arquivo gzip e faz upload para R2 via AWS CLI, usando região `auto`.
-- A configuração R2 é lida exclusivamente de `/opt/lowify/data_layer/.env-upload-bkp`; o arquivo é ignorado pelo Git.
+- A configuração R2 é lida exclusivamente de `/opt/lowify/data_layer/mariabd/.env-upload-bkp`; o arquivo é ignorado pelo Git.
 - `.env-upload-bkp.example` documenta somente os nomes das variáveis; não contém valores secretos.
 
 ## Pré-requisitos
@@ -30,7 +30,7 @@ O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência
 - `aws`, `docker`, `gzip`, `mkdir` e `rmdir` disponíveis no host.
 - O container MariaDB em execução com o nome `data-layer-mariadb`.
 - Bucket R2 existente e uma credencial S3 com permissão limitada de leitura/escrita ao bucket necessário.
-- Definição segura dos valores de `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` e, opcionalmente, `R2_OBJECT_KEY` em `/opt/lowify/data_layer/.env-upload-bkp`. Nunca registrar os valores em terminal compartilhado, Git, ticket ou este documento.
+- Definição segura dos valores de `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` e, opcionalmente, `R2_OBJECT_KEY` em `/opt/lowify/data_layer/mariabd/.env-upload-bkp`. Nunca registrar os valores em terminal compartilhado, Git, ticket ou este documento.
 
 ## Banco de dados
 
@@ -84,7 +84,7 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
    git rev-parse HEAD
    ```
 
-   O resultado precisa conter `d6cd2d0d21fa2ba89e751753c1035fea6c5ea1db` ou um descendente aprovado.
+   O resultado precisa conter `17ab23851c6e8d72777d8968921b6567e2fad609` ou um descendente aprovado.
 
 3. Confirme o diretório externo de backups já existente e suas permissões. Não crie, apague nem mova arquivos de backup nesta etapa:
 
@@ -95,12 +95,12 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 
    O resultado deve indicar diretório pertencente a `root` e permissão `700`. Se o diretório não existir ou tiver permissão diferente, pare e encaminhe ao responsável pela infraestrutura; não corrija permissões nem recrie backups durante este deploy.
 
-4. Crie, se ainda não existir, `/opt/lowify/data_layer/.env-upload-bkp` com permissão `600` e preencha apenas as variáveis R2 previstas. Não copie valores para o histórico do shell:
+4. Crie, se ainda não existir, `/opt/lowify/data_layer/mariabd/.env-upload-bkp` com permissão `600` e preencha apenas as variáveis R2 previstas. Não copie valores para o histórico do shell:
 
    ```bash
-   test -e /opt/lowify/data_layer/.env-upload-bkp || install -m 600 /dev/null /opt/lowify/data_layer/.env-upload-bkp
-   chmod 600 /opt/lowify/data_layer/.env-upload-bkp
-   editor /opt/lowify/data_layer/.env-upload-bkp
+   test -e /opt/lowify/data_layer/mariabd/.env-upload-bkp || install -m 600 /dev/null /opt/lowify/data_layer/mariabd/.env-upload-bkp
+   chmod 600 /opt/lowify/data_layer/mariabd/.env-upload-bkp
+   editor /opt/lowify/data_layer/mariabd/.env-upload-bkp
    ```
 
 5. Confirme a presença dos scripts e faça a primeira geração manual do backup. Esse comando pode levar alguns minutos, conforme o tamanho do banco:
@@ -129,8 +129,8 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 ## Rollback
 
 1. Pare de executar `mariabd/upload_latest_backup_r2.sh`; não apague o objeto já enviado ao R2 nem os backups locais existentes.
-2. Mantenha `/opt/lowify/data_layer/.env-upload-bkp` protegido até a decisão de segurança sobre revogação das credenciais. Não o versione ou copie para o repositório.
-3. Para restaurar o código anterior, crie e publique uma reversão revisada dos commits `d6cd2d0…`, `b07254e…` e `60aba3b…` no repositório de origem; em produção, atualize `main` pelo mesmo procedimento de `git fetch`, `git switch main` e `git pull --ff-only`.
+2. Mantenha `/opt/lowify/data_layer/mariabd/.env-upload-bkp` protegido até a decisão de segurança sobre revogação das credenciais. Não o versione ou copie para o repositório.
+3. Para restaurar o código anterior, crie e publique uma reversão revisada do commit de correção de caminho, de `d6cd2d0…`, `b07254e…` e `60aba3b…` no repositório de origem; em produção, atualize `main` pelo mesmo procedimento de `git fetch`, `git switch main` e `git pull --ff-only`.
 4. Antes de voltar a gerar backups após a reversão, confirme o diretório de destino do script restaurado. Não apague `/var/lib/lowify/mariadb-backups` como parte do rollback.
 
 ## Referências
