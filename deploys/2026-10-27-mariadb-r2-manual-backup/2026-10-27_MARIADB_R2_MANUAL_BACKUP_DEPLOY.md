@@ -49,7 +49,29 @@ O script executa um dump consistente de todos os bancos com `mariadb-dump --sing
    git show origin/main --format='%H %s' --no-patch
    ```
 
-   Se `git status` retornar qualquer arquivo, pare e peça orientação; não use `stash`, `reset` ou limpeza automática.
+   Na VPS atualmente conhecida, podem existir estes quatro itens operacionais não rastreados:
+
+   ```text
+   redis/.env_redis_secret_rotation.bk
+   traefik/.env.bak
+   traefik/docker-compose.yml.bak
+   traefik/letsencrypt/
+   ```
+
+   Preserve-os. Não use `git clean`, `stash`, `reset`, nem mova `traefik/letsencrypt/`, que pode conter certificados ativos. Caso apareça qualquer outro arquivo rastreado ou não rastreado, pare e peça orientação.
+
+   Se o único arquivo rastreado modificado for `mariabd/backup_mariadb.sh` com a mudança manual de `MAX_INDEX=7` para `MAX_INDEX=2`, descarte somente essa cópia local, pois a mesma retenção já está publicada:
+
+   ```bash
+   git restore --source=origin/main -- mariabd/backup_mariadb.sh
+   git diff -- mariabd/backup_mariadb.sh
+   ```
+
+   O segundo comando não deve produzir saída. Confirme também que os arquivos recebidos de `origin/main` não ocupam os quatro caminhos preservados:
+
+   ```bash
+   git diff --name-only HEAD..origin/main
+   ```
 
 2. Atualize a branch `main` sem criar merge automático e confira o commit final:
 
