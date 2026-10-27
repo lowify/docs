@@ -86,11 +86,14 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 
    O resultado precisa conter `d6cd2d0d21fa2ba89e751753c1035fea6c5ea1db` ou um descendente aprovado.
 
-3. Crie o diretório externo dos backups com acesso restrito. Não crie arquivos de backup dentro do repositório:
+3. Confirme o diretório externo de backups já existente e suas permissões. Não crie, apague nem mova arquivos de backup nesta etapa:
 
    ```bash
-   install -d -m 700 /var/lib/lowify/mariadb-backups
+   test -d /var/lib/lowify/mariadb-backups
+   stat -c '%U:%G %a %n' /var/lib/lowify/mariadb-backups
    ```
+
+   O resultado deve indicar diretório pertencente a `root` e permissão `700`. Se o diretório não existir ou tiver permissão diferente, pare e encaminhe ao responsável pela infraestrutura; não corrija permissões nem recrie backups durante este deploy.
 
 4. Crie, se ainda não existir, `/opt/lowify/data_layer/.env-upload-bkp` com permissão `600` e preencha apenas as variáveis R2 previstas. Não copie valores para o histórico do shell:
 
