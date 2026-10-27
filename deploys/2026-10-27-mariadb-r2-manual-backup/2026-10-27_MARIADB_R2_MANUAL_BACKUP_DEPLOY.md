@@ -25,6 +25,7 @@ O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência
 
 ## Pré-requisitos
 
+- Execute **todos os comandos deste roteiro como `root`** na VPS de produção. Isso é necessário para acessar `/etc/lowify`, `/var/lib/lowify/mariadb-backups` e o Docker sem criar arquivos com proprietário ou permissões incorretos.
 - Acesso administrativo à VPS de produção e ao repositório `/opt/lowify/data_layer`.
 - `aws`, `docker`, `gzip`, `mkdir` e `rmdir` disponíveis no host.
 - O container MariaDB em execução com o nome `data-layer-mariadb`.
@@ -38,6 +39,8 @@ Não há migration, DDL ou DML.
 O script executa um dump consistente de todos os bancos com `mariadb-dump --single-transaction`; ele não altera tabelas nem reinicia o container. O backup local anterior somente é rotacionado depois que um novo gzip íntegro é gerado.
 
 ## Sequência de deploy
+
+Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produção.
 
 1. Verifique que o repositório está limpo e que a referência remota esperada existe:
 
