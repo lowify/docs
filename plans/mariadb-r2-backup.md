@@ -6,23 +6,14 @@ O backup continua no `data_layer/mariabd`. Não criar projeto, pasta de ferramen
 
 As únicas adições são:
 
-- reter três backups locais no script existente;
 - criar o uploader manual `data_layer/mariabd/upload_latest_backup_r2.sh`;
 - criar o arquivo de configuração separado `data_layer/mariabd/.env-upload-bkp`.
 
 O `.env` do MariaDB não deve ser alterado nem lido pelo uploader.
 
-## Retenção do backup atual
+## Backup local existente
 
-`data_layer/mariabd/backup_mariadb.sh` usa `MAX_INDEX=2`. Como a rotação começa no índice zero, mantém exatamente:
-
-```text
-bkp.0.sql.gz  # backup mais recente
-bkp.1.sql.gz
-bkp.2.sql.gz  # backup mais antigo preservado
-```
-
-O cron atual que gera o dump permanece inalterado. Não reiniciar o container MariaDB nem modificar Docker, volumes ou configuração do banco.
+O backup já é gerado pelo processo local em `/data/backup/db/` e sua retenção atual, de `bkp.0.sql.gz` até `bkp.7.sql.gz`, deve ser preservada. O cron atual que gera o dump permanece inalterado. Não reiniciar o container MariaDB nem modificar Docker, volumes ou configuração do banco.
 
 ## Ferramenta de envio R2
 
@@ -58,7 +49,7 @@ O arquivo `.env-upload-bkp` deve ficar ignorado pelo Git e com acesso restrito a
 
 ## Envio manual
 
-Após a geração de `bkp.0.sql.gz`, executar:
+Usando o `bkp.0.sql.gz` já existente em `/data/backup/db/`, executar:
 
 ```bash
 bash /caminho/do/data_layer/mariabd/upload_latest_backup_r2.sh
@@ -67,7 +58,7 @@ bash /caminho/do/data_layer/mariabd/upload_latest_backup_r2.sh
 O uploader:
 
 - carrega somente `.env-upload-bkp`;
-- lê `data_layer/mariabd/db_backups/bkp.0.sql.gz` por padrão;
+- lê `/data/backup/db/bkp.0.sql.gz` por padrão;
 - valida o gzip antes de acessar a rede;
 - envia apenas para `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 - usa `s3://${R2_BUCKET}/${R2_OBJECT_KEY}` como destino;

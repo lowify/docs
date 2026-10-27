@@ -2,9 +2,9 @@
 
 ## Objetivo
 
-Disponibilizar no `data_layer` um fluxo manual para gerar o backup compactado do MariaDB e enviá-lo ao Cloudflare R2. O envio não é agendado: cada execução depende de uma ação explícita do operador.
+Disponibilizar no `data_layer` um fluxo manual para enviar ao Cloudflare R2 o backup local já gerado pelo processo existente. O envio não é agendado: cada execução depende de uma ação explícita do operador.
 
-O escopo também limita a retenção local a três arquivos de backup (`bkp.0.sql.gz`, `bkp.1.sql.gz` e `bkp.2.sql.gz`) e mantém os arquivos gerados fora do repositório Git.
+O backup local continua em `/data/backup/db`, com sua retenção atual de oito gerações (`bkp.0.sql.gz` até `bkp.7.sql.gz`). Este deploy não gera, move, remove ou reconfigura backups locais.
 
 Não há alteração em front, edge, JWT, filas, Docker Compose, banco de dados, Redis ou cron.
 
@@ -12,20 +12,20 @@ Não há alteração em front, edge, JWT, filas, Docker Compose, banco de dados,
 
 | Repositório | Diretório de produção | Branch | Commit de referência | Entrega |
 | --- | --- | --- | --- | --- |
-| `data_layer` | `/opt/lowify/data_layer` | `main` | `17ab23851c6e8d72777d8968921b6567e2fad609` | Uploader manual para R2, configuração externa junto ao script e retenção de três backups. |
+| `data_layer` | `/opt/lowify/data_layer` | `main` | `9631ef6cb5e005748036c42ca7f6f6618bafaf5e` | Uploader manual para R2 que lê o backup existente em `/data/backup/db`. |
 
 O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência imediata.
 
 ## Alterações incluídas
 
-- `mariabd/backup_mariadb.sh` passa a gravar backups em `/var/lib/lowify/mariadb-backups` e mantém três gerações.
-- `mariabd/upload_latest_backup_r2.sh` valida o arquivo gzip e faz upload para R2 via AWS CLI, usando região `auto`.
+- `mariabd/upload_latest_backup_r2.sh` valida `/data/backup/db/bkp.0.sql.gz` e faz upload para R2 via AWS CLI, usando região `auto`.
+- `mariabd/backup_mariadb.sh` preserva o diretório e a retenção já usados pelo backup local.
 - A configuração R2 é lida exclusivamente de `/opt/lowify/data_layer/mariabd/.env-upload-bkp`; o arquivo é ignorado pelo Git.
 - `.env-upload-bkp.example` documenta somente os nomes das variáveis; não contém valores secretos.
 
 ## Pré-requisitos
 
-- Execute **todos os comandos deste roteiro como `root`** na VPS de produção. Isso é necessário para acessar `/opt/lowify/data_layer`, `/var/lib/lowify/mariadb-backups` e o Docker sem criar arquivos com proprietário ou permissões incorretos.
+- Execute **todos os comandos deste roteiro como `root`** na VPS de produção. Isso é necessário para acessar `/opt/lowify/data_layer`, `/data/backup/db` e o Docker sem criar arquivos com proprietário ou permissões incorretos.
 - Acesso administrativo à VPS de produção e ao repositório `/opt/lowify/data_layer`.
 - `aws`, `docker`, `gzip`, `mkdir` e `rmdir` disponíveis no host.
 - O container MariaDB em execução com o nome `data-layer-mariadb`.
@@ -36,7 +36,7 @@ O commit inclui `60aba3bd8fa5e3726b9ecdca65cd31b071610165` como sua dependência
 
 Não há migration, DDL ou DML.
 
-O script executa um dump consistente de todos os bancos com `mariadb-dump --single-transaction`; ele não altera tabelas nem reinicia o container. O backup local anterior somente é rotacionado depois que um novo gzip íntegro é gerado.
+O deploy não executa `mariadb-dump` nem altera o backup local existente. O uploader apenas lê e valida o gzip mais recente antes de transmiti-lo à R2.
 
 ## Sequência de deploy
 
@@ -63,7 +63,7 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 
    Preserve-os. Não use `git clean`, `stash`, `reset`, nem mova `traefik/letsencrypt/`, que pode conter certificados ativos. Caso apareça qualquer outro arquivo rastreado ou não rastreado, pare e peça orientação.
 
-   Se o único arquivo rastreado modificado for `mariabd/backup_mariadb.sh` com a mudança manual de `MAX_INDEX=7` para `MAX_INDEX=2`, descarte somente essa cópia local, pois a mesma retenção já está publicada:
+   Se o único arquivo rastreado modificado for `mariabd/backup_mariadb.sh` com a mudança manual de `MAX_INDEX=7` para `MAX_INDEX=2`, descarte somente essa cópia local para preservar a retenção atual de oito gerações:
 
    ```bash
    git restore --source=origin/main -- mariabd/backup_mariadb.sh
@@ -84,13 +84,13 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
    git rev-parse HEAD
    ```
 
-   O resultado precisa conter `17ab23851c6e8d72777d8968921b6567e2fad609` ou um descendente aprovado.
+   O resultado precisa conter `9631ef6cb5e005748036c42ca7f6f6618bafaf5e` ou um descendente aprovado.
 
-3. Confirme o diretório externo de backups já existente e suas permissões. Não crie, apague nem mova arquivos de backup nesta etapa:
+3. Confirme o diretório de backup já existente e suas permissões. Não crie, apague nem mova arquivos de backup nesta etapa:
 
    ```bash
-   test -d /var/lib/lowify/mariadb-backups
-   stat -c '%U:%G %a %n' /var/lib/lowify/mariadb-backups
+   test -d /data/backup/db
+   stat -c '%U:%G %a %n' /data/backup/db
    ```
 
    O resultado deve indicar diretório pertencente a `root` e permissão `700`. Se o diretório não existir ou tiver permissão diferente, pare e encaminhe ao responsável pela infraestrutura; não corrija permissões nem recrie backups durante este deploy.
@@ -103,13 +103,12 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
    editor /opt/lowify/data_layer/mariabd/.env-upload-bkp
    ```
 
-5. Confirme a presença dos scripts e valide o backup mais recente, já gerado pelo processo de backup existente. Não execute `backup_mariadb.sh` neste deploy:
+5. Confirme a presença do uploader e valide o backup mais recente, já gerado pelo processo de backup existente. Não execute `backup_mariadb.sh` neste deploy:
 
    ```bash
-   test -x mariabd/backup_mariadb.sh
    test -x mariabd/upload_latest_backup_r2.sh
-   test -s /var/lib/lowify/mariadb-backups/bkp.0.sql.gz
-   gzip -t /var/lib/lowify/mariadb-backups/bkp.0.sql.gz
+   test -s /data/backup/db/bkp.0.sql.gz
+   gzip -t /data/backup/db/bkp.0.sql.gz
    ```
 
 6. Envie o backup validado para R2. Não reinicie containers e não instale cron:
@@ -121,7 +120,7 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 ## Validação pós-deploy
 
 1. Peça ao operador para confirmar que os dois comandos manuais terminaram com sucesso, sem exibir credenciais.
-2. Confira que existe um arquivo recente em `/var/lib/lowify/mariadb-backups/bkp.0.sql.gz` e que a validação `gzip -t` termina sem mensagem de erro.
+2. Confira que existe um arquivo recente em `/data/backup/db/bkp.0.sql.gz` e que a validação `gzip -t` termina sem mensagem de erro.
 3. No painel Cloudflare R2, abra o bucket configurado e confirme que o objeto `mariadb/latest.sql.gz` tem data/hora compatível com a execução e tamanho maior que zero.
 4. Confirme que a aplicação permanece acessível normalmente e que o container MariaDB não foi reiniciado.
 5. Não execute restauração de banco como parte desta validação.
@@ -130,10 +129,10 @@ Todos os comandos abaixo devem ser executados na sessão `root` da VPS de produ�
 
 1. Pare de executar `mariabd/upload_latest_backup_r2.sh`; não apague o objeto já enviado ao R2 nem os backups locais existentes.
 2. Mantenha `/opt/lowify/data_layer/mariabd/.env-upload-bkp` protegido até a decisão de segurança sobre revogação das credenciais. Não o versione ou copie para o repositório.
-3. Para restaurar o código anterior, crie e publique uma reversão revisada do commit de correção de caminho, de `d6cd2d0…`, `b07254e…` e `60aba3b…` no repositório de origem; em produção, atualize `main` pelo mesmo procedimento de `git fetch`, `git switch main` e `git pull --ff-only`.
-4. Antes de voltar a gerar backups após a reversão, confirme o diretório de destino do script restaurado. Não apague `/var/lib/lowify/mariadb-backups` como parte do rollback.
+3. Para restaurar o código anterior, crie e publique uma reversão revisada do commit `9631ef6…` e dos commits do uploader no repositório de origem; em produção, atualize `main` pelo mesmo procedimento de `git fetch`, `git switch main` e `git pull --ff-only`.
+4. Não apague, mova ou regenere arquivos em `/data/backup/db` como parte do rollback.
 
 ## Referências
 
-- `data_layer` — commits `60aba3bd8fa5e3726b9ecdca65cd31b071610165` e `b07254eb8a202ba8118b13aa632f0c626b853866`.
+- `data_layer` — commit `9631ef6cb5e005748036c42ca7f6f6618bafaf5e` e seus ancestrais do uploader.
 - `docs/plans/mariadb-r2-backup.md` — intenção inicial; o comportamento efetivamente publicado pelos commits prevalece quando houver divergência de caminho.
