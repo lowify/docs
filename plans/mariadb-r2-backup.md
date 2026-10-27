@@ -36,10 +36,10 @@ Ela é separada do script de geração (`backup_mariadb.sh`) e serve somente ao 
 
 ## Configuração do R2
 
-Criar manualmente, no mesmo diretório dos scripts, o arquivo não versionado:
+Criar manualmente, na raiz operacional do repositório, o arquivo não versionado:
 
 ```text
-data_layer/mariabd/.env-upload-bkp
+/opt/lowify/data_layer/.env-upload-bkp
 ```
 
 Partir de `.env-upload-bkp.example`:
@@ -54,7 +54,7 @@ R2_OBJECT_KEY=mariadb/latest.sql.gz
 
 Em homologação, preencher esse arquivo com as credenciais R2 já usadas pelo serviço de monitoramento na VPS, sem imprimir, alterar ou reiniciar esse serviço. Em produção, preencher pelo procedimento seguro aplicável.
 
-O arquivo `.env-upload-bkp` deve ficar ignorado pelo Git e com acesso restrito ao usuário operacional.
+O arquivo `.env-upload-bkp` deve ficar ignorado pelo Git e com acesso restrito ao usuário operacional. O template versionado permanece em `data_layer/mariabd/.env-upload-bkp.example`; somente o arquivo com valores reais fica em `/opt/lowify/data_layer/`.
 
 ## Envio manual
 
