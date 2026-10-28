@@ -17,6 +17,20 @@ A implantação se limita a Cielo e-commerce e Pagar.me PSP. Ambos suportam as d
 | Pós-venda | Consulta, reembolso, conciliação e atendimento usam a referência de cobrança já adotada pelo gateway. |
 | Alternativa | Cartão digitado permanece disponível se a carteira não estiver elegível, não for suportada ou falhar antes da autorização. |
 
+## Identificação da origem da cobrança
+
+Cada cobrança de cartão conservará a classificação da origem em `charges_card.wallet_card_id`:
+
+| Valor | Origem |
+| --- | --- |
+| `NULL` | Cartão convencional; preserva todas as cobranças atuais. |
+| `1` | Apple Pay. |
+| `2` | Google Pay. |
+
+O valor é definido no servidor a partir do tipo de autorização validado para a venda. Ele não é um identificador de cartão, cliente, dispositivo ou token, e não substitui a referência da transação no gateway.
+
+A classificação permite distinguir carteiras em consulta operacional, conciliação, reembolso, suporte e eventos de webhook, sem armazenar o conteúdo da autorização.
+
 ## Capacidades por gateway
 
 | Gateway | Apple Pay | Google Pay | Preparação externa necessária |

@@ -7,6 +7,7 @@
 3. Definir credenciais de homologação e produção no gerenciador de segredos.
 4. Formalizar o contrato de capacidades e de autorização de carteira entre checkout, comércio e banking.
 5. Definir métricas e códigos de erro normalizados para Apple Pay e Google Pay.
+6. Formalizar a classificação persistida da origem: `NULL` para cartão convencional, `1` para Apple Pay e `2` para Google Pay.
 
 **Saída:** cada gateway possui ambiente de teste pronto e o checkout conhece quais carteiras pode oferecer sem expor dados privados.
 
@@ -14,10 +15,13 @@
 
 1. Publicar, junto às opções de cartão, as capacidades de carteira do gateway ativo.
 2. Estender a entrada de pagamento para distinguir autorização por cartão digitado, Apple Pay e Google Pay.
-3. Implementar a tradução de Apple Pay e Google Pay no adaptador Cielo.
-4. Implementar a tradução de Apple Pay e Google Pay no adaptador Pagar.me.
-5. Reutilizar o fluxo existente de criação de pedido, cálculo de taxa, split, cobrança, idempotência, consulta e reembolso.
-6. Validar no servidor a consistência entre a carteira solicitada, o gateway ativo e a configuração permitida.
+3. Adicionar a migration, o modelo e os repositórios necessários para `charges_card.wallet_card_id`.
+4. Atribuir a classificação somente depois da validação do tipo de autorização no Banking.
+5. Implementar a tradução de Apple Pay e Google Pay no adaptador Cielo.
+6. Implementar a tradução de Apple Pay e Google Pay no adaptador Pagar.me.
+7. Ampliar o processamento de webhooks para atualizar a cobrança já classificada, sem registrar a autorização da carteira.
+8. Reutilizar o fluxo existente de criação de pedido, cálculo de taxa, split, cobrança, idempotência, consulta e reembolso.
+9. Validar no servidor a consistência entre a carteira solicitada, o gateway ativo e a configuração permitida.
 
 **Saída:** uma autorização de carteira percorre o mesmo ciclo financeiro de uma venda por cartão, sem criar registros alternativos ou persistir material sensível.
 
@@ -27,8 +31,9 @@
 2. Validar suporte local antes de renderizar cada botão.
 3. Abrir a sessão Apple Pay por intermédio do backend e confirmar a sessão no componente oficial.
 4. Construir a requisição Google Pay com a configuração pública do gateway ativo.
-5. Enviar o resultado da carteira pelo fluxo de finalização já utilizado pelo checkout.
-6. Preservar cartão digitado e os demais meios de pagamento em todos os cenários.
+5. Estender Edge Gateway e Public API com os contratos de capacidade, autorização e sessão necessários ao checkout.
+6. Enviar o resultado da carteira pelo fluxo de finalização já utilizado pelo checkout.
+7. Preservar cartão digitado e os demais meios de pagamento em todos os cenários.
 
 **Saída:** o comprador vê apenas opções compatíveis e pode concluir a compra sem mudança na navegação posterior ao pagamento.
 
@@ -44,6 +49,8 @@
 | Cancelamento da carteira | Nenhuma cobrança ou pedido duplicado é criado. |
 | Recusa do gateway | O checkout comunica a falha sem revelar detalhes sensíveis e permite nova tentativa. |
 | Split e taxa | Os valores enviados e conciliados equivalem aos de uma venda de cartão convencional. |
+| Classificação persistida | A cobrança usa `NULL`, `1` ou `2` conforme cartão convencional, Apple Pay ou Google Pay; nenhum token é salvo. |
+| Webhook | A atualização assíncrona encontra a mesma cobrança, preserva a classificação e permanece idempotente. |
 | Observabilidade | Eventos permitem identificar gateway, carteira e resultado sem conter dados de pagamento. |
 
 ## Etapa 5 — Liberação

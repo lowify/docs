@@ -16,6 +16,8 @@ O contrato separa a intenção de pagamento do formato particular de cada proved
 
 O payload de carteira é de uso único e sensível. Ele não deve ser salvo no banco, exposto em resposta pública, registrado em observabilidade ou repetido em retentativas fora do mecanismo normal de idempotência.
 
+Ao criar a cobrança, o Banking converte `authorization_type` em `wallet_card_id`: `NULL` para cartão convencional, `1` para Apple Pay e `2` para Google Pay. A classificação é determinada internamente; uma entrada incompatível com o gateway ou com a capacidade publicada é rejeitada.
+
 ## Disponibilidade enviada ao checkout
 
 A resposta de opções de pagamento passa a informar capacidades, sem entregar credenciais privadas:
@@ -40,9 +42,20 @@ O contrato definitivo usará nomes consistentes com a API atual. Informar uma ca
 | Comércio | Define se cartão está disponível para a venda e publica as capacidades permitidas para o gateway ativo. |
 | Checkout | Carrega os SDKs oficiais, avalia compatibilidade local, apresenta o botão correto e envia a autorização sem inspecionar seus dados internos. |
 | Borda/API | Autentica e valida o formato, tamanho e origem do pedido antes de encaminhá-lo ao serviço de comércio. |
-| Comércio e Banking | Preservam o ciclo de pedido e cobrança e encaminham a autorização ao adaptador correto. |
+| Comércio e Banking | Preservam o ciclo de pedido e cobrança, atribuem a classificação da carteira e encaminham a autorização ao adaptador correto. |
 | Adaptador Cielo/Pagar.me | Traduz o payload da carteira para a API do provedor e normaliza sucesso, recusa e erro técnico. |
+| Webhooks | Reutilizam a referência da cobrança para atualizar o mesmo registro e preservam sua classificação; não recebem nem persistem o payload da carteira. |
 | Operação | Mantém habilitações, domínios, certificados, chaves e identificadores das carteiras. |
+
+## Superfícies públicas
+
+| Superfície | Responsabilidade |
+| --- | --- |
+| Checkout | Apresenta as carteiras, abre a sessão Apple Pay e envia a autorização. |
+| Edge Gateway / Public API | Expõe somente os contratos necessários ao checkout, incluindo capacidades de carteira, criação da autorização e validação de sessão Apple Pay. |
+| Banking | Registra `wallet_card_id`, executa a cobrança no gateway e recebe as atualizações assíncronas da cobrança. |
+
+Não será criado um webhook paralelo apenas para a carteira. Quando Cielo ou Pagar.me notificarem uma cobrança, o webhook existente deve reconhecer a transação e atualizar o mesmo registro. Caso o contrato de algum gateway exija uma rota adicional para carteira, ela será tratada como extensão do mesmo ciclo de cobrança, com idempotência e validação de assinatura.
 
 ## Apple Pay
 
