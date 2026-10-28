@@ -8,7 +8,7 @@
 
 Disponibilizar Apple Pay e Google Pay como formas de autorizar pagamentos por cartão no checkout, utilizando as integrações de cartão já habilitadas. A mudança amplia a etapa de pagamento; não cria uma nova modalidade comercial, novo adquirente ou fluxo de venda.
 
-O pedido, a cobrança, o split, as taxas, a conciliação, o reembolso e os controles de risco permanecem no mesmo fluxo hoje utilizado para cartão.
+O pedido, a cobrança, o split, as taxas, a conciliação, o reembolso e os controles de risco permanecem no mesmo fluxo hoje utilizado para cartão. A cobrança passa a conservar a origem da carteira para que a operação consiga acompanhá-la durante todo o seu ciclo.
 
 ## Resultado esperado
 
@@ -23,6 +23,7 @@ Quando o pagamento por cartão estiver disponível para a oferta e a conta proce
 
 - Checkout normal de produtos de pagamento único.
 - Apple Pay e Google Pay dentro da experiência de cartão.
+- Seleção independente de Apple Pay e Google Pay na edição de cada produto.
 - Cielo e-commerce e Pagar.me PSP, que já participam da disponibilidade de cartão do checkout.
 - Pagamento à vista na primeira entrega. Parcelamento por carteira poderá ser habilitado depois de homologação específica por gateway.
 
@@ -42,6 +43,9 @@ Quando o pagamento por cartão estiver disponível para a oferta e a conta proce
 ## Princípios de entrega
 
 - A disponibilidade é decidida pelo servidor; o navegador apenas filtra o que consegue apresentar.
+- Cada carteira possui uma ativação global na configuração de sistema, independente de produto, vendedor e gateway.
+- A ativação global não publica uma carteira automaticamente: cada produto precisa selecioná-la.
 - O token ou payload de carteira é transitório: não será persistido nem registrado em logs.
+- A cobrança registra somente a classificação da origem: cartão convencional, Apple Pay ou Google Pay.
 - O checkout usa os componentes oficiais das carteiras; dados de cartão não passam pela interface da Lowify.
 - Uma indisponibilidade da carteira não remove o pagamento por cartão convencional.

@@ -17,6 +17,32 @@ A implantação se limita a Cielo e-commerce e Pagar.me PSP. Ambos suportam as d
 | Pós-venda | Consulta, reembolso, conciliação e atendimento usam a referência de cobrança já adotada pelo gateway. |
 | Alternativa | Cartão digitado permanece disponível se a carteira não estiver elegível, não for suportada ou falhar antes da autorização. |
 
+## Formas de pagamento do produto
+
+Apple Pay e Google Pay entram na edição do produto como opções próprias dentro de **Formas de pagamento**. Elas são opções derivadas do cartão: o produto continua usando o mesmo fluxo financeiro de cartão, mas o vendedor decide se aceita cada carteira naquele produto.
+
+| Campo em `tbl_produtos` | Padrão | Regra |
+| --- | --- | --- |
+| `credit_card_enabled` | Existente | É o pré-requisito para as duas carteiras. |
+| `apple_pay_enabled` | `0` | Só pode permanecer habilitado se cartão estiver habilitado. |
+| `google_pay_enabled` | `0` | Só pode permanecer habilitado se cartão estiver habilitado. |
+
+Produtos existentes e novos começam com as carteiras desabilitadas. Isso torna a adesão explícita e evita oferecer uma nova forma de pagamento sem escolha do responsável pelo produto.
+
+Ao desabilitar cartão no produto, Apple Pay e Google Pay são automaticamente desabilitados. A interface não permite ativar uma carteira se cartão estiver indisponível para o vendedor ou para aquele produto.
+
+## Regra de disponibilidade
+
+Um botão de carteira só é publicado quando todas as condições abaixo forem verdadeiras:
+
+1. Cartão está habilitado para o produto e para o vendedor.
+2. A respectiva carteira está habilitada na edição do produto.
+3. A chave global da carteira está ativa em `system_vars`.
+4. O gateway selecionado e a conta processadora aceitam a carteira.
+5. O dispositivo do comprador é compatível.
+
+Assim, a chave global funciona como freio operacional e a configuração do produto define a oferta comercial. Nenhuma delas substitui a outra.
+
 ## Identificação da origem da cobrança
 
 Cada cobrança de cartão conservará a classificação da origem em `charges_card.wallet_card_id`:
@@ -42,8 +68,21 @@ A classificação permite distinguir carteiras em consulta operacional, concilia
 
 - Apple Pay aparece somente em ambiente Apple compatível, após a verificação de domínio e a sessão de comerciante exigidas pela Apple.
 - Google Pay aparece somente quando o navegador, a carteira e a configuração do merchant puderem atender ao pedido de pagamento.
-- A decisão de mostrar cada botão combina: método cartão habilitado, gateway elegível, carteira habilitada para a conta e capacidade do dispositivo.
+- A decisão de mostrar cada botão combina: método cartão habilitado, gateway elegível, ativação global da carteira, carteira habilitada para a conta e capacidade do dispositivo.
 - A primeira versão solicita pagamento à vista. Essa limitação evita declarar uma modalidade de parcelamento que ainda não tenha sido aprovada em homologação para cada combinação de gateway e carteira.
+
+## Ativação global e desativação de emergência
+
+As carteiras terão chaves próprias na tabela `system_vars`:
+
+| Chave | Valor | Efeito |
+| --- | --- | --- |
+| `checkout_apple_pay_enabled` | `0` ou `1` | Controla Apple Pay para todos os checkouts. |
+| `checkout_google_pay_enabled` | `0` ou `1` | Controla Google Pay para todos os checkouts. |
+
+As chaves começam desabilitadas e são avaliadas pelo servidor ao publicar as opções de pagamento. Chave ausente, inválida ou desabilitada equivale a não oferecer a carteira.
+
+Esse controle é global: não depende de produto, vendedor nem gateway. Se houver incidente com certificado, domínio, SDK ou configuração de uma carteira, a operação desativa apenas a chave correspondente; nas próximas respostas de checkout o botão deixa de ser oferecido, preservando cartão digitado e os demais meios.
 
 ## Requisitos operacionais
 
@@ -54,6 +93,7 @@ Antes da produção, a operação deverá:
 3. Concluir o cadastro, a aprovação e a configuração de produção no Google Pay & Wallet Console, incluindo domínio e perfil comercial quando aplicável.
 4. Disponibilizar as chaves, identificadores e credenciais exclusivamente na camada de servidor ou no cofre de segredos apropriado.
 5. Homologar uma transação de cada carteira para cada gateway antes de liberar tráfego.
+6. Habilitar a chave global correspondente somente após a homologação e manter procedimento operacional para desabilitá-la em incidente.
 
 Essas providências são etapas de ativação e configuração da entrega; não constituem restrições arquiteturais para a implementação.
 

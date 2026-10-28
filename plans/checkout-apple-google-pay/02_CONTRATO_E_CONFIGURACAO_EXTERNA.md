@@ -35,17 +35,37 @@ A resposta de opções de pagamento passa a informar capacidades, sem entregar c
 
 O contrato definitivo usará nomes consistentes com a API atual. Informar uma carteira como habilitada significa que a conta e o gateway podem recebê-la; o cliente ainda deve confirmar suporte no dispositivo antes de exibir o botão.
 
+## Edição do produto
+
+A API de criação, leitura e atualização de produto passa a aceitar e devolver `apple_pay_enabled` e `google_pay_enabled`. O Dashboard Seller os apresenta como novas formas de pagamento, junto de Pix e cartão de crédito.
+
+As duas opções são dependentes de `credit_card_enabled`:
+
+- ao habilitar uma carteira, a API exige cartão habilitado;
+- ao desabilitar cartão, a API normaliza as duas carteiras para `0`;
+- se a integração de cartão do vendedor não estiver disponível, os controles permanecem indisponíveis;
+- a resposta do formulário informa o estado salvo e a elegibilidade necessária para renderizar os controles corretamente.
+
+A atualização não confia somente na interface. A validação é repetida no normalizador do Dashboard Seller, nas requisições da API de Comércio e no caso de uso que calcula as formas disponíveis no checkout.
+
+## Controle global
+
+O Comércio consulta as chaves `checkout_apple_pay_enabled` e `checkout_google_pay_enabled` em `system_vars` antes de publicar uma capacidade de carteira. A ausência, valor inválido ou `0` deve resultar em `enabled: false`, ainda que o produto tenha selecionado a carteira.
+
+O controle não é enviado como credencial nem aceito como decisão do cliente. Ele é aplicado antes de iniciar Apple Pay, Google Pay ou criar a cobrança, para que uma mudança operacional remova a carteira do checkout e também rejeite uma tentativa tardia.
+
 ## Responsabilidades
 
 | Camada | Responsabilidade |
 | --- | --- |
-| Comércio | Define se cartão está disponível para a venda e publica as capacidades permitidas para o gateway ativo. |
-| Checkout | Carrega os SDKs oficiais, avalia compatibilidade local, apresenta o botão correto e envia a autorização sem inspecionar seus dados internos. |
+| Dashboard Seller | Permite selecionar Pix, cartão, Apple Pay e Google Pay; aplica a dependência visual de carteira em relação ao cartão. |
+| Comércio | Valida e persiste a seleção do produto, aplica a ativação global e publica as capacidades permitidas para o gateway ativo. |
+| Checkout | Carrega os SDKs oficiais, avalia compatibilidade local, apresenta somente a carteira selecionada e envia a autorização sem inspecionar seus dados internos. |
 | Borda/API | Autentica e valida o formato, tamanho e origem do pedido antes de encaminhá-lo ao serviço de comércio. |
 | Comércio e Banking | Preservam o ciclo de pedido e cobrança, atribuem a classificação da carteira e encaminham a autorização ao adaptador correto. |
 | Adaptador Cielo/Pagar.me | Traduz o payload da carteira para a API do provedor e normaliza sucesso, recusa e erro técnico. |
 | Webhooks | Reutilizam a referência da cobrança para atualizar o mesmo registro e preservam sua classificação; não recebem nem persistem o payload da carteira. |
-| Operação | Mantém habilitações, domínios, certificados, chaves e identificadores das carteiras. |
+| Operação | Mantém habilitações, domínios, certificados, chaves, identificadores e ativações globais das carteiras. |
 
 ## Superfícies públicas
 
