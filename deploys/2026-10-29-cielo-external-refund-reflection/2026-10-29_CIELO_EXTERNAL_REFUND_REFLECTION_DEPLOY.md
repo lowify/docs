@@ -10,8 +10,8 @@ O fluxo publicado é:
 Cielo -> edge-webhook -> banking-v2:refunds:actions
 -> Banking V2 consulta a Cielo e confirma o refund
 -> commerce:refunds:actions
--> Dashboard Seller cria/confirma sales_refund e extrato
--> sales:events:refunded -> Commerce V2
+-> Commerce V2 cria/confirma sales_refund
+-> sales:events:refunded -> efeitos Commerce V2 e Wallet
 ```
 
 Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retorna `Payment.Status: 2` não altera cobrança, refund, extrato ou venda.
@@ -21,16 +21,16 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 | Repositório | Diretório na VPS | Branch de deploy | Commit | Papel nesta entrega |
 | --- | --- | --- | --- | --- |
 | `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Cria ou confirma `sales_refund`, lança extrato e só então publica o evento final. |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
 `edge-webhook` e `services-commerce-v2` já executam as etapas existentes do fluxo e não recebem código nesta entrega.
 
 ## Alterações incluídas
 
 - O Banking V2 localiza uma cobrança Cielo por `PaymentId`, valida provider, resolve a venda por `PaymentId` com fallback para `order_id`, cria ou conclui `refunds_charge`, cria/aprova as alocações e registra a mudança da cobrança para `refunded`.
 - Para refund externo confirmado, o Banking não publica diretamente `sales:events:refunded`; ele publica `cielo_external_refund_confirmed` em `commerce:refunds:actions` depois da transação bancária.
-- O Dashboard Seller usa `banking_refund_id` para localizar o refund local. Quando não existir, cria `sales_refund` para a venda, aprova-o e grava extrato de refund antes de publicar `sales:events:refunded`.
+- O Commerce V2 usa `banking_refund_id` para localizar ou criar o refund local, confirma-o em transação e só então publica `sales:events:refunded`. O extrato é responsabilidade do fluxo Wallet já consumido pelo Commerce V2.
 - Reenvios após aprovação não repetem refund, extrato ou evento final.
-- O Banking bloqueia a linha de `charges_card` do `PaymentId` durante a transação. Reentregas concorrentes do mesmo refund Cielo são serializadas, sem alterar dados legados de outros providers. O SQL Lowify adiciona a unicidade de `sales_refund(banking_refund_id)`.
+- O Banking bloqueia a linha de `charges_card` do `PaymentId` durante a transação. Reentregas concorrentes do mesmo refund Cielo são serializadas, sem alterar dados legados de outros providers. A migration do Commerce V2 adiciona a unicidade de `sales_refund(banking_refund_id)`.
 
 ## Arquivos alterados
 
@@ -41,9 +41,14 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 - `app/Domain/ChargeCard/Repository/ChargeCardRepository.php`
 - `app/Infrastructure/Services/CommerceRefundActionPublisher.php`
 
-### `dashboard-seller`
+### `service-commerce-v2`
 
-- `scripts/queues/commerce_refunds_actions_worker.php`
+- `app/Application/Service/Queue/SaleRefundedEventPublisher.php`
+- `app/Application/UseCase/Sale/ReflectExternalCieloRefundUseCase.php`
+- `app/Process/RefundActionsProcess.php`
+- `config/autoload/processes.php`
+- `config/autoload/refund_actions.php`
+- `migrations/20261029190000_add_sales_refund_banking_refund_unique_index.php`
 
 ### Documentação de deploy
 
@@ -52,28 +57,28 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 - `docs/deploys/2026-10-29-cielo-external-refund-reflection/sql/lowify/DEPLOY.sql`
 - `docs/deploys/2026-10-29-cielo-external-refund-reflection/sql/lowify/VALIDATE.sql`
 
-Não há arquivo alterado em `edge-webhook` nem em `services-commerce-v2` nesta feature.
+Não há arquivo alterado em `edge-webhook` nem em `dashboard-seller` nesta feature.
 
 ## Alteração de banco nova
 
-Executar o [precheck Lowify](sql/lowify/PRECHECK.sql). Ele deve retornar zero duplicidades e ausência do índice antes de executar o `ALTER TABLE`. Se o índice já existir, não executar o SQL novamente.
+Executar o [precheck Lowify](sql/lowify/PRECHECK.sql). Ele deve retornar zero duplicidades antes de executar a migration do Commerce V2.
 
 ## Banco de dados
 
 | Banco | Aplicação | Precheck | Validação |
 | --- | --- | --- | --- |
 | `services-banking` | Não há alteração de schema | — | — |
-| `lowify` | [DEPLOY.sql](sql/lowify/DEPLOY.sql) | [PRECHECK.sql](sql/lowify/PRECHECK.sql) | [VALIDATE.sql](sql/lowify/VALIDATE.sql) |
+| `lowify` | migration do Commerce V2 | [PRECHECK.sql](sql/lowify/PRECHECK.sql) | [VALIDATE.sql](sql/lowify/VALIDATE.sql) |
 
 O índice Lowify é aditivo e não deve ser removido no rollback.
 
 ## Sequência de deploy
 
-Atualizar o Dashboard antes de iniciar o Banking, para que a nova ação intermediária seja consumida pelo worker que cria `sales_refund` externo.
+Atualizar o Commerce V2 antes de iniciar o Banking, para que a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
 
 ### 1. Atualizar os dois componentes novos
 
-No Banking e no Dashboard:
+No Banking e no Commerce V2:
 
 ```bash
 git fetch origin --prune
@@ -82,23 +87,22 @@ git pull --ff-only origin feat/cielo-external-refund-reflection
 git rev-parse --short HEAD
 ```
 
-### 2. Aplicar o índice Lowify
+### 2. Aplicar a migration do Commerce V2
 
-Aplicar uma única vez o [SQL Lowify](sql/lowify/DEPLOY.sql) no schema `lowify`, somente se o precheck houver confirmado que o índice ainda não existe. Em seguida, executar o [VALIDATE.sql](sql/lowify/VALIDATE.sql).
+Executar a migration `20261029190000_add_sales_refund_banking_refund_unique_index.php` no Commerce V2, somente se o precheck houver confirmado que não há duplicidades. Em seguida, executar o [VALIDATE.sql](sql/lowify/VALIDATE.sql).
 
-### 3. Reiniciar o worker novo do Dashboard Seller
+### 3. Publicar o Commerce V2
 
-O Dashboard deve estar atualizado antes do Banking começar a publicar `commerce:refunds:actions` externas.
+O Commerce V2 deve estar atualizado antes do Banking começar a publicar `commerce:refunds:actions` externas.
 
 ```bash
-cd /opt/lowify/front/dashboard-seller
-docker compose up -d front-dashboard-seller-commerce-refunds-actions-worker
-docker compose restart front-dashboard-seller-commerce-refunds-actions-worker
+cd /opt/lowify/services/service-commerce-v2
+docker compose up -d --build service-commerce-v2
 docker compose ps
-docker compose logs --tail=100 front-dashboard-seller-commerce-refunds-actions-worker
+docker compose logs --tail=100 service-commerce-v2
 ```
 
-Confirmar que o worker iniciou e não há erro de arquivo, conexão de banco ou Redis.
+Confirmar que `commerce_refund_actions_queue` iniciou e não há erro de banco ou Redis.
 
 ### 4. Publicar o Banking V2
 
@@ -118,15 +122,15 @@ Usar somente uma venda de homologação conhecida e registrar `PaymentId`, `sale
 1. Fazer refund total no Portal Cielo e aguardar `ChangeType: 25`.
 2. Confirmar em `services-webhook.webhook_raws` que o webhook foi persistido e que a ação alcançou `banking-v2:refunds:actions`.
 3. Confirmar que o Banking consultou a Cielo e, para status `10` ou `11`, criou ou concluiu exatamente um `refunds_charge`, criou/aprovou o plano de alocações, atualizou `charges_card.status` para `refunded` e gravou um evento de cobrança com origem `webhook`.
-4. Confirmar que há exatamente uma instrução `cielo_external_refund_confirmed` em `commerce:refunds:actions` e que o Dashboard criou/atualizou exatamente um `sales_refund` aprovado com o mesmo `banking_refund_id`.
+4. Confirmar que há exatamente uma instrução `cielo_external_refund_confirmed` em `commerce:refunds:actions` e que o Commerce V2 criou/atualizou exatamente um `sales_refund` aprovado com o mesmo `banking_refund_id`.
 5. Confirmar um único lançamento de extrato tipo `12` e, quando aplicável, um lançamento de taxa tipo `13`; então confirmar que `sales:events:refunded` foi publicado e o Commerce V2 consumiu seus efeitos normais.
 6. Reenviar o mesmo callback Cielo duas vezes. Não pode haver duplicação em `refunds_charge`, alocações, evento da cobrança, `sales_refund`, extrato, evento final ou efeitos do Commerce.
 7. Fazer um cenário controlado em que a consulta responda status `2` após `ChangeType: 25`. A cobrança deve continuar paga e não pode existir novo refund, extrato ou evento de venda.
-8. Verificar logs do Banking e do worker de refunds do Dashboard; registrar erro de conciliação, venda ausente, provider incompatível ou falha de fila.
+8. Verificar logs do Banking e de `commerce_refund_actions_queue`; registrar erro de conciliação, venda ausente, provider incompatível ou falha de fila.
 
 ## Rollback
 
-1. Retornar o Banking e o worker de refunds do Dashboard às revisões anteriores aprovadas, reconstruindo/reiniciando somente os containers atualizados.
+1. Retornar Banking e Commerce V2 às revisões anteriores aprovadas, reconstruindo/reiniciando somente os containers atualizados.
 2. Não remover o índice Lowify e não apagar dados financeiros ou mensagens de fila. O rollback só restaura o código.
 
 ## Fora de escopo
