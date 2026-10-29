@@ -10,19 +10,21 @@ Fora do escopo: cartão RisePay, Woovi e Kiwify; split; onboarding e regras do c
 
 ## Componentes e referências
 
-| Repositório | Diretório de produção | Branch | Commit de deploy | Papel |
-| --- | --- | --- | --- | --- |
-| `services-checkout-transparent-api` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `feat/checkout-transparent-card` | `e6e2e87` | Contrato de charge/tentativa, schema CT, idempotência, confirmação, erros sanitizados e processos de expiração. |
-| `services-checkout-transparent-worker` | `/opt/lowify-ct/services/services-checkout-transparent-worker` | `feat/checkout-transparent-card` | `408a41a` | Cria e consulta pagamentos Mercado Pago, Pagar.me e Efí; reconcilia timeout/5xx Efí por `custom_id`. |
-| `edge-checkout-transparent-webhook` | `/opt/lowify-ct-webhook/edge-checkout-transparent-webhook/edge/edge-checkout-transparent-webhook` | `feat/checkout-transparent-card` | `e80026c` | Recebe eventos dos provedores e solicita a consulta/normalização da charge. |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/checkout-transparent-card` | `ca837fa` | Cria venda pendente transparente, recebe a confirmação e preserva o fluxo convencional de cartão/recorrência. |
-| `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/checkout-transparent-card` | `178555b` | Recebe a confirmação autenticada do CT e a encaminha ao Commerce. |
-| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/checkout-transparent-card` | `01a75ed` | Expõe disponibilidade, cria venda/charge/tentativa e encaminha consulta de erros autenticada. |
-| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/checkout-transparent-card` | `d375dc2` | Roteia os contratos CT entre Dashboard, Public API e CT API. |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/checkout-transparent-card` | `55e99cd` | Tokeniza no navegador e envia somente token transitório, endereço e dados permitidos. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-transparent-card` | `1cea1e46` | Configura cartão por método de integração e apresenta erros sanitizados. |
+| Repositório | Host | Diretório de produção | Branch | Commit de deploy | Papel |
+| --- | --- | --- | --- | --- | --- |
+| `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `feat/checkout-transparent-card` | `e6e2e87` | Contrato de charge/tentativa, schema CT, idempotência, confirmação, erros sanitizados e processos de expiração. |
+| `services-checkout-transparent-worker` | `80.190.72.241` | `/opt/lowify-ct/services/services-checkout-transparent-worker` | `feat/checkout-transparent-card` | `408a41a` | Cria e consulta pagamentos Mercado Pago, Pagar.me e Efí; reconcilia timeout/5xx Efí por `custom_id`. |
+| `edge-checkout-transparent-webhook` | `80.190.72.228` | `/opt/lowify-ct-webhook/edge-checkout-transparent-webhook/edge/edge-checkout-transparent-webhook` | `feat/checkout-transparent-card` | `e80026c` | Recebe eventos dos provedores e solicita a consulta/normalização da charge. |
+| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/checkout-transparent-card` | `ca837fa` | Cria venda pendente transparente, recebe a confirmação e preserva o fluxo convencional de cartão/recorrência. |
+| `edge-webhook` | `144.126.149.57` | `/opt/lowify/edge/edge-webhook` | `feat/checkout-transparent-card` | `178555b` | Recebe a confirmação autenticada do CT e a encaminha ao Commerce. |
+| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/checkout-transparent-card` | `01a75ed` | Expõe disponibilidade, cria venda/charge/tentativa e encaminha consulta de erros autenticada. |
+| `edge-gateway` | `144.126.149.57` | `/opt/lowify/edge/edge-gateway` | `feat/checkout-transparent-card` | `d375dc2` | Roteia os contratos CT entre Dashboard, Public API e CT API. |
+| `front-checkout` | `144.126.149.57` | `/opt/lowify/front/front-checkout` | `feat/checkout-transparent-card` | `55e99cd` | Tokeniza no navegador e envia somente token transitório, endereço e dados permitidos. |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-transparent-card` | `1cea1e46` | Configura cartão por método de integração e apresenta erros sanitizados. |
 
 `services-banking-v2` não é um componente de código desta publicação. Ele é referência do contrato de provedores e continua atendendo apenas o checkout convencional. Não trocar sua branch nem reiniciá-lo por causa desta feature.
+
+`services-checkout-transparent-billing` permanece em `80.190.72.228`, mas não tem alteração nesta entrega e não recebe troca de branch, rebuild ou migration.
 
 ## Alterações incluídas
 
@@ -83,7 +85,7 @@ Esta branch não adiciona migration nova em `services-banking-v2` nem em `servic
 
 Modo de rebuild: incremental, com rebuild obrigatório para cada componente empacotado que tiver a revisão atualizada. Em cada etapa, confirme o commit mínimo com `git merge-base --is-ancestor <commit> HEAD`; se o comando falhar, pare. Os comandos abaixo não descartam alterações locais.
 
-### 1. CT Worker
+### 1. CT Worker — `80.190.72.241`
 
 Publicar o consumidor antes de permitir que a API publique as novas instruções de cartão.
 
@@ -100,7 +102,7 @@ docker compose ps
 docker compose logs --tail=100 app
 ```
 
-### 2. CT API e migrations
+### 2. CT API e migrations — `80.190.72.228`
 
 ```bash
 cd /opt/lowify-ct/services/services-checkout-transparent-api
@@ -120,7 +122,7 @@ docker compose logs --tail=100 app
 
 Confirmar nos logs o início sem erro do processo `stale_card_attempt_expiration`. Não executar o comando de expiração manual como rotina de deploy: ele é somente recuperação de incidente, quando houver tentativas antigas a tratar.
 
-### 3. Commerce V2
+### 3. Commerce V2 — `144.126.149.57`
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
@@ -135,7 +137,7 @@ docker compose ps
 docker compose logs --tail=100
 ```
 
-### 4. Edges e webhook CT
+### 4. Edges e webhook CT — `80.190.72.228` e `144.126.149.57`
 
 ```bash
 cd /opt/lowify-ct-webhook/edge-checkout-transparent-webhook/edge/edge-checkout-transparent-webhook
@@ -179,7 +181,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-### 5. Front Checkout e Dashboard
+### 5. Front Checkout e Dashboard — `144.126.149.57`
 
 ```bash
 cd /opt/lowify/front/front-checkout
