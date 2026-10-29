@@ -13,13 +13,12 @@ Os commits abaixo foram registrados no ambiente de desenvolvimento em 20/10/2026
 | Repositório | Diretório na VPS | Branch de deploy | Commit observado | Entrega |
 | --- | --- | --- | --- | --- |
 | `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-split-card-recurring` | `e97093b` | Criação/cancelamento/reconciliação da série Cielo, consulta por `PaymentId`, Split pós-transacional, persistência de estado e publicação da ação exclusiva. |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-split-card-recurring` | `cec9650` | Elegibilidade de cartão recorrente, validação de `1x`, consumidor confiável da fila Cielo, eventos duráveis e efeitos idempotentes da venda. |
+| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-split-card-recurring` | `8656388` | Elegibilidade de cartão recorrente, validação de `1x`, consumidor confiável da fila Cielo, eventos duráveis e efeitos idempotentes da venda. |
 | `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-split-card-recurring` | `d55f2d7` | Aceita `ChangeType: 2`, preserva `PaymentId`/`RecurrentPaymentId` e encaminha o evento ao Banking. |
-| `services-account` | `/opt/lowify/services/services-account` | `feat/cielo-split-card-recurring` | `72750c9` | Deduplicação de notificações por chave de idempotência. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/cielo-split-card-recurring` | `ee105bed` | Controle triestado por seller e configuração de produto de assinatura com cartão somente em `1x`. |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/cielo-split-card-recurring` | `fc22c16` | Atualização da revisão alinhada à branch; não há commit específico desta feature neste repositório. |
+| `services-account` | `/opt/lowify/services/services-account` | `feat/cielo-split-card-recurring` | `d7349e2` | Deduplicação de notificações por chave de idempotência. |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/cielo-split-card-recurring` | `9dc92a5` | Controle triestado por seller e configuração de produto de assinatura com cartão somente em `1x`. |
 
-`edge-gateway` e `edge-public-api` não recebem commit nesta feature; o contrato necessário já percorre os componentes existentes. Não incluí-los neste corte evita publicar revisões sem relação com a recorrência Cielo.
+No corte inicial de recorrência, `edge-gateway` e `edge-public-api` não recebiam mudanças. O complemento de suporte operacional descrito abaixo passa a exigir a publicação compatível desses dois componentes antes do Dashboard.
 
 ## Alterações incluídas
 
@@ -45,7 +44,7 @@ Não habilitar Cartão Protegido, 3DS ou gerar novas credenciais apenas por caus
 
 1. Executar a configuração do portal Cielo acima. Um retorno `313` na criação indica que a Recorrência Programada ainda não foi habilitada.
 2. Homologar com credenciais reais da Cielo uma série completa: criação, primeira cobrança, próxima cobrança, callback `ChangeType: 2`, consulta, Split, venda, entrega, cancelamento e refund de uma parcela. O teste local de 20/10 usou mock e reconciliação; ele não substitui o callback real.
-3. Confirmar que os seis diretórios da tabela estão limpos e que suas branches e commits aprovados já foram enviados ao remoto. Se `git status --porcelain=v1` retornar linhas, parar antes de `git switch`.
+3. Confirmar que os cinco diretórios da tabela estão limpos e que suas branches e commits aprovados já foram enviados ao remoto. Se `git status --porcelain=v1` retornar linhas, parar antes de `git switch`.
 4. Confirmar MariaDB e Redis saudáveis. Não limpar, consumir manualmente, mover ou reprocessar mensagens Redis durante o deploy.
 5. Preservar os segredos já existentes, sem registrar valores no runbook: `CIELO_ECOMMERCE_MERCHANT_ID`, `CIELO_ECOMMERCE_MERCHANT_KEY`, `CIELO_ECOMMERCE_SPLIT_MERCHANT_ID`, `CIELO_ECOMMERCE_SPLIT_CLIENT_SECRET` e `CIELO_ECOMMERCE_WEBHOOK_SECRET`.
 6. Antes de subir o Commerce V2, definir ou preservar `CIELO_SUBSCRIPTION_ACTIONS_PROCESS_ENABLED=false`. A fila é `commerce:cielo:subscriptions:actions` por padrão e pode ser explicitamente fixada por `CIELO_SUBSCRIPTION_ACTIONS_QUEUE` nos dois serviços.
@@ -134,7 +133,7 @@ docker compose logs --tail=100 edge-webhook
 
 Confirmar que a autenticação existente do webhook Cielo continua ativa. O payload e os logs não podem expor PAN, CVV, tokens, segredo ou Bearer token.
 
-### 5. Atualizar `dashboard-seller` e `front-checkout`
+### 5. Atualizar `dashboard-seller`
 
 ```bash
 cd /opt/lowify/front/dashboard-seller
@@ -143,16 +142,6 @@ git fetch origin --prune
 git switch feat/cielo-split-card-recurring
 git pull --ff-only origin feat/cielo-split-card-recurring
 git rev-parse --short HEAD
-
-cd /opt/lowify/front/front-checkout
-git status --porcelain=v1
-git fetch origin --prune
-git switch feat/cielo-split-card-recurring
-git pull --ff-only origin feat/cielo-split-card-recurring
-git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100
 ```
 
 Não liberar o cartão no Dashboard neste ponto. A ausência da linha em `user_system_vars` é o estado padrão negado.
@@ -183,12 +172,23 @@ Não liberar o cartão no Dashboard neste ponto. A ausência da linha em `user_s
 - Usar `RecurrentPaymentId`, `PaymentId`, `subscription_id`, `sale_id`, número da parcela e `event_id` como chaves de investigação. Nunca usar ou registrar dados de cartão, CVV, tokens ou segredos.
 - Antes de ampliar a liberação, conciliar valor pago, Split e saldo/repasse do seller para cada cobrança do piloto.
 
+## Complemento — suporte aos erros de integração
+
+Foi adicionada ao painel administrativo do Checkout Transparente uma consulta de erros de integração por seller. Ela é destinada ao suporte investigar falhas reportadas pelo vendedor, sem exigir acesso direto ao banco ou aos logs dos serviços.
+
+1. A página administrativa exibe inicialmente os 20 erros mais recentes e oferece **Carregar mais** para consultar o histórico progressivamente.
+2. Cada linha identifica a integração, a origem, o momento e um resumo legível. O detalhe abre os dados técnicos sanitizados do registro.
+3. Dashboard, `edge-public-api` e `edge-gateway` fazem a consulta autenticada até a API do Checkout Transparente; a API mantém o escopo do seller e da integração.
+4. PAN, CVV, token, segredo e credenciais não podem ser apresentados; os dados exibidos usam a sanitização já aplicada ao log de integração.
+
+Para publicar esse complemento, subir primeiro `edge-public-api` e `edge-gateway`, e depois `dashboard-seller`. Não depende de habilitar cartão recorrente, nem altera o fluxo financeiro ou as filas da Cielo.
+
 ## Rollback
 
 1. Primeiro remover a liberação do seller piloto no Dashboard, escolhendo `Não configurado` ou `Bloqueado`. Isso pausa novas adesões sem cancelar séries já existentes.
 2. Manter Banking V2, Commerce V2, webhook e o consumidor Cielo na revisão compatível enquanto houver `PaymentId`, Split, evento durável, retry ou mensagem pendente. O Commerce V2 é o último componente interno que pode ser revertido, após concluir ou isolar todas as ações.
 3. Se necessário, desligar `CIELO_SUBSCRIPTION_ACTIONS_PROCESS_ENABLED` e reconstruir somente o Commerce V2; preservar a fila, DLQ e eventos para análise e recuperação.
-4. Depois de drenar/registrar as pendências, retornar o código na ordem inversa: `front-checkout`, `dashboard-seller`, `edge-webhook`, `services-commerce-v2`, `services-banking-v2`, `services-account`.
+4. Depois de drenar/registrar as pendências, retornar o código na ordem inversa: `dashboard-seller`, `edge-webhook`, `services-commerce-v2`, `services-banking-v2`, `services-account`.
 5. Não executar `down`, não apagar migrations, assinaturas, parcelas, `RecurrentPaymentId`, `PaymentId`, estado/evidência de Split, vendas, eventos, steps, logs, mensagens ou DLQ. Nenhuma compensação financeira automática faz parte do rollback.
 6. Antes de qualquer nova liberação, reconciliar cada série e cobrança pendente com a Cielo e registrar a causa da reversão.
 
