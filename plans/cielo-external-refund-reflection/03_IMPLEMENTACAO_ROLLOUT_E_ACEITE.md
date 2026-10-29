@@ -1,0 +1,61 @@
+# Implementação, rollout e aceite
+
+## Etapa 1 — Contratos e proteção de dados
+
+1. Registrar a URL de notificação no portal Cielo para a integração correta, com HTTPS, headers de autenticação e evento de cancelamento selecionado.
+2. Confirmar em homologação a entrega de `ChangeType 25` e a consulta por `PaymentId`.
+3. Definir a chave idempotente `provider + PaymentId + sale_id` e a garantia correspondente em `refunds_charge` e `sales_refund`.
+4. Definir o tratamento explícito de status 10, 11, 2 e não finais.
+5. Garantir que dados da consulta e do webhook sejam sanitizados em logs e filas.
+
+**Saída:** contrato Cielo validado e regras inequívocas para não confundir estorno total com cancelamento parcial.
+
+## Etapa 2 — Edge e Banking V2
+
+1. Reutilizar o endpoint Cielo, a persistência de webhook bruto e a rota de `ChangeType 25` já existentes.
+2. Manter a consulta Cielo como verificação obrigatória antes de qualquer mutação.
+3. Estender o tratador Cielo para resolver cobrança e venda quando não houver refund pendente iniciado pela Lowify.
+4. Criar ou concluir `refunds_charge` de forma idempotente.
+5. Criar e aprovar o plano de alocação de parcelas para o valor confirmado.
+6. Atualizar `charges_card` e registrar `charge_card_events` apenas quando a baixa total estiver concluída.
+7. Publicar `sales:events:refunded` somente depois de persistir o refund aprovado.
+8. Classificar reembolso parcial como não suportado nesta entrega, sem publicar evento de venda reembolsada.
+
+**Saída:** um refund total externo Cielo deixa Banking V2 no mesmo estado financeiro de um refund aprovado iniciado pela Lowify.
+
+## Etapa 3 — Commerce V2
+
+1. Tornar o consumo de `sales:events:refunded` idempotente por `banking_refund_id`.
+2. Atualizar `sales_refund` pendente quando o refund já tiver sido solicitado pela Lowify.
+3. Criar `sales_refund` aprovado quando o Banking sinalizar um refund externo ainda não conhecido pelo Commerce.
+4. Executar extrato, afiliados, recompensas e integrações somente após o upsert aprovado.
+5. Manter a venda e os relatórios coerentes com a existência de reembolso aprovado.
+
+**Saída:** a visão Lowify reflete o reembolso externo sem registros duplicados ou efeitos comerciais antes da confirmação financeira.
+
+## Homologação
+
+| Cenário | Critério de aceite |
+| --- | --- |
+| Estorno total externo | `ChangeType 25` seguido de status 10 ou 11 cria/conclui `refunds_charge`, baixa alocações, atualiza cobrança e cria/aprova `sales_refund`. |
+| Refund solicitado pela Lowify | O mesmo webhook conclui os registros pendentes existentes, sem criar segunda linha. |
+| Duplicidade Cielo | Reenvios do mesmo webhook não duplicam refund, evento de cobrança, alocação, `sales_refund`, extrato ou integrações. |
+| Duplicidade legada | A migration de unicidade é aplicada somente após auditar registros legados e preservar a capacidade de consulta. |
+| Consulta indisponível | Nenhuma alteração financeira ou comercial é confirmada; a mensagem é reprocessável e observável. |
+| Cobrança sem venda | Nenhuma venda é alterada; há diagnóstico com `PaymentId`. |
+| Provider incompatível | Nenhuma tabela é alterada. |
+| Valor incompatível | Nenhuma baixa ou evento comercial é publicado até conciliação segura. |
+| Cancelamento parcial | Status 2 após `ChangeType 25` não muda `charges_card` para `refunded` e não dispara `sale:refunded`. |
+| Efeitos comerciais | Após refund aprovado, `sales_refund` existe antes de extrato, afiliados, recompensas e integrações. |
+
+## Liberação
+
+1. Validar endpoint e headers no sandbox Cielo.
+2. Executar transação de cartão paga e estorno total diretamente no ambiente de homologação Cielo.
+3. Conferir banco, filas e efeitos Commerce para uma única execução e para reenvio.
+4. Habilitar o evento de cancelamento na URL de produção da Cielo.
+5. Acompanhar os primeiros refunds com painel de filas, erros de consulta, divergência de valor e duplicidade.
+
+## Reversão
+
+Em incidente, desabilitar temporariamente o consumo da instrução Cielo de refund ou a seleção do evento no portal, preservando o webhook bruto para reprocessamento. Não apagar mensagens, refunds ou eventos já gravados. A retomada deve reprocessar somente mensagens ainda sem confirmação financeira/comercial.
