@@ -12,8 +12,8 @@ A entrega cobre o estorno total de uma cobrança de cartão Cielo associada a um
 | --- | --- |
 | Cielo | Informa `PaymentId` e `ChangeType 25`; a consulta posterior informa o estado real da cobrança. |
 | Edge Webhook | Persiste o webhook bruto, aplica a deduplicação de entrega e envia a instrução para a fila de refunds do Banking V2. |
-| Banking V2 | Consulta a Cielo, resolve a venda, registra ou conclui o refund, atualiza a cobrança e publica o evento `refunded`. |
-| Commerce V2 | Cria ou atualiza `sales_refund` e executa os efeitos existentes de `sale:refunded`. |
+| Banking V2 | Consulta a Cielo, resolve a venda, registra ou conclui o refund e atualiza a cobrança. Depois publica uma instrução para a Lowify. |
+| Lowify | Consome a fila intermediária, cria ou atualiza `sales_refund` na própria base e só após o commit publica `sale:refunded`. |
 
 ## Estados Cielo aceitos
 
@@ -36,13 +36,15 @@ A Cielo usa o mesmo `ChangeType 25` para cancelamento e estorno parcial. Em Spli
 
 Esta entrega considera total somente os estados finais 10 e 11. A implementação deve registrar métrica para notificação parcial ignorada e manter evidência suficiente para uma entrega futura de reembolso parcial, que precisará de chave própria da operação e valor acumulado.
 
-## Idempotência
+## Fila intermediária e idempotência
 
-A Cielo pode reenviar notificações e o Edge pode reprocessar uma mensagem. A unidade de idempotência do reembolso total é:
+A Cielo pode reenviar notificações e o Edge pode reprocessar uma mensagem. O Banking não publica diretamente em `sales:events:refunded`. Ele envia uma instrução para `commerce:refunds:actions`, que é consumida no ambiente Lowify.
+
+A unidade de idempotência do reembolso total é:
 
 `cielo_ecommerce + PaymentId + sale_id`.
 
-Uma repetição não pode criar novos registros de refund, repetir a baixa de alocações, atualizar novamente a cobrança, duplicar `sales_refund` nem reenviar efeitos de `sale:refunded`.
+O consumidor Lowify persiste `sales_refund` em transação e somente depois publica `sale:refunded`. Uma repetição não pode criar novos registros de refund, repetir a baixa de alocações, duplicar `sales_refund` nem reenviar efeitos de venda.
 
 ## Referências externas
 

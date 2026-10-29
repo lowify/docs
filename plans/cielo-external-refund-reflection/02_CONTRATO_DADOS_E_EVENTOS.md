@@ -49,13 +49,13 @@ As garantias devem existir no banco, não apenas no consumidor de fila:
 
 Antes de adicionar índices únicos, a migration deve auditar e tratar registros legados duplicados ou nulos. A operação não deve criar uma restrição que impeça o processamento de refunds existentes sem uma estratégia de compatibilidade.
 
-## Evento Banking para Commerce
+## Evento Banking para Lowify
 
-Depois de persistir o refund aprovado, o Banking publica na fila `sales:events:refunded`:
+Depois de persistir o refund aprovado, o Banking publica uma instrução na fila intermediária `commerce:refunds:actions`:
 
     {
       "sale_id": 123,
-      "event": "refunded",
+      "event": "cielo_external_refund_confirmed",
       "status": "approved",
       "banking_refund_id": 456,
       "amount": 199.90,
@@ -63,24 +63,24 @@ Depois de persistir o refund aprovado, o Banking publica na fila `sales:events:r
       "triggered_at": "2026-10-29 12:00:00"
     }
 
-O `banking_refund_id` é a chave de idempotência entre Banking e Commerce. A publicação ocorre somente após a transação do Banking ter concluído os registros financeiros.
+O `banking_refund_id` é a chave de idempotência entre Banking e Lowify. A publicação ocorre somente após a transação do Banking ter concluído os registros financeiros.
 
-## Reflexo no Commerce V2
+## Reflexo na Lowify
 
-Ao receber o evento aprovado, Commerce V2 deve fazer upsert de `sales_refund` por `banking_refund_id`:
+O consumidor de `commerce:refunds:actions` deve ser a fronteira de persistência na Lowify. Ele recebe a instrução, valida o vínculo da venda e faz upsert de `sales_refund` por `banking_refund_id`:
 
 | Situação | Ação |
 | --- | --- |
 | Registro pendente criado por solicitação Lowify | Atualizar para `approved`, preservando valor, taxa e vínculo da venda. |
-| Sem registro local, pois o refund veio da Cielo | Criar `sales_refund` aprovado com venda, seller, valor, taxa e identificador do Banking. |
+| Sem registro local, pois o refund veio da Cielo | Criar o registro `sales_refund` na tabela existente da Lowify, com venda, seller, valor, taxa, status aprovado e identificador do Banking. |
 | Registro aprovado | Não repetir efeitos. |
 
-Depois do upsert aprovado, o fluxo existente de `sale:refunded` continua responsável por extrato, afiliados, recompensas e integrações. Nenhum efeito é executado antes de o `sales_refund` existir e estar aprovado.
+Após a transação Lowify confirmar o `sales_refund`, o próprio consumidor publica `sales:events:refunded`. Só então o fluxo de `sale:refunded` executa extrato, afiliados, recompensas e integrações. Nenhum efeito é executado antes de o registro Lowify existir e estar aprovado.
 
 ## Falhas, repetição e observabilidade
 
 - Webhook inválido, sem `PaymentId` ou duplicado não altera cobrança nem venda.
-- Falha de consulta Cielo ou de comunicação com Commerce deve reencaminhar a mensagem conforme a política da fila; nenhuma confirmação parcial é persistida.
+- Falha de consulta Cielo ou de persistência na Lowify deve reencaminhar a mensagem conforme a política da fila; nenhuma confirmação parcial é persistida.
 - Cobrança sem venda correspondente, provider incompatível ou valor não conciliável gera erro observável e não cria refund artificial.
 - Repetição após sucesso encontra os registros aprovados e termina sem novos efeitos.
 - Logs, métricas e alertas carregam `PaymentId`, `charge_card_id`, `sale_id`, `banking_refund_id`, status Cielo e resultado. Nunca registram cartão, token, credenciais ou payload sensível além do necessário.

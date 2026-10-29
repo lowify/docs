@@ -4,7 +4,7 @@
 
 1. Registrar a URL de notificação no portal Cielo para a integração correta, com HTTPS, headers de autenticação e evento de cancelamento selecionado.
 2. Confirmar em homologação a entrega de `ChangeType 25` e a consulta por `PaymentId`.
-3. Definir a chave idempotente `provider + PaymentId + sale_id` e a garantia correspondente em `refunds_charge` e `sales_refund`.
+3. Definir a chave idempotente `provider + PaymentId + sale_id` no Banking e `banking_refund_id` na Lowify.
 4. Definir o tratamento explícito de status 10, 11, 2 e não finais.
 5. Garantir que dados da consulta e do webhook sejam sanitizados em logs e filas.
 
@@ -18,26 +18,28 @@
 4. Criar ou concluir `refunds_charge` de forma idempotente.
 5. Criar e aprovar o plano de alocação de parcelas para o valor confirmado.
 6. Atualizar `charges_card` e registrar `charge_card_events` apenas quando a baixa total estiver concluída.
-7. Publicar `sales:events:refunded` somente depois de persistir o refund aprovado.
+7. Publicar `commerce:refunds:actions` somente depois de persistir o refund aprovado.
 8. Classificar reembolso parcial como não suportado nesta entrega, sem publicar evento de venda reembolsada.
 
 **Saída:** um refund total externo Cielo deixa Banking V2 no mesmo estado financeiro de um refund aprovado iniciado pela Lowify.
 
-## Etapa 3 — Commerce V2
+## Etapa 3 — Lowify e ação da venda
 
-1. Tornar o consumo de `sales:events:refunded` idempotente por `banking_refund_id`.
-2. Atualizar `sales_refund` pendente quando o refund já tiver sido solicitado pela Lowify.
-3. Criar `sales_refund` aprovado quando o Banking sinalizar um refund externo ainda não conhecido pelo Commerce.
-4. Executar extrato, afiliados, recompensas e integrações somente após o upsert aprovado.
-5. Manter a venda e os relatórios coerentes com a existência de reembolso aprovado.
+1. Auditar `sales_refund` na base Lowify e criar a migration do índice único de `banking_refund_id`, sem recriar a tabela existente.
+2. Estender o consumidor de `commerce:refunds:actions` para reconhecer a instrução de refund externo Cielo.
+3. Atualizar `sales_refund` pendente quando o refund já tiver sido solicitado pela Lowify.
+4. Criar `sales_refund` aprovado quando o Banking sinalizar um refund externo ainda não conhecido pela Lowify.
+5. Publicar `sales:events:refunded` somente após o commit do upsert na Lowify.
+6. Executar extrato, afiliados, recompensas e integrações somente após a publicação da ação de venda.
+7. Manter a venda e os relatórios coerentes com a existência de reembolso aprovado.
 
-**Saída:** a visão Lowify reflete o reembolso externo sem registros duplicados ou efeitos comerciais antes da confirmação financeira.
+**Saída:** a Lowify cria o reembolso antes de disparar a ação da venda, sem registros duplicados ou efeitos comerciais antes da confirmação financeira.
 
 ## Homologação
 
 | Cenário | Critério de aceite |
 | --- | --- |
-| Estorno total externo | `ChangeType 25` seguido de status 10 ou 11 cria/conclui `refunds_charge`, baixa alocações, atualiza cobrança e cria/aprova `sales_refund`. |
+| Estorno total externo | `ChangeType 25` seguido de status 10 ou 11 cria/conclui `refunds_charge`, baixa alocações, atualiza cobrança, publica a fila intermediária e cria/aprova `sales_refund` na Lowify. |
 | Refund solicitado pela Lowify | O mesmo webhook conclui os registros pendentes existentes, sem criar segunda linha. |
 | Duplicidade Cielo | Reenvios do mesmo webhook não duplicam refund, evento de cobrança, alocação, `sales_refund`, extrato ou integrações. |
 | Duplicidade legada | A migration de unicidade é aplicada somente após auditar registros legados e preservar a capacidade de consulta. |
@@ -46,7 +48,7 @@
 | Provider incompatível | Nenhuma tabela é alterada. |
 | Valor incompatível | Nenhuma baixa ou evento comercial é publicado até conciliação segura. |
 | Cancelamento parcial | Status 2 após `ChangeType 25` não muda `charges_card` para `refunded` e não dispara `sale:refunded`. |
-| Efeitos comerciais | Após refund aprovado, `sales_refund` existe antes de extrato, afiliados, recompensas e integrações. |
+| Ordem dos efeitos | `sales_refund` é criado e confirmado na Lowify antes de `sales:events:refunded`, extrato, afiliados, recompensas e integrações. |
 
 ## Liberação
 
