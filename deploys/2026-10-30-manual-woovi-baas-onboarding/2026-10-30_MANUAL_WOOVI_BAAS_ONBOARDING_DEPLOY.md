@@ -15,10 +15,10 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
 
 | Repositório | Diretório na VPS | Branch de deploy | Entrega |
 | --- | --- | --- | --- |
-| `services-account` | `/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
-| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | Autorização JWT e contrato HTTP da abertura manual. |
-| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | Rota autenticada e encaminhamento ao Public API. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | Toggle de revisão e ação manual no overview do seller. |
+| `services-account` | `/root/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | `dce4eab` — Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
+| `edge-public-api` | `/root/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | `8e1d645` — Autorização JWT e contrato HTTP da abertura manual. |
+| `edge-gateway` | `/root/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | `8f2742e` — Rota autenticada e encaminhamento ao Public API. |
+| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | `c1e5df71` — Toggle de revisão e abertura manual em modal no overview do seller. |
 
 ## Alterações incluídas
 
@@ -34,6 +34,10 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
    Dashboard apenas com `admin_financial_providers`.
 5. O pedido manual não faz bloqueio prévio baseado em contas BaaS existentes;
    o fluxo do provider mantém a responsabilidade por validar e retornar erros.
+6. No overview do seller, a lista de contas BaaS exibe o botão “Adicionar”. O
+   segundo modal exige selecionar a conta e informa sua finalidade: Woovi gera
+   checkout nominal do vendedor; Cielo Split opera cartão de crédito com split
+   na Lowify.
 
 ## Pré-requisitos
 
@@ -43,9 +47,8 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
 2. Publicar as quatro branches no remoto antes de executar este roteiro.
 3. Preservar `ACCOUNT_EVENTS_PROCESS_ENABLED=true` no `services-account`; ele
    consome `account:user:events`, incluindo solicitações manuais Woovi e Cielo.
-4. Definir explicitamente `WOOVI_BAAS_AUTO_REGISTER_ENABLED=false` no ambiente
-   do `services-account`. A ausência também resulta em `false`, mas declarar a
-   variável deixa a operação auditável.
+4. Confirmar que `WOOVI_BAAS_AUTO_REGISTER_ENABLED` está ausente ou com valor
+   `false` no ambiente do `services-account`; ambos preservam o default seguro.
 5. Não alterar credenciais Woovi/Cielo, não limpar Redis e não consumir ou
    reprocessar mensagens manualmente durante o deploy.
 
@@ -62,7 +65,7 @@ nem reconstruir seu container neste roteiro.
 ### 1. `services-account`
 
 ```bash
-cd /opt/lowify/services/services-account
+cd /root/opt/lowify/services/services-account
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -78,7 +81,7 @@ configurada e que o processo de eventos da conta iniciou sem erro.
 ### 2. `edge-public-api`
 
 ```bash
-cd /opt/lowify/edge/edge-public-api
+cd /root/opt/lowify/edge/edge-public-api
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -91,7 +94,7 @@ docker compose ps
 ### 3. `edge-gateway`
 
 ```bash
-cd /opt/lowify/edge/edge-gateway
+cd /root/opt/lowify/edge/edge-gateway
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -104,7 +107,7 @@ docker compose ps
 ### 4. `dashboard-seller`
 
 ```bash
-cd /opt/lowify/front/dashboard-seller
+cd /root/opt/lowify/front/dashboard-seller
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -139,7 +142,8 @@ mensagens ou registros de eventos para encobrir o teste.
 ## Validação pós-deploy
 
 1. Faça login como administrador autorizado e abra o overview de um seller.
-   Em “Contas BaaS”, a opção “Criar envio” deve mostrar Woovi e Cielo Split.
+   Em “Contas BaaS”, clique em “Adicionar”, selecione Woovi ou Cielo Split e
+   confira a finalidade exibida antes de criar o envio.
 2. Solicite cada provider com uma conta de teste. A tela deve confirmar o
    envio ou mostrar o erro retornado, sem travar a página.
 3. Abra uma revisão de conta. A nova etapa “Integração Woovi” deve aparecer
