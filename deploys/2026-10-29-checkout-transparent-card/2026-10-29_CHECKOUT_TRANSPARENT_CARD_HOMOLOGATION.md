@@ -9,7 +9,7 @@ Não aplicar migrations, não habilitar `card_credit` para sellers e não realiz
 ## VPS e modo de rebuild
 
 - VPS: `root@217.216.87.77`
-- Modo de rebuild: incremental. Reconstruir apenas o target cuja branch ou commit mudar.
+- Modo de rebuild: incremental. Reconstruir somente edges e serviços cuja branch ou commit mudar. Todo target `front/*` recebe apenas `git pull`; não executar Docker Compose nem rebuild nos fronts.
 - Targets mantidos como estão: `checkout-transparent-infra` e `data_layer`, pois são infraestrutura, banco e Redis.
 - Targets ausentes da VPS e repositórios sem mapeamento oficial não fazem parte desta operação.
 
@@ -60,7 +60,7 @@ Depois de todos limpos, executar `git fetch origin --prune` em todos e confirmar
 1. Atualizar os participantes na ordem: `checkout-transparent-worker`, `checkout-transparent-api`, `services-commerce-v2`, `ct-webhook`, `edge-webhook`, `edge-public-api`, `edge-gateway`, `front-checkout`, `dashboard-seller`.
 2. Atualizar cada participante com `git switch feat/checkout-transparent-card` e `git pull --ff-only origin feat/checkout-transparent-card`.
 3. Atualizar cada target não participante da tabela com `git switch main` e `git pull --ff-only origin main`.
-4. Registrar branch e commit antes/depois de cada target. Se a branch ou o commit mudar, executar o comando Compose configurado pelo repositório: `docker compose up --build -d`.
+4. Registrar branch e commit antes/depois de cada target. Se a branch ou o commit mudar, executar `docker compose up --build -d` somente nos edges e serviços. Para `dashboard-seller`, `front-chat`, `front-checkout`, `front-idv` e `front-member-area`, a atualização termina no `git pull --ff-only`; não executar Compose.
 5. Após cada rebuild, conferir `docker compose ps`. Se a atualização ou o container falhar, parar a sequência; não fazer rollback automático e não atualizar targets restantes.
 
 ## Validação de build e saúde
