@@ -4,12 +4,12 @@ Data da execução: 30/10/2026.
 
 ## Estado publicado
 
-| Componente | Commit em homologação | Resultado |
-| --- | --- | --- |
-| `services-account` | `dce4eab` | Container recriado e saudável; worker de `account:user:events` ativo. |
-| `edge-public-api` | `8e1d645` | Container recriado e saudável; rota manual disponível. |
-| `edge-gateway` | `8f2742e` | Gateway e worker recriados e saudáveis. |
-| `dashboard-seller` | `c1e5df71` | Atualizado somente por Git, sem reconstrução de container. |
+| Componente | Resultado |
+| --- | --- |
+| `services-account` | Container recriado e saudável; worker de `account:user:events` ativo. |
+| `edge-public-api` | Container recriado e saudável; rota manual disponível. |
+| `edge-gateway` | Gateway e worker recriados e saudáveis. |
+| `dashboard-seller` | Atualizado somente por Git, sem reconstrução de container. |
 
 Nenhum outro repositório foi alterado na VPS. O `services-banking` foi
 consultado somente em modo leitura para acompanhar o resultado das filas.

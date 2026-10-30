@@ -15,10 +15,10 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
 
 | Repositório | Diretório na VPS | Branch de deploy | Entrega |
 | --- | --- | --- | --- |
-| `services-account` | `/root/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | `dce4eab` — Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
-| `edge-public-api` | `/root/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | `8e1d645` — Autorização JWT e contrato HTTP da abertura manual. |
-| `edge-gateway` | `/root/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | `8f2742e` — Rota autenticada e encaminhamento ao Public API. |
-| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | `c1e5df71` — Toggle de revisão e abertura manual em modal no overview do seller. |
+| `services-account` | `/root/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
+| `edge-public-api` | `/root/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | Autorização JWT e contrato HTTP da abertura manual. |
+| `edge-gateway` | `/root/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | Rota autenticada e encaminhamento ao Public API. |
+| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | Toggle de revisão e abertura manual em modal no overview do seller. |
 
 ## Alterações incluídas
 
