@@ -15,7 +15,7 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
 
 | Repositório | Diretório na VPS | Branch de deploy | Entrega |
 | --- | --- | --- | --- |
-| `services-account` | `/root/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
+| `services-account` | `/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
 | `edge-public-api` | `/root/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | Autorização JWT e contrato HTTP da abertura manual. |
 | `edge-gateway` | `/root/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | Rota autenticada e encaminhamento ao Public API. |
 | `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | Toggle de revisão e abertura manual em modal no overview do seller. |
@@ -65,7 +65,7 @@ nem reconstruir seu container neste roteiro.
 ### 1. `services-account`
 
 ```bash
-cd /root/opt/lowify/services/services-account
+cd /opt/lowify/services/services-account
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
