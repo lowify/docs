@@ -20,9 +20,9 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 
 | Repositório | Diretório na VPS | Branch de deploy | Commit | Papel nesta entrega |
 | --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
-| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
-`edge-webhook` e `services-commerce-v2` já executam as etapas existentes do fluxo e não recebem código nesta entrega.
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `91266aa` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `5454c6f` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
+`edge-webhook` participa do fluxo já existente e não recebe código nesta entrega. O `service-commerce-v2` recebe o novo consumidor de `commerce:refunds:actions` e a migration de unicidade de `sales_refund(banking_refund_id)`.
 
 ## Alterações incluídas
 
@@ -43,6 +43,7 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 
 ### `service-commerce-v2`
 
+- `app/Application/Service/Queue/ReliableRedisQueue.php`
 - `app/Application/Service/Queue/SaleRefundedEventPublisher.php`
 - `app/Application/UseCase/Sale/ReflectExternalCieloRefundUseCase.php`
 - `app/Process/RefundActionsProcess.php`
