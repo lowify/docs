@@ -55,8 +55,9 @@ Não há migration, DDL ou DML nesta entrega.
 
 ## Sequência de deploy
 
-O modo é incremental. Atualizar e reconstruir somente os quatro componentes
-da tabela, nessa ordem: Account, Public API, Gateway e Dashboard.
+O modo é incremental. Atualizar e reconstruir Account, Public API e Gateway,
+nessa ordem. O `dashboard-seller` recebe somente a atualização Git; não subir
+nem reconstruir seu container neste roteiro.
 
 ### 1. `services-account`
 
@@ -67,8 +68,6 @@ git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
 git pull --ff-only origin feat/manual-woovi-baas-onboarding
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
 ```
 
 Confirmar no ambiente que `WOOVI_BAAS_AUTO_REGISTER_ENABLED=false` está
