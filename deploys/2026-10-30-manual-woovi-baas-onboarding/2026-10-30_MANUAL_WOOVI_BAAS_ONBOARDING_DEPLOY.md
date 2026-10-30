@@ -16,9 +16,9 @@ revisão efetivamente publicada com `git rev-parse --short HEAD`.
 | Repositório | Diretório na VPS | Branch de deploy | Entrega |
 | --- | --- | --- | --- |
 | `services-account` | `/opt/lowify/services/services-account` | `feat/manual-woovi-baas-onboarding` | Flag Woovi, decisão de review, evento manual e resolução de abertura Cielo/Woovi. |
-| `edge-public-api` | `/root/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | Autorização JWT e contrato HTTP da abertura manual. |
-| `edge-gateway` | `/root/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | Rota autenticada e encaminhamento ao Public API. |
-| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | Toggle de revisão e abertura manual em modal no overview do seller. |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/manual-woovi-baas-onboarding` | Autorização JWT e contrato HTTP da abertura manual. |
+| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/manual-woovi-baas-onboarding` | Rota autenticada e encaminhamento ao Public API. |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/manual-woovi-baas-onboarding` | Toggle de revisão e abertura manual em modal no overview do seller. |
 
 ## Alterações incluídas
 
@@ -81,7 +81,7 @@ configurada e que o processo de eventos da conta iniciou sem erro.
 ### 2. `edge-public-api`
 
 ```bash
-cd /root/opt/lowify/edge/edge-public-api
+cd /opt/lowify/edge/edge-public-api
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -94,7 +94,7 @@ docker compose ps
 ### 3. `edge-gateway`
 
 ```bash
-cd /root/opt/lowify/edge/edge-gateway
+cd /opt/lowify/edge/edge-gateway
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
@@ -107,7 +107,7 @@ docker compose ps
 ### 4. `dashboard-seller`
 
 ```bash
-cd /root/opt/lowify/front/dashboard-seller
+cd /opt/lowify/front/dashboard-seller
 git status --porcelain=v1
 git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
