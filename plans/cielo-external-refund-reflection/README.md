@@ -13,11 +13,11 @@ O fluxo não cria uma nova forma de reembolso. Ele estende o mesmo ciclo usado q
 ## Resultado esperado
 
     Portal Cielo
-      -> webhook ChangeType 25
+      -> webhook ChangeType 7 (atualização da transação)
       -> Edge Webhook registra e enfileira
       -> Banking V2 consulta PaymentId e confirma o estado final
       -> refunds_charge, charges_card, evento da cobrança e alocações financeiras
-      -> commerce:refunds:actions
+      -> commerce:refunds:external:actions
       -> Lowify cria/atualiza sales_refund
       -> sales:events:refunded / ação sale:refunded
 
@@ -42,7 +42,7 @@ Ao término, a mesma venda passa a ter:
 - Disparar um novo reembolso para a Cielo; esta entrega apenas reflete um reembolso já feito externamente.
 - Pix, boleto, Pagar.me, PagSmile, Woovi ou outros provedores.
 - Chargeback, contestação ou cancelamento de assinatura.
-- Reembolso parcial. A Cielo pode emitir `ChangeType 25` mantendo `Payment.Status` 2; não é correto publicar `sale:refunded` nessa situação sem identificar o valor e a operação parcial de forma inequívoca.
+- Reembolso parcial. A Cielo pode informar uma atualização mantendo `Payment.Status` 2; não é correto publicar `sale:refunded` nessa situação sem identificar o valor e a operação parcial de forma inequívoca.
 
 ## Documentos
 

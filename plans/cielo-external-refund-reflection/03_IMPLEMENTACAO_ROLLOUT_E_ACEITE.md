@@ -3,7 +3,7 @@
 ## Etapa 1 — Contratos e proteção de dados
 
 1. Registrar a URL de notificação no portal Cielo para a integração correta, com HTTPS, headers de autenticação e evento de cancelamento selecionado.
-2. Confirmar em homologação a entrega de `ChangeType 25` e a consulta por `PaymentId`.
+2. Confirmar em homologação a entrega de `ChangeType 7` com `Data.PaymentId`, a consulta de disputa e a consulta por `PaymentId`.
 3. Definir a chave idempotente `provider + PaymentId + sale_id` no Banking e `banking_refund_id` na Lowify.
 4. Definir o tratamento explícito de status 10, 11, 2 e não finais.
 5. Garantir que dados da consulta e do webhook sejam sanitizados em logs e filas.
@@ -12,13 +12,13 @@
 
 ## Etapa 2 — Edge e Banking V2
 
-1. Reutilizar o endpoint Cielo, a persistência de webhook bruto e a rota de `ChangeType 25` já existentes.
+1. Reutilizar o endpoint Cielo e a persistência de webhook bruto; para `ChangeType 7`, extrair `Data.PaymentId` e enviar a atualização ao Banking.
 2. Manter a consulta Cielo como verificação obrigatória antes de qualquer mutação.
 3. Estender o tratador Cielo para resolver cobrança e venda quando não houver refund pendente iniciado pela Lowify.
 4. Criar ou concluir `refunds_charge` de forma idempotente.
 5. Criar e aprovar o plano de alocação de parcelas para o valor confirmado.
 6. Atualizar `charges_card` e registrar `charge_card_events` apenas quando a baixa total estiver concluída.
-7. Publicar `commerce:refunds:actions` somente depois de persistir o refund aprovado.
+7. Publicar `commerce:refunds:external:actions` somente depois de persistir o refund aprovado.
 8. Classificar reembolso parcial como não suportado nesta entrega, sem publicar evento de venda reembolsada.
 
 **Saída:** um refund total externo Cielo deixa Banking V2 no mesmo estado financeiro de um refund aprovado iniciado pela Lowify.
@@ -26,7 +26,7 @@
 ## Etapa 3 — Lowify e ação da venda
 
 1. Auditar `sales_refund` na base Lowify e criar a migration do índice único de `banking_refund_id`, sem recriar a tabela existente.
-2. Estender o consumidor de `commerce:refunds:actions` para reconhecer a instrução de refund externo Cielo.
+2. Adicionar o consumidor do Commerce V2 em `commerce:refunds:external:actions` para reconhecer a instrução de refund externo Cielo.
 3. Atualizar `sales_refund` pendente quando o refund já tiver sido solicitado pela Lowify.
 4. Criar `sales_refund` aprovado quando o Banking sinalizar um refund externo ainda não conhecido pela Lowify.
 5. Publicar `sales:events:refunded` somente após o commit do upsert na Lowify.
@@ -39,7 +39,7 @@
 
 | Cenário | Critério de aceite |
 | --- | --- |
-| Estorno total externo | `ChangeType 25` seguido de status 10 ou 11 cria/conclui `refunds_charge`, baixa alocações, atualiza cobrança, publica a fila intermediária e cria/aprova `sales_refund` na Lowify. |
+| Estorno total externo | `ChangeType 7` seguido de consulta sem disputa e status 10 ou 11 cria/conclui `refunds_charge`, baixa alocações, atualiza cobrança, publica a fila intermediária e cria/aprova `sales_refund` na Lowify. |
 | Refund solicitado pela Lowify | O mesmo webhook conclui os registros pendentes existentes, sem criar segunda linha. |
 | Duplicidade Cielo | Reenvios do mesmo webhook não duplicam refund, evento de cobrança, alocação, `sales_refund`, extrato ou integrações. |
 | Duplicidade legada | A migration de unicidade é aplicada somente após auditar registros legados e preservar a capacidade de consulta. |
@@ -47,7 +47,7 @@
 | Cobrança sem venda | Nenhuma venda é alterada; há diagnóstico com `PaymentId`. |
 | Provider incompatível | Nenhuma tabela é alterada. |
 | Valor incompatível | Nenhuma baixa ou evento comercial é publicado até conciliação segura. |
-| Cancelamento parcial | Status 2 após `ChangeType 25` não muda `charges_card` para `refunded` e não dispara `sale:refunded`. |
+| Atualização sem refund final | Status 2 após `ChangeType 7` não muda `charges_card` para `refunded` e não dispara `sale:refunded`. |
 | Ordem dos efeitos | `sales_refund` é criado e confirmado na Lowify antes de `sales:events:refunded`, extrato, afiliados, recompensas e integrações. |
 
 ## Liberação

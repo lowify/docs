@@ -2,26 +2,28 @@
 
 ## Evento externo
 
-A Cielo envia para a URL cadastrada um corpo reduzido:
+A Cielo envia uma atualização reduzida. O formato observado em produção é:
 
     {
-      "PaymentId": "uuid-da-cobranca",
-      "ChangeType": 25
+      "ChangeType": 7,
+      "Data": {
+        "PaymentId": "uuid-da-cobranca"
+      }
     }
 
 O Edge responde ao protocolo da Cielo, persiste o recebimento e publica uma instrução interna. Ele não tenta decidir valor, venda ou situação financeira a partir do webhook.
 
     {
       "provider": "cielo_ecommerce",
-      "event": "refund_status_changed",
+      "event": "transaction_status_updated",
       "instructions": {
-        "type": "refund_status_changed",
+        "type": "transaction_status_updated",
         "payment_id": "uuid-da-cobranca",
-        "change_type": 25
+        "change_type": 7
       }
     }
 
-O Banking consulta `GET /1/sales/{PaymentId}` no ambiente Cielo correspondente e utiliza a resposta como fonte de verdade. Do retorno são necessários, no mínimo, `PaymentId`, `Payment.Status`, `Payment.Amount`, tipo de pagamento e `MerchantOrderId`.
+Para `ChangeType 7`, o Banking consulta primeiro a disputa; uma resposta com `DisputeId` publica o evento de chargeback. Sem disputa, consulta `GET /1/sales/{PaymentId}` no ambiente Cielo correspondente e utiliza a resposta como fonte de verdade para decidir refund. Do retorno são necessários, no mínimo, `PaymentId`, `Payment.Status`, `Payment.Amount`, tipo de pagamento e `MerchantOrderId`.
 
 ## Persistência no Banking V2
 
@@ -51,7 +53,7 @@ Antes de adicionar índices únicos, a migration deve auditar e tratar registros
 
 ## Evento Banking para Lowify
 
-Depois de persistir o refund aprovado, o Banking publica uma instrução na fila intermediária `commerce:refunds:actions`:
+Depois de persistir o refund aprovado, o Banking publica uma instrução na fila intermediária exclusiva `commerce:refunds:external:actions`:
 
     {
       "sale_id": 123,
@@ -67,7 +69,7 @@ O `banking_refund_id` é a chave de idempotência entre Banking e Lowify. A publ
 
 ## Reflexo na Lowify
 
-O consumidor de `commerce:refunds:actions` deve ser a fronteira de persistência na Lowify. Ele recebe a instrução, valida o vínculo da venda e faz upsert de `sales_refund` por `banking_refund_id`:
+O consumidor do Commerce V2 em `commerce:refunds:external:actions` deve ser a fronteira de persistência na Lowify. Ele recebe a instrução, valida o vínculo da venda e faz upsert de `sales_refund` por `banking_refund_id`:
 
 | Situação | Ação |
 | --- | --- |

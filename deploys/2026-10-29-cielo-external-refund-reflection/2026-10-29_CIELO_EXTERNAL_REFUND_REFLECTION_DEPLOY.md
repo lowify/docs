@@ -2,19 +2,19 @@
 
 ## Objetivo
 
-Publicar o reflexo de um cancelamento ou estorno total iniciado no Portal Cielo para uma venda Lowify já paga. O webhook `ChangeType: 25` continua sendo apenas o gatilho: o Banking V2 consulta a Cielo e só aceita `Payment.Status` `10` ou `11` antes de persistir efeitos financeiros.
+Publicar o reflexo de um cancelamento ou estorno total iniciado no Portal Cielo para uma venda Lowify já paga. Em produção, o webhook observado é `ChangeType: 7` com `Data.PaymentId`; ele é apenas o gatilho. O Banking V2 consulta primeiro a disputa e, quando não há `DisputeId`, consulta o pagamento e só aceita `Payment.Status` `10` ou `11` antes de persistir efeitos financeiros. `ChangeType: 25` permanece compatível como gatilho de refund.
 
 O fluxo publicado é:
 
 ```text
 Cielo -> edge-webhook -> banking-v2:refunds:actions
 -> Banking V2 consulta a Cielo e confirma o refund
--> commerce:refunds:actions
+-> commerce:refunds:external:actions
 -> Commerce V2 cria/confirma sales_refund
 -> sales:events:refunded -> efeitos Commerce V2 e Wallet
 ```
 
-Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retorna `Payment.Status: 2` não altera cobrança, refund, extrato ou venda.
+Refund parcial permanece fora de escopo. Uma atualização cuja consulta retorna `Payment.Status: 2` não altera cobrança, refund, extrato ou venda.
 
 ## Componentes publicados
 
@@ -22,12 +22,14 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 | --- | --- | --- | --- | --- |
 | `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `91266aa` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
 | `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `a0c0d58` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
-`edge-webhook` participa do fluxo já existente e não recebe código nesta entrega. O `service-commerce-v2` recebe o novo consumidor de `commerce:refunds:actions` e a migration de unicidade de IDs bancários reais em `sales_refund`.
+| `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Extrai `Data.PaymentId` do `ChangeType 7` e envia a atualização para o Banking. |
+
+O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:actions` e a migration de unicidade de IDs bancários reais em `sales_refund`.
 
 ## Alterações incluídas
 
 - O Banking V2 localiza uma cobrança Cielo por `PaymentId`, valida provider, resolve a venda por `PaymentId` com fallback para `order_id`, cria ou conclui `refunds_charge`, cria/aprova as alocações e registra a mudança da cobrança para `refunded`.
-- Para refund externo confirmado, o Banking não publica diretamente `sales:events:refunded`; ele publica `cielo_external_refund_confirmed` em `commerce:refunds:actions` depois da transação bancária.
+- Para refund externo confirmado, o Banking não publica diretamente `sales:events:refunded`; ele publica `cielo_external_refund_confirmed` em `commerce:refunds:external:actions` depois da transação bancária.
 - O Commerce V2 usa `banking_refund_id` para localizar ou criar o refund local, confirma-o em transação e só então publica `sales:events:refunded`. O extrato é responsabilidade do fluxo Wallet já consumido pelo Commerce V2.
 - Reenvios após aprovação não repetem refund, extrato ou evento final.
 - O Banking bloqueia a linha de `charges_card` do `PaymentId` durante a transação. Reentregas concorrentes do mesmo refund Cielo são serializadas, sem alterar dados legados de outros providers. A migration do Commerce V2 torna único apenas `banking_refund_id > 0`; o sentinela legado `0` continua repetível.
@@ -40,6 +42,12 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 - `app/Domain/RefundAction/Handler/CieloEcommerce/CieloEcommerceRefundActionHandler.php`
 - `app/Domain/ChargeCard/Repository/ChargeCardRepository.php`
 - `app/Infrastructure/Services/CommerceRefundActionPublisher.php`
+- `app/Infrastructure/Services/CommerceDisputeEventPublisher.php`
+
+### `edge-webhook`
+
+- `app/Http/Controllers/WebhookCieloEcommerceController.php`
+- `app/Infrastructure/Gateways/CieloEcommerce/Service/CieloEcommerceWebhookHandler.php`
 
 ### `service-commerce-v2`
 
@@ -58,7 +66,7 @@ Refund parcial permanece fora de escopo. Um `ChangeType: 25` cuja consulta retor
 - `docs/deploys/2026-10-29-cielo-external-refund-reflection/sql/lowify/DEPLOY.sql`
 - `docs/deploys/2026-10-29-cielo-external-refund-reflection/sql/lowify/VALIDATE.sql`
 
-Não há arquivo alterado em `edge-webhook` nem em `dashboard-seller` nesta feature.
+Não há arquivo alterado em `dashboard-seller` nesta feature.
 
 ## Alteração de banco nova
 
@@ -75,11 +83,11 @@ O índice Lowify é aditivo e não deve ser removido no rollback.
 
 ## Sequência de deploy
 
-Atualizar o Commerce V2 antes de iniciar o Banking, para que a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
+Atualizar o Edge e o Commerce V2 antes de iniciar o Banking, para que `ChangeType 7` seja encaminhado e a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
 
-### 1. Atualizar os dois componentes novos
+### 1. Atualizar os três componentes
 
-No Banking e no Commerce V2:
+No Edge, Banking e Commerce V2:
 
 ```bash
 git fetch origin --prune
@@ -94,7 +102,7 @@ Executar a migration `20261029190000_add_sales_refund_banking_refund_unique_inde
 
 ### 3. Publicar o Commerce V2
 
-O Commerce V2 deve estar atualizado antes do Banking começar a publicar `commerce:refunds:actions` externas.
+O Commerce V2 deve estar atualizado antes do Banking começar a publicar `commerce:refunds:external:actions` externas.
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
@@ -120,13 +128,13 @@ Confirmar que `refund_actions_queue` iniciou sem erro e está ouvindo `banking-v
 
 Usar somente uma venda de homologação conhecida e registrar `PaymentId`, `sale_id`, `refund_charge_id` e horário; não registrar PAN, CVV, tokens ou segredos.
 
-1. Fazer refund total no Portal Cielo e aguardar `ChangeType: 25`.
+1. Fazer refund total no Portal Cielo e aguardar a atualização `ChangeType: 7` com `Data.PaymentId`.
 2. Confirmar em `services-webhook.webhook_raws` que o webhook foi persistido e que a ação alcançou `banking-v2:refunds:actions`.
 3. Confirmar que o Banking consultou a Cielo e, para status `10` ou `11`, criou ou concluiu exatamente um `refunds_charge`, criou/aprovou o plano de alocações, atualizou `charges_card.status` para `refunded` e gravou um evento de cobrança com origem `webhook`.
-4. Confirmar que há exatamente uma instrução `cielo_external_refund_confirmed` em `commerce:refunds:actions` e que o Commerce V2 criou/atualizou exatamente um `sales_refund` aprovado com o mesmo `banking_refund_id`.
+4. Confirmar que há exatamente uma instrução `cielo_external_refund_confirmed` em `commerce:refunds:external:actions` e que o Commerce V2 criou/atualizou exatamente um `sales_refund` aprovado com o mesmo `banking_refund_id`.
 5. Confirmar um único lançamento de extrato tipo `12` e, quando aplicável, um lançamento de taxa tipo `13`; então confirmar que `sales:events:refunded` foi publicado e o Commerce V2 consumiu seus efeitos normais.
 6. Reenviar o mesmo callback Cielo duas vezes. Não pode haver duplicação em `refunds_charge`, alocações, evento da cobrança, `sales_refund`, extrato, evento final ou efeitos do Commerce.
-7. Fazer um cenário controlado em que a consulta responda status `2` após `ChangeType: 25`. A cobrança deve continuar paga e não pode existir novo refund, extrato ou evento de venda.
+7. Fazer um cenário controlado em que a consulta responda status `2` após `ChangeType: 7`. A cobrança deve continuar paga e não pode existir novo refund, extrato ou evento de venda.
 8. Verificar logs do Banking e de `commerce_refund_actions_queue`; registrar erro de conciliação, venda ausente, provider incompatível ou falha de fila.
 
 ## Rollback
