@@ -68,6 +68,8 @@ git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
 git pull --ff-only origin feat/manual-woovi-baas-onboarding
 git rev-parse --short HEAD
+docker compose up -d --build
+docker compose ps
 ```
 
 Confirmar no ambiente que `WOOVI_BAAS_AUTO_REGISTER_ENABLED=false` está
@@ -108,8 +110,6 @@ git fetch origin --prune
 git switch feat/manual-woovi-baas-onboarding
 git pull --ff-only origin feat/manual-woovi-baas-onboarding
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
 ```
 
 ## Testes de compatibilidade em homologação
