@@ -65,12 +65,9 @@ git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
 git merge-base --is-ancestor d683a083 HEAD
 git rev-parse --short HEAD
-docker compose up -d --build front-dashboard-seller
-docker compose ps
-docker compose logs --tail=100 front-dashboard-seller
 ```
 
-Os workers do Dashboard não foram alterados. Não os reinicie isoladamente por causa desta entrega.
+O Dashboard usa o checkout montado no container; não executar `docker compose up -d --build front-dashboard-seller` nesta entrega. Os workers do Dashboard também não foram alterados e não devem ser reiniciados isoladamente.
 
 ## Validação pós-deploy
 
