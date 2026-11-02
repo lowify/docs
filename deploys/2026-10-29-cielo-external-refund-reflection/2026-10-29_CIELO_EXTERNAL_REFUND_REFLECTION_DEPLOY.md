@@ -85,24 +85,15 @@ O índice Lowify é aditivo e não deve ser removido no rollback.
 
 ### 0. Diagnóstico obrigatório antes do deploy da feature
 
-Antes de publicar esta feature, publicar a `main` de `services-banking-v2` até
-o commit `3d17612`. A única alteração de runtime nesse deploy é o commit
-`0bd9394` (`feat(cielo): add chargeback probe command`); `3d17612` apenas
-documenta sua execução. Esse deploy isolado não inclui o fluxo de refund desta
-feature.
+`services-banking-v2` deve estar na `main` até o commit `3d17612`.
 
-Com um `PaymentId` real recebido no webhook Cielo, o Davison deve executar no
-host, sem entrar manualmente no container:
+Com um `PaymentId` real, executar no host:
 
 ```bash
 cd /opt/lowify/services/services-banking-v2 && docker compose exec -T services-banking-v2 php bin/hyperf.php cielo:chargeback:probe "PAYMENT_ID"
 ```
 
-O comando consulta o mesmo `PaymentId` com credenciais Cielo, com OAuth Split
-e na API de chargeback. Ele devolve os três resultados em JSON sanitizado;
-tokens, chaves e dados sensíveis de cartão são ocultados. Enviar o resultado
-para análise antes de decidir se a feature de refund deve ser publicada ou se o
-handler precisa ser ajustado.
+Enviar o JSON retornado para análise antes de seguir o deploy.
 
 Atualizar o Edge e o Commerce V2 antes de iniciar o Banking, para que `ChangeType 7` seja encaminhado e a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
 
