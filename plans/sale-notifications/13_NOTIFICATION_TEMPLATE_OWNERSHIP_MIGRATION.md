@@ -22,8 +22,8 @@ Commerce V2 → stream:notifications:whatsapp_meta
   context + params comerciais, sem template Meta
 
 Notifications
-  action + context → regra/vínculo vencedor entre N pré-templates
-                   → template principal do vínculo
+  action + context → resolver em código escolhe um cenário conhecido
+                   → vínculo do cenário → template principal
                    → persistência da mensagem e envio à Meta
 ```
 
@@ -33,13 +33,14 @@ ação `sale_recovery` autorizada, mas jamais escolher o template físico.
 ## Resultado esperado
 
 Não existirá uma relação 1:1 entre `sale_recovery` e um único template default.
-O Notifications manterá N vínculos pré-definidos de recuperação. Para cada
-mensagem, o resolvedor avalia o payload, encontra a regra de maior prioridade
-compatível e usa o principal daquele vínculo.
+O Notifications manterá N cenários pré-definidos de recuperação. Para cada
+mensagem, um resolver escrito no código avalia o payload e devolve um
+`scenario_code` conhecido; o vínculo desse cenário determina o template principal.
+Os critérios não são configuráveis no banco.
 
 Exemplo conceitual:
 
-| Pré-template/vínculo | Critério do payload | Principal | Reserva |
+| Pré-template/vínculo | Regra aplicada pelo resolver | Principal | Reserva |
 | --- | --- | --- | --- |
 | Recuperação 1 — sem PIX | `stage=1` e `has_pix_code=false` | template X | template Y |
 | Recuperação 1 — oficial | `stage=1` | template A | vazio |
@@ -75,7 +76,7 @@ marcado como inelegível.
 | Campo | Responsabilidade |
 | --- | --- |
 | `action` | Valor fechado: `sale_recovery`; não é nome de template. |
-| `context` | Fatos de negócio permitidos para a regra selecionar um dos N vínculos. Não contém provider, nome ou ID Meta. |
+| `context` | Fatos de negócio usados pelo resolver em código para selecionar um cenário conhecido. Não contém provider, nome ou ID Meta. |
 | `params` | Dados autorizados para renderização e correlação/outcome. |
 | template final | Resolvido somente pelo Notifications. |
 
@@ -95,8 +96,6 @@ separada de `whatsapp_meta_templates`.
 | `action` | Inicialmente sempre `sale_recovery`; mantém o modelo extensível sem ampliar o escopo. |
 | `scenario_code` | Chave estável, por exemplo `recovery_stage_1_without_pix`; não é nome Meta. |
 | `label` | Rótulo administrativo: “Recuperação 1 — sem PIX”. |
-| `priority` | Ordem determinística entre os N vínculos elegíveis. |
-| `match_criteria` | Critérios versionados comparados com `context`; JSON com operadores restritos e validados em código, nunca SQL livre. |
 | `primary_template_id` | Template oficial atual. FK para `whatsapp_meta_templates`. |
 | `backup_template_id` | Template reserva de uso único; FK anulável. |
 | `is_active`, timestamps | Estado e auditoria. |
@@ -106,10 +105,11 @@ Restrições:
 - unicidade de `action + scenario_code`;
 - vínculo ativo exige principal;
 - principal e reserva não podem ser iguais;
-- há exatamente um vencedor: maior prioridade entre regras satisfeitas;
-- empate, critério inválido ou ausência de fallback são erros observáveis, nunca
-  seleção arbitrária;
-- há um vínculo de fallback oficial explícito, com a menor prioridade, para RDC.
+- todo `scenario_code` retornado pelo resolver possui exatamente um vínculo ativo;
+- payload inválido, cenário desconhecido ou vínculo ausente são erros observáveis,
+  nunca seleção arbitrária;
+- o resolver retorna um cenário oficial de fallback explícito quando nenhum caso
+  específico se aplicar.
 
 O `whatsapp_meta` deve persistir o `template_id` já resolvido e uma referência ou
 snapshot do `binding_id`/`scenario_code`. Assim, auditoria, métricas, callback e
@@ -118,8 +118,9 @@ reprocessamento representam o template que realmente foi enviado.
 ## Seleção e regra de reserva
 
 1. O consumer recebe `sale_recovery`, valida o contrato e o `context`.
-2. O resolvedor avalia todos os vínculos ativos da ação e escolhe o vencedor por
-   prioridade.
+2. O resolver de RDC, escrito no Notifications, aplica as regras de negócio ao
+   payload e devolve um `scenario_code` conhecido, ou o cenário oficial de
+   fallback.
 3. Na transação que cria a mensagem, grava o principal resolvido no
    `whatsapp_meta` e o snapshot do vínculo.
 4. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
@@ -150,8 +151,7 @@ template persistido. Essa decisão evita alterar uma comunicação já aceita na
 No caminho Admin → Gateway → Public API → Notifications, administrar vínculos —
 não um default global ou nomes de template soltos:
 
-- listar vínculos, critérios, prioridade, principal, reserva e estado;
-- criar/editar cenário e critérios permitidos;
+- listar vínculos, cenário conhecido, principal, reserva e estado;
 - definir/substituir principal e reserva, validando templates ativos e distintos;
 - ativar/desativar vínculo;
 - consultar histórico de edições e de promoção de reserva.
@@ -164,7 +164,8 @@ segunda fonte de verdade.
 
 ### Etapa 0 — decisão funcional e inventário
 
-- Fechar os N cenários de RDC, critérios permitidos, prioridades e fallback.
+- Fechar os N cenários de RDC e o fallback; implementar suas regras e precedência
+  em um resolver de código versionado no Notifications.
 - Decidir o comportamento de “sem PIX” frente à elegibilidade atual.
 - Inventariar produtores de `stream:notifications:whatsapp_meta`, eventos legados,
   variáveis de ambiente, templates Meta, mensagens pendentes e relatórios que
@@ -174,8 +175,8 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 ### Etapa 1 — fundação no Notifications
 
-- Criar schema, modelo, repositório, validador de critérios, resolvedor e
-  histórico/auditoria dos vínculos.
+- Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
+  dos vínculos.
 - Cadastrar N vínculos que reproduzam o comportamento atual, mais o fallback
   oficial; reservas são explícitas e inicialmente opcionais.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
@@ -217,8 +218,10 @@ Saída: RDC não possui dependência externa de template Meta.
 
 ## Testes e aceite
 
-- O mesmo payload resolve o mesmo vínculo vencedor dentre os N pré-definidos.
-- Critérios inválidos, empate e ausência de fallback falham de forma observável.
+- O mesmo payload resolve o mesmo `scenario_code` dentre os N cenários definidos
+  no código e, então, o mesmo vínculo ativo.
+- Payload inválido, cenário sem vínculo ativo e ausência de fallback falham de
+  forma observável.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
 - A mensagem persiste o template e vínculo efetivamente resolvidos antes do sender.
 - Falha qualificada com reserva promove-a para principal e limpa a reserva.
@@ -230,7 +233,8 @@ Saída: RDC não possui dependência externa de template Meta.
 
 ## Decisões pendentes
 
-- Taxonomia final dos N pré-templates e a precedência de cada regra.
+- Taxonomia final dos N pré-templates e as regras/precedência implementadas pelo
+  resolver de RDC.
 - Política que qualifica “cair” (falha imediata, limiar consecutivo etc.); o plano
   pressupõe transição idempotente por vínculo.
 - Comportamento para principal inativo/ausente ou payload sem cenário elegível.
