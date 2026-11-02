@@ -11,7 +11,7 @@ Fora do escopo: alterar a política de expiração, revogar tokens existentes, e
 | Repositório | Host | Diretório de produção | Branch | Commit de deploy | Papel |
 | --- | --- | --- | --- | --- | --- |
 | `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `f021334` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
-| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `5b3c6b57` | Registra invalidações e apresenta o histórico na visão geral do vendedor. |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `54862ec5` | Registra invalidações e apresenta o histórico no item Adicional da visão geral do vendedor. |
 
 ## Alterações incluídas
 
@@ -64,7 +64,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor 5b3c6b57 HEAD
+git merge-base --is-ancestor 54862ec5 HEAD
 git rev-parse --short HEAD
 ```
 
@@ -75,7 +75,7 @@ O Dashboard usa o checkout montado no container; não executar `docker compose u
 1. Abra o Dashboard com uma conta de teste válida e navegue por uma página que consulte dados no Public API. A página deve continuar carregando normalmente.
 2. Mantenha a sessão aberta por mais de 15 minutos e volte a navegar. Se o cookie de refresh estiver válido, a pessoa deve permanecer autenticada sem precisar entrar novamente.
 3. Em uma sessão controlada, remova apenas o cookie de refresh no navegador de teste, aguarde a expiração do access token e navegue. A pessoa deve ser direcionada ao login; isso cria o cenário esperado de expiração sem refresh.
-4. Como administrador, abra a Visão geral do vendedor de teste. A seção “Histórico de logout” deve mostrar data, origem, motivo e caminho do evento, sem token, cookie, senha ou IP.
+4. Como administrador, abra a Visão geral do vendedor de teste, acesse o item Adicional “Histórico de logout”. O modal deve mostrar data, origem, motivo e caminho do evento, sem token, cookie, senha ou IP.
 5. Se a navegação normal falhar, interrompa a publicação, preserve os logs de container e execute o rollback abaixo. Não tente corrigir apagando chaves Redis.
 
 ## Rollback
