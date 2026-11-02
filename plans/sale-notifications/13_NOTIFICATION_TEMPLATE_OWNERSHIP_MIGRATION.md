@@ -45,10 +45,9 @@ Exemplo conceitual:
 | Recuperação 1 — sem PIX | `stage=1` e `has_pix_code=false` | template X | template Y |
 | Recuperação 1 — oficial | `stage=1` | template A | vazio |
 | Recuperação 2 — oferta expirando | `stage=2` | template B | template C |
-| Recuperação — fallback oficial | fallback explícito | template D | vazio |
 
 “Sem PIX” é o exemplo de nome de negócio, não um template Meta. Hoje o Commerce
-descarta RDC sem código PIX; antes de ativar esse vínculo, será preciso decidir se
+descarta RDC sem código PIX; antes de cadastrar esse vínculo, será preciso decidir se
 o caso muda a elegibilidade da recuperação ou se apenas classifica mensagens que
 já seriam elegíveis. O Notifications não deve liberar um envio que Commerce tenha
 marcado como inelegível.
@@ -98,18 +97,16 @@ separada de `whatsapp_meta_templates`.
 | `label` | Rótulo administrativo: “Recuperação 1 — sem PIX”. |
 | `primary_template_id` | Template oficial atual. FK para `whatsapp_meta_templates`. |
 | `backup_template_id` | Template reserva de uso único; FK anulável. |
-| `is_active`, timestamps | Estado e auditoria. |
+| timestamps | Auditoria de criação e alteração. |
 
 Restrições:
 
 - unicidade de `action + scenario_code`;
-- vínculo ativo exige principal;
+- todo vínculo registrado exige principal;
 - principal e reserva não podem ser iguais;
-- todo `scenario_code` retornado pelo resolver possui exatamente um vínculo ativo;
-- payload inválido, cenário desconhecido ou vínculo ausente são erros observáveis,
-  nunca seleção arbitrária;
-- o resolver retorna um cenário oficial de fallback explícito quando nenhum caso
-  específico se aplicar.
+- todo `scenario_code` retornado pelo resolver possui exatamente um vínculo;
+- payload inválido, cenário desconhecido, vínculo ausente ou principal ausente são
+  erros observáveis; não existe seleção alternativa ou fallback.
 
 O `whatsapp_meta` deve persistir o `template_id` já resolvido e uma referência ou
 snapshot do `binding_id`/`scenario_code`. Assim, auditoria, métricas, callback e
@@ -119,8 +116,7 @@ reprocessamento representam o template que realmente foi enviado.
 
 1. O consumer recebe `sale_recovery`, valida o contrato e o `context`.
 2. O resolver de RDC, escrito no Notifications, aplica as regras de negócio ao
-   payload e devolve um `scenario_code` conhecido, ou o cenário oficial de
-   fallback.
+   payload e devolve um `scenario_code` conhecido; se não houver cenário, falha.
 3. Na transação que cria a mensagem, grava o principal resolvido no
    `whatsapp_meta` e o snapshot do vínculo.
 4. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
@@ -137,8 +133,8 @@ passa a pertencer exclusivamente ao vínculo escolhido:
 4. registra a mudança em auditoria e emite alerta operacional seguro;
 5. se a reserva já está vazia, mantém o principal oficial atual e não rotaciona.
 
-Não há busca de próximo template, encadeamento, wrap-around nem fallback implícito
-entre vínculos. Uma nova reserva só é cadastrada por ação administrativa explícita.
+Não há busca de próximo template, encadeamento, wrap-around ou alternativa entre
+vínculos. Uma nova reserva só é cadastrada por ação administrativa explícita.
 O limiar de falha deve ser contado por `binding_id` (recomendado), para que uma
 falha de um cenário não promova a reserva de outro cenário que use o mesmo
 template físico.
@@ -153,7 +149,6 @@ não um default global ou nomes de template soltos:
 
 - listar vínculos, cenário conhecido, principal, reserva e estado;
 - definir/substituir principal e reserva, validando templates ativos e distintos;
-- ativar/desativar vínculo;
 - consultar histórico de edições e de promoção de reserva.
 
 O endpoint atual que define um único default de recuperação permanece somente como
@@ -164,8 +159,8 @@ segunda fonte de verdade.
 
 ### Etapa 0 — decisão funcional e inventário
 
-- Fechar os N cenários de RDC e o fallback; implementar suas regras e precedência
-  em um resolver de código versionado no Notifications.
+- Fechar os N cenários de RDC e implementar suas regras/precedência em um resolver
+  de código versionado no Notifications, sem cenário fallback.
 - Decidir o comportamento de “sem PIX” frente à elegibilidade atual.
 - Inventariar produtores de `stream:notifications:whatsapp_meta`, eventos legados,
   variáveis de ambiente, templates Meta, mensagens pendentes e relatórios que
@@ -177,8 +172,8 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 - Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
   dos vínculos.
-- Cadastrar N vínculos que reproduzam o comportamento atual, mais o fallback
-  oficial; reservas são explícitas e inicialmente opcionais.
+- Cadastrar os N vínculos exigidos pelos cenários do resolver; reservas são
+  explícitas e inicialmente opcionais.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
   reescrever histórico.
 - Adaptar health/alertas para identificar falhas por vínculo, deixando a promoção
@@ -219,9 +214,9 @@ Saída: RDC não possui dependência externa de template Meta.
 ## Testes e aceite
 
 - O mesmo payload resolve o mesmo `scenario_code` dentre os N cenários definidos
-  no código e, então, o mesmo vínculo ativo.
-- Payload inválido, cenário sem vínculo ativo e ausência de fallback falham de
-  forma observável.
+  no código e, então, o mesmo vínculo registrado.
+- Payload inválido, cenário sem vínculo ou principal ausente falham de forma
+  observável, sem fallback.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
 - A mensagem persiste o template e vínculo efetivamente resolvidos antes do sender.
 - Falha qualificada com reserva promove-a para principal e limpa a reserva.
@@ -237,7 +232,7 @@ Saída: RDC não possui dependência externa de template Meta.
   resolver de RDC.
 - Política que qualifica “cair” (falha imediata, limiar consecutivo etc.); o plano
   pressupõe transição idempotente por vínculo.
-- Comportamento para principal inativo/ausente ou payload sem cenário elegível.
+- Formato do erro/outcome para principal ausente ou payload sem cenário elegível.
 - Interface administrativa: é parte posterior à API administrativa, não condição
   para a primeira migração de backend.
 
