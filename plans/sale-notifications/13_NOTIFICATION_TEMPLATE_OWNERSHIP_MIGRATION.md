@@ -1,51 +1,58 @@
-# Plano — Centralização de templates de comunicações de venda
+# Plano — Centralização de templates da recuperação de venda
 
-> Status: planejado  
-> Escopo inicial: entrega pós-compra e recuperação de venda (RDC), somente WhatsApp Meta.  
-> Não inclui implementação, migration executável, deploy, alteração de filas nem mudança de comportamento em produção.
+> Status: planejado
+>
+> Escopo: somente RDC por WhatsApp Meta. Entrega pós-compra, e-mail, push e outros fluxos não fazem parte desta migração.
+> Não inclui implementação, migration executável, deploy ou alteração de comportamento em produção.
 
 ## Decisão de arquitetura
 
-`services-notification` passa a ser o único componente que escolhe o template
-físico enviado à Meta. Nenhum produtor de mensagem — HTTP, Redis stream, processo
-ou outro serviço — pode informar ou depender de `whatsapp_meta_templates.name`.
+`services-notification` será o único dono da escolha do template físico enviado
+à Meta para recuperação de venda. Nenhum produtor externo — Commerce, HTTP,
+stream Redis ou processo — informa nome ou ID de template.
 
-Os demais componentes continuam decidindo **se** uma comunicação é elegível,
-quando ela deve ocorrer, canal, destinatário, cobrança, correlação comercial e
-os dados de negócio. Eles publicam somente uma ação semântica e seu contexto.
+O Commerce continua dono de elegibilidade, agendamento, destinatário, cobrança,
+correlação e parâmetros da venda. Na fila, ele informa apenas a ação semântica
+`sale_recovery`, fatos do payload necessários para a decisão e os parâmetros de
+renderização.
 
 ```text
-Commerce V2
-  └─ stream:notifications:whatsapp_meta
-       action = sale_delivery | sale_recovery
-       context + params comerciais, sem nome/id de template Meta
+Commerce V2 → stream:notifications:whatsapp_meta
+  action = sale_recovery
+  context + params comerciais, sem template Meta
 
 Notifications
-  └─ resolve ação + contexto/payload → vínculo ativo → template principal
-  └─ persiste a mensagem já associada ao template resolvido
-  └─ envia à Meta e publica outcome comercial como hoje
+  action + context → regra/vínculo vencedor entre N pré-templates
+                   → template principal do vínculo
+                   → persistência da mensagem e envio à Meta
 ```
 
-Essa regra vale igualmente para qualquer entrada futura HTTP: HTTP pode criar uma
-ação semântica autorizada, mas não pode selecionar template físico.
+Esta mesma regra vale para qualquer entrada HTTP futura: ela poderá solicitar a
+ação `sale_recovery` autorizada, mas jamais escolher o template físico.
 
-## Estado atual e lacuna que a migração corrige
+## Resultado esperado
 
-Hoje o Commerce V2 publica um `event` que também é o nome lógico/físico do
-template, por exemplo os eventos configurados por estágio do RDC e os nomes de
-template da entrega. O Notifications só troca o nome no sender para a família
-especial `sale_recovering_ct`/`sale_recovering_ct_3` a `_7`.
+Não existirá uma relação 1:1 entre `sale_recovery` e um único template default.
+O Notifications manterá N vínculos pré-definidos de recuperação. Para cada
+mensagem, o resolvedor avalia o payload, encontra a regra de maior prioridade
+compatível e usa o principal daquele vínculo.
 
-Assim, a decisão ainda é híbrida: Commerce influencia o template recebido e o
-Notifications aplica rotação apenas a uma exceção. Além disso, o registro
-`whatsapp_meta.template_id` pode representar o evento recebido e não o template
-efetivamente enviado à Meta. A nova modelagem elimina essa ambiguidade.
+Exemplo conceitual:
+
+| Pré-template/vínculo | Critério do payload | Principal | Reserva |
+| --- | --- | --- | --- |
+| Recuperação 1 — sem PIX | `stage=1` e `has_pix_code=false` | template X | template Y |
+| Recuperação 1 — oficial | `stage=1` | template A | vazio |
+| Recuperação 2 — oferta expirando | `stage=2` | template B | template C |
+| Recuperação — fallback oficial | fallback explícito | template D | vazio |
+
+“Sem PIX” é o exemplo de nome de negócio, não um template Meta. Hoje o Commerce
+descarta RDC sem código PIX; antes de ativar esse vínculo, será preciso decidir se
+o caso muda a elegibilidade da recuperação ou se apenas classifica mensagens que
+já seriam elegíveis. O Notifications não deve liberar um envio que Commerce tenha
+marcado como inelegível.
 
 ## Contrato-alvo da fila
-
-O payload deve separar ação, contexto de roteamento e parâmetros de renderização.
-Os nomes abaixo são ilustrativos; o contrato final deve ser versionado e validado
-antes da implementação.
 
 ```json
 {
@@ -65,243 +72,181 @@ antes da implementação.
 }
 ```
 
-| Campo | Dono | Regra |
-| --- | --- | --- |
-| `action` | produtor da comunicação | Valor fechado inicialmente: `sale_delivery` ou `sale_recovery`. Não é nome de template. |
-| `context` | produtor da comunicação | Fatos de negócio necessários para selecionar o cenário. Não contém nome, ID, provider ou categoria Meta. |
-| `params` | produtor da comunicação | Dados já autorizados para renderizar o template e para correlação/outcome. |
-| template final | Notifications | Resolvido exclusivamente no banco do Notifications. |
+| Campo | Responsabilidade |
+| --- | --- |
+| `action` | Valor fechado: `sale_recovery`; não é nome de template. |
+| `context` | Fatos de negócio permitidos para a regra selecionar um dos N vínculos. Não contém provider, nome ou ID Meta. |
+| `params` | Dados autorizados para renderização e correlação/outcome. |
+| template final | Resolvido somente pelo Notifications. |
 
-O consumidor deve rejeitar/registrar como erro de contrato payload novo que
-contenha `template`, `template_name`, `template_id` ou equivalente. Durante a
-migração, o formato legado será aceito apenas pelo adaptador de compatibilidade,
-nunca pelo novo resolvedor.
+O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
+externa como `template`, `template_name` ou `template_id`. Durante a transição,
+um adaptador traduz os eventos legados conhecidos; o resolvedor novo nunca recebe
+o nome físico vindo do produtor.
 
-## Cenários e vínculos de template
+## Modelo de dados proposto
 
-Criar no `services-notification` uma entidade de vínculo de template, separada de
-`whatsapp_meta_templates`. Nome sugerido: `whatsapp_meta_template_bindings`.
+Criar no `services-notification` a tabela `whatsapp_meta_template_bindings`,
+separada de `whatsapp_meta_templates`.
 
 | Campo | Finalidade |
 | --- | --- |
-| `id` | Identidade interna. |
-| `action` | `sale_delivery` ou `sale_recovery`. |
-| `scenario_code` | Chave estável de negócio, como `recovery_stage_1_without_pix`; não é o nome do template Meta. |
-| `label` | Rótulo administrativo, por exemplo “Recuperação 1 — sem PIX”. |
-| `priority` | Ordem determinística entre cenários elegíveis da mesma ação. |
-| `match_criteria` | Critérios versionados para comparar com `context`; inicialmente JSON com operadores restritos/evaluados em código, não SQL livre. |
-| `primary_template_id` | Template oficial atualmente usado pelo vínculo. FK para `whatsapp_meta_templates`. |
-| `backup_template_id` | Reserva de uso único; FK anulável para a mesma tabela. |
-| `is_active`, timestamps | Habilitação e auditoria operacional. |
+| `id` | Identidade interna do vínculo. |
+| `action` | Inicialmente sempre `sale_recovery`; mantém o modelo extensível sem ampliar o escopo. |
+| `scenario_code` | Chave estável, por exemplo `recovery_stage_1_without_pix`; não é nome Meta. |
+| `label` | Rótulo administrativo: “Recuperação 1 — sem PIX”. |
+| `priority` | Ordem determinística entre os N vínculos elegíveis. |
+| `match_criteria` | Critérios versionados comparados com `context`; JSON com operadores restritos e validados em código, nunca SQL livre. |
+| `primary_template_id` | Template oficial atual. FK para `whatsapp_meta_templates`. |
+| `backup_template_id` | Template reserva de uso único; FK anulável. |
+| `is_active`, timestamps | Estado e auditoria. |
 
-Restrições obrigatórias:
+Restrições:
 
 - unicidade de `action + scenario_code`;
-- `primary_template_id` obrigatório para vínculo ativo;
+- vínculo ativo exige principal;
 - principal e reserva não podem ser iguais;
-- a seleção exige exatamente um cenário vencedor: maior prioridade entre os
-  critérios satisfeitos; empate ou ausência de cenário é erro observável e não
-  pode cair silenciosamente em um template arbitrário;
-- toda ação tem um cenário oficial de fallback explícito, com menor prioridade,
-  para os casos em que nenhum cenário específico se aplique.
+- há exatamente um vencedor: maior prioridade entre regras satisfeitas;
+- empate, critério inválido ou ausência de fallback são erros observáveis, nunca
+  seleção arbitrária;
+- há um vínculo de fallback oficial explícito, com a menor prioridade, para RDC.
 
-Exemplo de configuração inicial a validar com Produto:
+O `whatsapp_meta` deve persistir o `template_id` já resolvido e uma referência ou
+snapshot do `binding_id`/`scenario_code`. Assim, auditoria, métricas, callback e
+reprocessamento representam o template que realmente foi enviado.
 
-| Ação | Cenário | Critério ilustrativo | Principal | Reserva |
-| --- | --- | --- | --- | --- |
-| `sale_recovery` | Recuperação 1 — sem PIX | `stage=1` e `has_pix_code=false` | template X | template Y |
-| `sale_recovery` | Recuperação 1 — oficial | `stage=1` | template A | vazio |
-| `sale_delivery` | Entrega — conteúdo | `delivery_mode=content_link` | template B | vazio |
-| `sale_delivery` | Entrega — oficial | fallback da ação | template C | template D |
+## Seleção e regra de reserva
 
-“Sem PIX” é apenas exemplo de cenário solicitado. No código atual, RDC sem código
-PIX é ignorada; portanto, antes de ativar esse cenário, Produto/Commerce devem
-decidir se ele muda a elegibilidade do RDC ou apenas classifica um payload que já
-seja elegível. A seleção de template não deve, por si só, liberar uma comunicação
-que Commerce tenha marcado como inelegível.
+1. O consumer recebe `sale_recovery`, valida o contrato e o `context`.
+2. O resolvedor avalia todos os vínculos ativos da ação e escolhe o vencedor por
+   prioridade.
+3. Na transação que cria a mensagem, grava o principal resolvido no
+   `whatsapp_meta` e o snapshot do vínculo.
+4. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
+   nem nomes legados de template.
 
-## Resolução e persistência
+A rotação por sufixos (`sale_recovering_ct_3` a `_7`) será removida. A reserva
+passa a pertencer exclusivamente ao vínculo escolhido:
 
-1. O consumidor recebe a ação e valida o contrato.
-2. O resolvedor encontra o cenário vencedor a partir de `action + context`.
-3. Ainda dentro da criação da mensagem, grava em `whatsapp_meta` o
-   `template_id` do `primary_template_id` resolvido, além de um snapshot mínimo
-   do vínculo/cenário para auditoria.
-4. O sender usa somente o `template_id` persistido; ele não interpreta eventos
-   de venda nem consulta configuração de rotação.
-5. O outcome para Commerce preserva a correlação comercial atual e pode incluir
-   o `binding_id`/`scenario_code` para observabilidade, sem expor parâmetros ou
-   conteúdo da mensagem.
+1. a rotina de saúde identifica falhas qualificadas do principal de um vínculo;
+2. bloqueia esse vínculo em transação e confirma que o template falho ainda é o
+   seu principal;
+3. se há reserva, promove `backup_template_id` para `primary_template_id` e
+   grava `backup_template_id = NULL` na mesma transação;
+4. registra a mudança em auditoria e emite alerta operacional seguro;
+5. se a reserva já está vazia, mantém o principal oficial atual e não rotaciona.
 
-O snapshot na criação evita que uma troca posterior altere mensagens já aceitas e
-mantém histórico, métricas e callbacks associados ao template que foi realmente
-enviado.
+Não há busca de próximo template, encadeamento, wrap-around nem fallback implícito
+entre vínculos. Uma nova reserva só é cadastrada por ação administrativa explícita.
+O limiar de falha deve ser contado por `binding_id` (recomendado), para que uma
+falha de um cenário não promova a reserva de outro cenário que use o mesmo
+template físico.
 
-## Nova regra de reserva e falha
-
-A rotação deixa de ser uma sequência global de nomes (`_3` a `_7`). Ela pertence
-ao vínculo que selecionou a mensagem.
-
-Quando a rotina de saúde/falha confirmar que o **principal atual** de um vínculo
-deve ser desativado:
-
-1. bloqueia o vínculo em transação;
-2. confirma que o template que falhou ainda é o `primary_template_id` atual;
-3. se `backup_template_id` estiver preenchido, promove-o a
-   `primary_template_id` e define `backup_template_id = NULL` na mesma
-   transação;
-4. registra uma transição de configuração auditável e emite o alerta operacional
-   com vínculo, cenário e antigo/novo principal;
-5. se não houver reserva, não modifica o vínculo e não tenta qualquer rotação:
-   o template oficial atual permanece sendo usado.
-
-Não há encadeamento automático, wrap-around nem busca de “próximo” template. Uma
-nova reserva só existe após alteração administrativa explícita do vínculo. Essa
-regra também evita que uma falha num cenário altere outros cenários que, por
-acaso, usam o mesmo template.
-
-O limiar que caracteriza “cair” deve reutilizar ou substituir explicitamente a
-política atual de `DeliveryHealthProcess`. A decisão necessária é se o limiar será
-contado por `binding_id` (recomendado) ou por template físico; para a nova regra,
-o primeiro evita que falhas de cenários distintos consumam a reserva errada.
+Trocas de vínculo afetam apenas mensagens novas; mensagens já criadas mantêm o
+template persistido. Essa decisão evita alterar uma comunicação já aceita na fila.
 
 ## Administração
 
-Criar administração no caminho já existente de Admin → Gateway → Public API →
-Notifications para listar e alterar vínculos, não templates em linha solta.
+No caminho Admin → Gateway → Public API → Notifications, administrar vínculos —
+não um default global ou nomes de template soltos:
 
-Operações previstas:
-
-- listar vínculos, cenário, critérios, principal, reserva e estado;
-- criar/editar critérios e prioridade;
+- listar vínculos, critérios, prioridade, principal, reserva e estado;
+- criar/editar cenário e critérios permitidos;
 - definir/substituir principal e reserva, validando templates ativos e distintos;
 - ativar/desativar vínculo;
-- consultar histórico de mudanças e de promoção de reserva.
+- consultar histórico de edições e de promoção de reserva.
 
-O endpoint atual que escolhe um único default de recuperação deve permanecer
-somente como compatibilidade temporária ou ser descontinuado após a migração. Ele
-não deve coexistir como uma segunda fonte de verdade para a ação `sale_recovery`.
+O endpoint atual que define um único default de recuperação permanece somente como
+compatibilidade temporária e é removido ao fim da migração. Ele não pode ser uma
+segunda fonte de verdade.
 
 ## Migração por etapas
 
-### Etapa 0 — definição funcional e inventário
+### Etapa 0 — decisão funcional e inventário
 
-- Fechar a taxonomia de cenários para `sale_delivery` e `sale_recovery`, incluindo
-  campos permitidos no `context`, precedência e fallback oficial de cada ação.
-- Decidir o significado operacional de “sem PIX” frente à elegibilidade atual de
-  RDC.
-- Inventariar todos os produtores atuais de `stream:notifications:whatsapp_meta`,
-  chamadas HTTP relacionadas e todos os templates Meta usados por entrega/RDC.
-- Mapear mensagens pendentes e dashboards/relatórios que leem `template_id`.
+- Fechar os N cenários de RDC, critérios permitidos, prioridades e fallback.
+- Decidir o comportamento de “sem PIX” frente à elegibilidade atual.
+- Inventariar produtores de `stream:notifications:whatsapp_meta`, eventos legados,
+  variáveis de ambiente, templates Meta, mensagens pendentes e relatórios que
+  usam `template_id`.
 
-Saída: contrato versionado, tabela de cenários aprovada e plano de compatibilidade.
+Saída: matriz de decisão aprovada e contrato versionado.
 
-### Etapa 1 — fundação no Notifications, sem mudar produtores
+### Etapa 1 — fundação no Notifications
 
-- Criar migrations, modelos, repositório, resolvedor de cenário e trilha de
-  auditoria de vínculos.
-- Cadastrar os vínculos equivalentes ao comportamento atual, com principal e,
-  quando houver, uma reserva explícita.
-- Evoluir `whatsapp_meta` para armazenar o vínculo/cenário resolvido ou snapshot
-  equivalente, sem reescrever o histórico existente.
-- Implementar administração e autorização já usada para configurações de admin.
-- Adaptar health/alertas para operar por vínculo, mas manter a rotação automática
-  desligada até a Etapa 3.
+- Criar schema, modelo, repositório, validador de critérios, resolvedor e
+  histórico/auditoria dos vínculos.
+- Cadastrar N vínculos que reproduzam o comportamento atual, mais o fallback
+  oficial; reservas são explícitas e inicialmente opcionais.
+- Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
+  reescrever histórico.
+- Adaptar health/alertas para identificar falhas por vínculo, deixando a promoção
+  automática desligada até a validação da etapa seguinte.
 
-Saída: Notifications sabe resolver e auditar vínculos, ainda sem depender do novo
-contrato de Commerce.
+Saída: Notifications resolve e audita a decisão sem alteração de Commerce.
 
-### Etapa 2 — contrato semântico e adaptador de compatibilidade
+### Etapa 2 — novo contrato e compatibilidade
 
-- Aceitar o novo envelope `action + context + params` no consumer da stream.
-- Manter um adaptador explícito para eventos legados, traduzindo-os para ações e
-  contextos conhecidos; registrar métricas de uso legado.
-- Fazer o sender usar somente o template persistido pelo resolvedor; remover a
-  lógica especial de nomes `sale_recovering_ct*` dele.
-- Rejeitar nomes de template nos novos payloads e cobrir rejeição com testes.
+- Aceitar `action=sale_recovery`, `context` e `params` no consumer.
+- Traduzir eventos legados conhecidos para esse contrato por um adaptador isolado
+  e medir seu uso.
+- Fazer o sender depender exclusivamente do template persistido; remover a lógica
+  especial de `sale_recovering_ct*`.
+- Rejeitar template físico no novo envelope e testar o contrato.
 
-Saída: o Notifications é capaz de escolher o template final tanto para contratos
-novos quanto para produtores ainda legados.
+Saída: Notifications escolhe entre N pré-templates para contratos novos e legados.
 
-### Etapa 3 — migração de entrega pós-compra
+### Etapa 3 — Commerce V2: recuperação de venda
 
-- Alterar o Commerce V2 para publicar `action=sale_delivery` e apenas contexto
-  semântico de entrega (por exemplo, modo de conteúdo), parâmetros e correlação.
-- Remover do Commerce constantes/configurações que representem nomes de template
-  Meta de entrega.
-- Validar outcome, cobrança, timeout, fallback de e-mail e reenvios: eles devem
-  permanecer inalterados porque não pertencem à escolha do template.
-- Ativar a promoção principal→reserva para vínculos de entrega que já tenham
-  reserva aprovada.
+- Publicar somente `action=sale_recovery`, fatos aprovados no `context`, telefone,
+  parâmetros e correlação; remover nomes Meta da fila.
+- Retirar `SALE_RECOVERY_WHATSAPP_META_*_EVENT` e constantes equivalentes após o
+  adaptador confirmar que não há outro produtor dependente.
+- Preservar agendamento, pending/janela, contato, crédito, cobrança e callbacks
+  no Commerce: apenas a escolha do template muda de dono.
+- Ativar a promoção principal→reserva somente para vínculos que tenham reserva
+  aprovada.
 
-Saída: entrega não tem dependência externa de nome de template.
+Saída: RDC não possui dependência externa de template Meta.
 
-### Etapa 4 — migração de recuperação de venda
+### Etapa 4 — retirada do legado
 
-- Alterar o Commerce V2 para publicar `action=sale_recovery`, estágio e demais
-  fatos aprovados no contexto, sem `SALE_RECOVERY_WHATSAPP_META_*_EVENT` nem
-  nomes de template.
-- Migrar os cenários de RDC, inclusive fallback oficial por etapa, para vínculos
-  administrados no Notifications.
-- Ativar promoção principal→reserva exclusivamente nos vínculos com reserva.
-- Manter regras de agendamento, pending/janela, contato, crédito e callbacks no
-  Commerce; somente a escolha de template muda de dono.
-
-Saída: RDC não depende de configuração externa para template Meta.
-
-### Etapa 5 — retirada da compatibilidade
-
-- Após métricas comprovarem ausência de produtores legados e não existirem
-  mensagens legadas pendentes, remover o adaptador e as envs/configurações de
-  nomes de template no Commerce.
-- Remover o endpoint/default global legado e a rotação baseada em sufixos.
-- Atualizar mapa técnico da feature e documentação operacional.
+- Com métricas sem produtores legados e sem backlog pendente, remover adaptador,
+  endpoint/default global e rotação baseada em sufixos.
+- Atualizar o mapa técnico e a documentação operacional confirmada.
 
 ## Testes e aceite
 
-- Para cada ação, o mesmo `context` sempre resolve o mesmo vínculo vencedor;
-  critérios ausentes, inválidos ou ambíguos falham de modo observável.
-- Nenhum producer consegue alterar o template físico ao incluir nome/id de
-  template no novo contrato.
-- Entrega e RDC persistem o template efetivamente escolhido antes do sender.
-- Após falha qualificada com reserva, a próxima mensagem nova usa a reserva como
-  principal e o campo reserva fica vazio.
-- Após nova falha de vínculo sem reserva, o principal permanece inalterado e não
-  há tentativa de próximo template.
-- Uma rotação de um vínculo não altera outro vínculo que compartilhe o mesmo
-  template físico.
-- Callbacks, outcomes, idempotência comercial, holds/consumo/liberação e e-mail
-  fallback de entrega continuam com os mesmos contratos.
-- O adaptador legado produz a mesma seleção esperada enquanto estiver ativo, e
-  sua remoção só ocorre sem backlog pendente.
+- O mesmo payload resolve o mesmo vínculo vencedor dentre os N pré-definidos.
+- Critérios inválidos, empate e ausência de fallback falham de forma observável.
+- Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
+- A mensagem persiste o template e vínculo efetivamente resolvidos antes do sender.
+- Falha qualificada com reserva promove-a para principal e limpa a reserva.
+- Nova falha sem reserva mantém o principal oficial e não rotaciona.
+- A troca de um vínculo não altera qualquer outro, mesmo que ambos referenciem o
+  mesmo template físico.
+- Outcomes, idempotência comercial, holds, consumo e liberação do RDC mantêm seus
+  contratos atuais.
 
-## Riscos e decisões pendentes
+## Decisões pendentes
 
-- Definir todos os cenários, seus critérios permitidos e precedência antes de
-  expor telas administrativas; JSON livre sem validador não é aceitável.
-- Decidir se alteração de vínculo afeta somente mensagens novas (recomendado e
-  previsto neste plano) ou também mensagens já pendentes.
-- Confirmar se a saúde deve promover reserva após falha imediata, após limiar de
-  falhas consecutivas ou por outra política; o plano pressupõe uma confirmação
-  idempotente por vínculo.
-- Definir comportamento para template principal inativo/ausente e para nenhum
-  cenário elegível: falhar com outcome técnico, nunca escolher outro template por
-  aproximação.
-- O escopo não cobre push, Evolution, e-mail, outros domínios de WhatsApp nem
-  configuração por produto/afiliação além do contexto já produzido por Commerce.
+- Taxonomia final dos N pré-templates e a precedência de cada regra.
+- Política que qualifica “cair” (falha imediata, limiar consecutivo etc.); o plano
+  pressupõe transição idempotente por vínculo.
+- Comportamento para principal inativo/ausente ou payload sem cenário elegível.
+- Interface administrativa: é parte posterior à API administrativa, não condição
+  para a primeira migração de backend.
 
 ## Componentes afetados
 
-| Componente | Papel na migração |
+| Componente | Papel |
 | --- | --- |
-| `services-notification` | Dono dos vínculos, seleção, persistência do template resolvido, promoção de reserva, administração e observabilidade. |
-| `services-commerce-v2` | Publica ações/contexto semântico para entrega e RDC; mantém elegibilidade, cobrança, agendamento e outcomes. |
-| `edge-public-api` e `edge-gateway` | Expõem somente a administração de vínculos autorizada; não resolvem templates. |
-| `dashboard-seller`/admin | Interface futura para administrar vínculos; fora da primeira implementação até existir contrato administrativo aprovado. |
+| `services-notification` | Dono dos vínculos, resolução entre N pré-templates, template persistido, reserva, administração e observabilidade. |
+| `services-commerce-v2` | Publica ação/contexto semântico e preserva regras comerciais de RDC. |
+| `edge-public-api` e `edge-gateway` | Expõem administração autorizada de vínculos, sem decidir templates. |
 
 ## Referências confirmadas
 
-- `services-commerce-v2/app/Application/UseCase/Sale/ProcessPaidSaleEventDeliveryUseCase.php`
 - `services-commerce-v2/app/Application/UseCase/Sale/ExecuteSaleRecoveryDispatchUseCase.php`
 - `services-commerce-v2/app/Queue/NotificationQueueService.php`
 - `services-notification/app/Service/RegisterWhatsappMetaEvent.php`
