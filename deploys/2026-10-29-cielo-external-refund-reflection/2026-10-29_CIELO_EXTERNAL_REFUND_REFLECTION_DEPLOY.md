@@ -20,7 +20,7 @@ Refund parcial permanece fora de escopo. Uma atualização cuja consulta retorna
 
 | Repositório | Diretório na VPS | Branch de deploy | Commit | Papel nesta entrega |
 | --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `eeb7d10` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `efe1425` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
 | `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `d8be047` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
 | `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-external-refund-reflection` | `e15d339` | Extrai `Data.PaymentId` do `ChangeType 7` e envia a atualização para o Banking. |
 
