@@ -43,6 +43,10 @@ O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:action
 - `app/Domain/ChargeCard/Repository/ChargeCardRepository.php`
 - `app/Infrastructure/Services/CommerceRefundActionPublisher.php`
 - `app/Infrastructure/Services/CommerceDisputeEventPublisher.php`
+- `app/Command/ProbeCieloChargebackCommand.php`
+- `app/Infrastructure/Gateways/CieloEcommerce/Client/CieloEcommercePaymentQueryClient.php`
+- `config/autoload/commands.php`
+- `README.md`
 
 ### `edge-webhook`
 
@@ -123,6 +127,20 @@ docker compose logs --tail=100 services-banking-v2
 ```
 
 Confirmar que `refund_actions_queue` iniciou sem erro e está ouvindo `banking-v2:refunds:actions`.
+
+### 5. Diagnosticar o retorno Cielo de um `ChangeType: 7`
+
+Com um `PaymentId` de chargeback real, executar no container Banking:
+
+```bash
+php bin/hyperf.php cielo:chargeback:probe "PAYMENT_ID"
+```
+
+O comando é somente de leitura e compara: consulta de pagamento com
+`MerchantId`/`MerchantKey`, consulta de pagamento com OAuth Split e consulta
+de chargeback por `PaymentId`. Registrar o JSON retornado para confirmar qual
+consulta traz o `DisputeId`; a saída já oculta tokens, chaves e dados sensíveis
+de cartão. Ele não substitui a validação funcional abaixo.
 
 ## Validação pós-deploy
 
