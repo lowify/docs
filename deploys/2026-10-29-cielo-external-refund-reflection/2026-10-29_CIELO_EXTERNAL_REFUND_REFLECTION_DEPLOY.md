@@ -24,7 +24,7 @@ Refund parcial permanece fora de escopo. Uma atualização cuja consulta retorna
 | `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `d8be047` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
 | `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-external-refund-reflection` | `e15d339` | Extrai `Data.PaymentId` do `ChangeType 7` e envia a atualização para o Banking. |
 
-O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:actions` e a migration de unicidade de IDs bancários reais em `sales_refund`.
+O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:actions`; o SQL deste deploy aplica a unicidade de IDs bancários em `sales_refund`.
 
 ## Alterações incluídas
 
@@ -32,7 +32,7 @@ O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:action
 - Para refund externo confirmado, o Banking não publica diretamente `sales:events:refunded`; ele publica `cielo_external_refund_confirmed` em `commerce:refunds:external:actions` depois da transação bancária.
 - O Commerce V2 usa `banking_refund_id` para localizar ou criar o refund local, confirma-o em transação e só então publica `sales:events:refunded`. O extrato é responsabilidade do fluxo Wallet já consumido pelo Commerce V2.
 - Reenvios após aprovação não repetem refund, extrato ou evento final.
-- O Banking bloqueia a linha de `charges_card` do `PaymentId` durante a transação. Reentregas concorrentes do mesmo refund Cielo são serializadas, sem alterar dados legados de outros providers. A migration do Commerce V2 torna único apenas `banking_refund_id > 0`; o sentinela legado `0` continua repetível.
+- O Banking bloqueia a linha de `charges_card` do `PaymentId` durante a transação. Reentregas concorrentes do mesmo refund Cielo são serializadas, sem alterar dados legados de outros providers. O SQL do deploy torna único `banking_refund_id`; confirme o precheck antes de aplicá-lo.
 
 ## Arquivos alterados
 
@@ -70,14 +70,14 @@ Não há arquivo alterado em `dashboard-seller` nesta feature.
 
 ## Alteração de banco nova
 
-Executar o [precheck Lowify](sql/lowify/PRECHECK.sql). Ele deve retornar zero duplicidades para IDs bancários reais (`banking_refund_id > 0`) antes de executar a migration do Commerce V2. Valores legados `0` não representam um refund bancário e são excluídos da unicidade.
+Executar o [precheck Lowify](sql/lowify/PRECHECK.sql). Ele deve retornar zero duplicidades antes de aplicar o SQL deste deploy.
 
 ## Banco de dados
 
 | Banco | Aplicação | Precheck | Validação |
 | --- | --- | --- | --- |
 | `services-banking` | Não há alteração de schema | — | — |
-| `lowify` | migration do Commerce V2 | [PRECHECK.sql](sql/lowify/PRECHECK.sql) | [VALIDATE.sql](sql/lowify/VALIDATE.sql) |
+| `lowify` | [DEPLOY.sql](sql/lowify/DEPLOY.sql) | [PRECHECK.sql](sql/lowify/PRECHECK.sql) | [VALIDATE.sql](sql/lowify/VALIDATE.sql) |
 
 O índice Lowify é aditivo e não deve ser removido no rollback.
 
@@ -117,9 +117,9 @@ git pull --ff-only origin feat/cielo-external-refund-reflection
 git rev-parse --short HEAD
 ```
 
-### 2. Aplicar a migration do Commerce V2
+### 2. Aplicar o SQL Lowify
 
-Executar a migration `20261029190000_add_sales_refund_banking_refund_unique_index.php` no Commerce V2, somente se o precheck houver confirmado que não há duplicidades de IDs bancários reais. Ela cria `banking_refund_unique_id`, uma coluna gerada que converte o sentinela `0` em `NULL`, e aplica a chave única nessa coluna. Em seguida, executar o [VALIDATE.sql](sql/lowify/VALIDATE.sql).
+Executar manualmente o [DEPLOY.sql](sql/lowify/DEPLOY.sql) no banco `lowify`, a partir do arquivo que acompanha este deploy. Aplicar somente após o precheck já aprovado; em seguida, executar o [VALIDATE.sql](sql/lowify/VALIDATE.sql).
 
 ### 3. Publicar o Edge Webhook
 
