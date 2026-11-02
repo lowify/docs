@@ -10,8 +10,8 @@ Fora do escopo: alterar a política de expiração, revogar tokens existentes, e
 
 | Repositório | Host | Diretório de produção | Branch | Commit de deploy | Papel |
 | --- | --- | --- | --- | --- | --- |
-| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `1702700` | Registra falhas finais de expiração/refresh JWT no Redis. |
-| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `d683a083` | Registra invalidação da sessão legada e respostas 401 que encerram a sessão. |
+| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `f021334` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `5b3c6b57` | Registra invalidações e apresenta o histórico na visão geral do vendedor. |
 
 ## Alterações incluídas
 
@@ -19,6 +19,7 @@ Fora do escopo: alterar a política de expiração, revogar tokens existentes, e
 - Cada evento contém `at`, `source`, `reason` e `request_path`.
 - O Public API registra: `jwt_expired_without_refresh_token`, `jwt_refresh_token_missing`, `jwt_refresh_rejected` e `jwt_refresh_lock_timeout`.
 - O Dashboard registra: `legacy_login_token_mismatch` e `upstream_401` antes de limpar a sessão local.
+- O endpoint autenticado `GET /api/admin/users/{sellerId}/auth-logout-events` devolve o histórico somente para administradores; a visão geral administrativa do vendedor o apresenta em tabela.
 - A escrita no Redis é estritamente observacional: falha de conexão não bloqueia login, refresh, resposta HTTP nem logout.
 
 ## Pré-requisitos
@@ -46,7 +47,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor 1702700 HEAD
+git merge-base --is-ancestor f021334 HEAD
 git rev-parse --short HEAD
 docker compose up -d --build edge-public-api
 docker compose ps
@@ -63,7 +64,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor d683a083 HEAD
+git merge-base --is-ancestor 5b3c6b57 HEAD
 git rev-parse --short HEAD
 ```
 
@@ -74,7 +75,7 @@ O Dashboard usa o checkout montado no container; não executar `docker compose u
 1. Abra o Dashboard com uma conta de teste válida e navegue por uma página que consulte dados no Public API. A página deve continuar carregando normalmente.
 2. Mantenha a sessão aberta por mais de 15 minutos e volte a navegar. Se o cookie de refresh estiver válido, a pessoa deve permanecer autenticada sem precisar entrar novamente.
 3. Em uma sessão controlada, remova apenas o cookie de refresh no navegador de teste, aguarde a expiração do access token e navegue. A pessoa deve ser direcionada ao login; isso cria o cenário esperado de expiração sem refresh.
-4. Como conferência técnica opcional, consulte a lista Redis do seller de teste. O evento deve ter data, origem e motivo, sem token, cookie, senha ou IP. Não apagar os eventos após a conferência.
+4. Como administrador, abra a Visão geral do vendedor de teste. A seção “Histórico de logout” deve mostrar data, origem, motivo e caminho do evento, sem token, cookie, senha ou IP.
 5. Se a navegação normal falhar, interrompa a publicação, preserve os logs de container e execute o rollback abaixo. Não tente corrigir apagando chaves Redis.
 
 ## Rollback
@@ -86,6 +87,6 @@ O Dashboard usa o checkout montado no container; não executar `docker compose u
 
 ## Riscos e limites
 
-- O histórico não cria uma interface de leitura nesta entrega; a consulta inicial é operacional no Redis.
+- A tela de histórico é restrita à visão administrativa do vendedor. O endpoint também exige JWT administrativo; colaboradores não podem consultar eventos.
 - `legacy_login_token_mismatch` indica que a validação da sessão legada falhou. A investigação deve considerar novo login concorrente, alteração do token legado ou conta inativa antes de concluir a causa.
 - Falhas de rede entre Public API e `services-auth` continuam seguindo o comportamento atual de erro; esta entrega não as converte em logout nem muda a política de retry.
