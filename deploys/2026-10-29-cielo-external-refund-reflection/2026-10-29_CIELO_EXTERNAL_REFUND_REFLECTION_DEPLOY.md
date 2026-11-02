@@ -20,9 +20,9 @@ Refund parcial permanece fora de escopo. Uma atualização cuja consulta retorna
 
 | Repositório | Diretório na VPS | Branch de deploy | Commit | Papel nesta entrega |
 | --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `91266aa` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
-| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `a0c0d58` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
-| `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-external-refund-reflection` | Registrar após commit e push | Extrai `Data.PaymentId` do `ChangeType 7` e envia a atualização para o Banking. |
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/cielo-external-refund-reflection` | `eeb7d10` | Confirma a Cielo, persiste o refund/alocações e publica a ação intermediária. |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/cielo-external-refund-reflection` | `d8be047` | Consome a ação externa, persiste `sales_refund`, publica o evento final e aciona o extrato já existente via Wallet. |
+| `edge-webhook` | `/opt/lowify/edge/edge-webhook` | `feat/cielo-external-refund-reflection` | `e15d339` | Extrai `Data.PaymentId` do `ChangeType 7` e envia a atualização para o Banking. |
 
 O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:actions` e a migration de unicidade de IDs bancários reais em `sales_refund`.
 
@@ -43,10 +43,6 @@ O `service-commerce-v2` recebe o consumidor de `commerce:refunds:external:action
 - `app/Domain/ChargeCard/Repository/ChargeCardRepository.php`
 - `app/Infrastructure/Services/CommerceRefundActionPublisher.php`
 - `app/Infrastructure/Services/CommerceDisputeEventPublisher.php`
-- `app/Command/ProbeCieloChargebackCommand.php`
-- `app/Infrastructure/Gateways/CieloEcommerce/Client/CieloEcommercePaymentQueryClient.php`
-- `config/autoload/commands.php`
-- `README.md`
 
 ### `edge-webhook`
 
@@ -86,6 +82,27 @@ Executar o [precheck Lowify](sql/lowify/PRECHECK.sql). Ele deve retornar zero du
 O índice Lowify é aditivo e não deve ser removido no rollback.
 
 ## Sequência de deploy
+
+### 0. Diagnóstico obrigatório antes do deploy da feature
+
+Antes de publicar esta feature, publicar a `main` de `services-banking-v2` até
+o commit `3d17612`. A única alteração de runtime nesse deploy é o commit
+`0bd9394` (`feat(cielo): add chargeback probe command`); `3d17612` apenas
+documenta sua execução. Esse deploy isolado não inclui o fluxo de refund desta
+feature.
+
+Com um `PaymentId` real recebido no webhook Cielo, o Davison deve executar no
+host, sem entrar manualmente no container:
+
+```bash
+cd /opt/lowify/services/services-banking-v2 && docker compose exec -T services-banking-v2 php bin/hyperf.php cielo:chargeback:probe "PAYMENT_ID"
+```
+
+O comando consulta o mesmo `PaymentId` com credenciais Cielo, com OAuth Split
+e na API de chargeback. Ele devolve os três resultados em JSON sanitizado;
+tokens, chaves e dados sensíveis de cartão são ocultados. Enviar o resultado
+para análise antes de decidir se a feature de refund deve ser publicada ou se o
+handler precisa ser ajustado.
 
 Atualizar o Edge e o Commerce V2 antes de iniciar o Banking, para que `ChangeType 7` seja encaminhado e a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
 
@@ -127,20 +144,6 @@ docker compose logs --tail=100 services-banking-v2
 ```
 
 Confirmar que `refund_actions_queue` iniciou sem erro e está ouvindo `banking-v2:refunds:actions`.
-
-### 5. Diagnosticar o retorno Cielo de um `ChangeType: 7`
-
-Com um `PaymentId` de chargeback real, executar no container Banking:
-
-```bash
-php bin/hyperf.php cielo:chargeback:probe "PAYMENT_ID"
-```
-
-O comando é somente de leitura e compara: consulta de pagamento com
-`MerchantId`/`MerchantKey`, consulta de pagamento com OAuth Split e consulta
-de chargeback por `PaymentId`. Registrar o JSON retornado para confirmar qual
-consulta traz o `DisputeId`; a saída já oculta tokens, chaves e dados sensíveis
-de cartão. Ele não substitui a validação funcional abaixo.
 
 ## Validação pós-deploy
 
