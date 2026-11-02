@@ -18,6 +18,7 @@ Evolution será descontinuado. Toda comunicação paga prioriza créditos de com
 8. [Auditoria de implementação e pendências](09_IMPLEMENTATION_AUDIT_AND_REMAINING_TASKS.md)
 9. [Dashboard Admin: comunicações de venda](10_DASHBOARD_ADMIN_TASKS.md)
 10. [Dashboard Seller: preferência de saldo](11_DASHBOARD_SELLER_TASKS.md)
+11. [Centralização de templates no Notifications](13_NOTIFICATION_TEMPLATE_OWNERSHIP_MIGRATION.md)
 
 ## Responsabilidade e acesso
 
