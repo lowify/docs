@@ -10,12 +10,12 @@ Fora do escopo: alterar a política de expiração, revogar tokens existentes, e
 
 | Repositório | Host | Diretório de produção | Branch | Commit de deploy | Papel |
 | --- | --- | --- | --- | --- | --- |
-| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `f021334` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
-| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `54862ec5` | Registra invalidações e apresenta o histórico no item Adicional da visão geral do vendedor. |
+| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `814c76e` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `2b5b54fd` | Registra invalidações e apresenta o histórico no item Adicional da visão geral do vendedor. |
 
 ## Alterações incluídas
 
-- A lista por seller usa a chave `auth:logout-events:{seller_id}`, conserva no máximo 50 eventos e expira após 14 dias.
+- A lista por seller usa a chave `auth:logout-events:{seller_id}`, conserva no máximo 50 eventos e expira após 7 dias.
 - Cada evento contém `at`, `source`, `reason` e `request_path`.
 - O Public API registra: `jwt_expired_without_refresh_token`, `jwt_refresh_token_missing`, `jwt_refresh_rejected` e `jwt_refresh_lock_timeout`.
 - O Dashboard registra: `legacy_login_token_mismatch` e `upstream_401` antes de limpar a sessão local.
@@ -47,7 +47,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor f021334 HEAD
+git merge-base --is-ancestor 814c76e HEAD
 git rev-parse --short HEAD
 docker compose up -d --build edge-public-api
 docker compose ps
@@ -64,7 +64,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor 54862ec5 HEAD
+git merge-base --is-ancestor 2b5b54fd HEAD
 git rev-parse --short HEAD
 ```
 
@@ -82,7 +82,7 @@ O Dashboard usa o checkout montado no container; não executar `docker compose u
 
 1. Reverter primeiro o Dashboard para a referência saudável anterior e recriar apenas `front-dashboard-seller`.
 2. Reverter em seguida o Public API para a referência saudável anterior e recriar `edge-public-api`.
-3. Não executar migration rollback e não apagar `auth:logout-events:{seller_id}`. Os registros são temporários, expiram automaticamente em 14 dias e podem ajudar a investigar a causa do rollback.
+3. Não executar migration rollback e não apagar `auth:logout-events:{seller_id}`. Os registros são temporários, expiram automaticamente em 7 dias e podem ajudar a investigar a causa do rollback.
 4. Validar login, uma navegação autenticada no Dashboard e uma chamada que passe pelo Public API.
 
 ## Riscos e limites
