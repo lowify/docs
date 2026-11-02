@@ -83,25 +83,34 @@ O índice Lowify é aditivo e não deve ser removido no rollback.
 
 ## Sequência de deploy
 
-### 0. Diagnóstico obrigatório antes do deploy da feature
-
-`services-banking-v2` deve estar na `main` até o commit `3d17612`.
-
-Com um `PaymentId` real, executar no host:
-
-```bash
-cd /opt/lowify/services/services-banking-v2 && docker compose exec -T services-banking-v2 php bin/hyperf.php cielo:chargeback:probe "PAYMENT_ID"
-```
-
-Enviar o JSON retornado para análise antes de seguir o deploy.
-
 Atualizar o Edge e o Commerce V2 antes de iniciar o Banking, para que `ChangeType 7` seja encaminhado e a nova ação intermediária seja consumida pelo processo que cria `sales_refund` externo.
 
 ### 1. Atualizar os três componentes
 
-No Edge, Banking e Commerce V2:
+#### `edge-webhook`
 
 ```bash
+cd /opt/lowify/edge/edge-webhook
+git fetch origin --prune
+git switch feat/cielo-external-refund-reflection
+git pull --ff-only origin feat/cielo-external-refund-reflection
+git rev-parse --short HEAD
+```
+
+#### `service-commerce-v2`
+
+```bash
+cd /opt/lowify/services/service-commerce-v2
+git fetch origin --prune
+git switch feat/cielo-external-refund-reflection
+git pull --ff-only origin feat/cielo-external-refund-reflection
+git rev-parse --short HEAD
+```
+
+#### `services-banking-v2`
+
+```bash
+cd /opt/lowify/services/services-banking-v2
 git fetch origin --prune
 git switch feat/cielo-external-refund-reflection
 git pull --ff-only origin feat/cielo-external-refund-reflection
@@ -112,7 +121,18 @@ git rev-parse --short HEAD
 
 Executar a migration `20261029190000_add_sales_refund_banking_refund_unique_index.php` no Commerce V2, somente se o precheck houver confirmado que não há duplicidades de IDs bancários reais. Ela cria `banking_refund_unique_id`, uma coluna gerada que converte o sentinela `0` em `NULL`, e aplica a chave única nessa coluna. Em seguida, executar o [VALIDATE.sql](sql/lowify/VALIDATE.sql).
 
-### 3. Publicar o Commerce V2
+### 3. Publicar o Edge Webhook
+
+```bash
+cd /opt/lowify/edge/edge-webhook
+docker compose up -d --build edge-webhook
+docker compose ps
+docker compose logs --tail=100 edge-webhook
+```
+
+Confirmar que o container `edge-webhook` iniciou sem erro.
+
+### 4. Publicar o Commerce V2
 
 O Commerce V2 deve estar atualizado antes do Banking começar a publicar `commerce:refunds:external:actions` externas.
 
@@ -125,7 +145,7 @@ docker compose logs --tail=100 service-commerce-v2
 
 Confirmar que `commerce_refund_actions_queue` iniciou e não há erro de banco ou Redis.
 
-### 4. Publicar o Banking V2
+### 5. Publicar o Banking V2
 
 ```bash
 cd /opt/lowify/services/services-banking-v2
