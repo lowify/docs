@@ -10,8 +10,8 @@ Fora do escopo: alterar a política de expiração, revogar tokens existentes, e
 
 | Repositório | Host | Diretório de produção | Branch | Commit de deploy | Papel |
 | --- | --- | --- | --- | --- | --- |
-| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `814c76e` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
-| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `2b5b54fd` | Registra invalidações e apresenta o histórico no item Adicional da visão geral do vendedor. |
+| `edge-public-api` | `144.126.149.57` | `/opt/lowify/edge/edge-public-api` | `feat/auth-logout-observability` | `5910a10` | Registra e fornece, a administradores autenticados, o histórico de logout no Redis. |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `feat/auth-logout-observability` | `6e4cf9da` | Registra invalidações e apresenta o histórico no item Adicional da visão geral do vendedor. |
 
 ## Alterações incluídas
 
@@ -47,7 +47,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor 814c76e HEAD
+git merge-base --is-ancestor 5910a10 HEAD
 git rev-parse --short HEAD
 docker compose up -d --build edge-public-api
 docker compose ps
@@ -64,7 +64,7 @@ git status --porcelain=v1
 git fetch origin --prune
 git switch feat/auth-logout-observability
 git pull --ff-only origin feat/auth-logout-observability
-git merge-base --is-ancestor 2b5b54fd HEAD
+git merge-base --is-ancestor 6e4cf9da HEAD
 git rev-parse --short HEAD
 ```
 
