@@ -33,8 +33,8 @@ ação `sale_recovery` autorizada, mas jamais escolher o template físico.
 ## Resultado esperado
 
 Não existirá uma relação 1:1 entre `sale_recovery` e um único template default.
-O Notifications manterá N cenários pré-definidos de recuperação. Para cada
-mensagem, um resolver escrito no código avalia o payload e devolve um
+O Notifications manterá exatamente quatro cenários iniciais de recuperação. Para
+cada mensagem, um resolver escrito no código avalia o payload e devolve um
 `scenario_code` conhecido; o vínculo desse cenário determina o template principal.
 Os critérios não são configuráveis no banco.
 
@@ -42,9 +42,14 @@ Exemplo conceitual:
 
 | Pré-template/vínculo | Regra aplicada pelo resolver | Principal | Reserva |
 | --- | --- | --- | --- |
-| Recuperação 1 — sem PIX | `stage=1` e `pix_code` vazio | template X | template Y |
-| Recuperação 1 — oficial | `stage=1` | template A | vazio |
-| Recuperação 2 — oferta expirando | `stage=2` | template B | template C |
+| Recuperação 1 — com PIX | `stage=1` e `pix_code` presente | template X | template Y |
+| Recuperação 1 — sem PIX | `stage=1` e `pix_code` ausente | template A | vazio |
+| Recuperação 2 — com PIX | `stage=2` e `pix_code` presente | template B | template C |
+| Recuperação 2 — sem PIX | `stage=2` e `pix_code` ausente | template D | vazio |
+
+Os quatro cenários são fechados para esta fase: estágio 1 ou 2, combinado com
+PIX presente ou ausente. Nenhum outro campo do payload decide o template e não há
+fallback para outro cenário.
 
 “Sem PIX” é o exemplo de nome de negócio, não um template Meta. Hoje o Commerce
 descarta RDC sem código PIX; antes de cadastrar esse vínculo, será preciso decidir se
@@ -164,8 +169,8 @@ segunda fonte de verdade.
 
 ### Etapa 0 — decisão funcional e inventário
 
-- Fechar os N cenários de RDC e implementar suas regras/precedência em um resolver
-  de código versionado no Notifications, sem cenário fallback.
+- Implementar no resolver de código os quatro cenários fechados: estágio 1/2 ×
+  PIX presente/ausente, sem cenário fallback.
 - Decidir o comportamento de “sem PIX” frente à elegibilidade atual.
 - Inventariar produtores de `stream:notifications:whatsapp_meta`, eventos legados,
   variáveis de ambiente, templates Meta, mensagens pendentes e relatórios que
@@ -177,7 +182,7 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 - Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
   dos vínculos.
-- Cadastrar os N vínculos exigidos pelos cenários do resolver; reservas são
+- Cadastrar os quatro vínculos exigidos pelos cenários do resolver; reservas são
   explícitas e inicialmente opcionais.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
   reescrever histórico.
@@ -195,7 +200,7 @@ Saída: Notifications resolve e audita a decisão sem alteração de Commerce.
   especial de `sale_recovering_ct*`.
 - Rejeitar template físico no novo envelope e testar o contrato.
 
-Saída: Notifications escolhe entre N pré-templates para contratos novos e legados.
+Saída: Notifications escolhe entre os quatro pré-templates para contratos novos e legados.
 
 ### Etapa 3 — Commerce V2: recuperação de venda
 
@@ -218,8 +223,8 @@ Saída: RDC não possui dependência externa de template Meta.
 
 ## Testes e aceite
 
-- O mesmo payload resolve o mesmo `scenario_code` dentre os N cenários definidos
-  no código e, então, o mesmo vínculo registrado.
+- O mesmo payload resolve o mesmo `scenario_code` dentre os quatro cenários
+  definidos no código e, então, o mesmo vínculo registrado.
 - Payload inválido, cenário sem vínculo ou principal ausente falham de forma
   observável, sem fallback.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
@@ -233,8 +238,8 @@ Saída: RDC não possui dependência externa de template Meta.
 
 ## Decisões pendentes
 
-- Taxonomia final dos N pré-templates e as regras/precedência implementadas pelo
-  resolver de RDC.
+- Representação única de PIX ausente (`null` ou string vazia) no contrato, para
+  distinguir com precisão os quatro cenários do resolver.
 - Política que qualifica “cair” (falha imediata, limiar consecutivo etc.); o plano
   pressupõe transição idempotente por vínculo.
 - Formato do erro/outcome para principal ausente ou payload sem cenário elegível.
@@ -245,7 +250,7 @@ Saída: RDC não possui dependência externa de template Meta.
 
 | Componente | Papel |
 | --- | --- |
-| `services-notification` | Dono dos vínculos, resolução entre N pré-templates, template persistido, reserva, administração e observabilidade. |
+| `services-notification` | Dono dos vínculos, resolução entre os quatro pré-templates, template persistido, reserva, administração e observabilidade. |
 | `services-commerce-v2` | Publica ação/contexto semântico e preserva regras comerciais de RDC. |
 | `edge-public-api` e `edge-gateway` | Expõem administração autorizada de vínculos, sem decidir templates. |
 
