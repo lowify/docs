@@ -62,6 +62,7 @@ inelegível.
 
 ```json
 {
+  "version": 2,
   "action": "sale_recovery",
   "phone": "5511999999999",
   "context": {
@@ -80,6 +81,7 @@ inelegível.
 
 | Campo | Responsabilidade |
 | --- | --- |
+| `version` | Versão do contrato; o novo envelope usa `2`. |
 | `action` | Valor fechado: `sale_recovery`; não é nome de template. |
 | `context` | Fatos de negócio usados pelo resolver em código para selecionar um cenário conhecido. Inclui o valor literal de `pix_code`, nunca o booleano derivado `has_pix_code`; não contém provider, nome ou ID Meta. |
 | `params` | Dados autorizados para renderização e correlação/outcome. |
@@ -158,7 +160,7 @@ template físico.
 Trocas de vínculo afetam apenas mensagens novas; mensagens já criadas mantêm o
 template persistido. Essa decisão evita alterar uma comunicação já aceita na fila.
 
-## Administração
+## Administração e Dashboard Seller
 
 No caminho Admin → Gateway → Public API → Notifications, administrar vínculos —
 não um default global ou nomes de template soltos:
@@ -170,6 +172,39 @@ não um default global ou nomes de template soltos:
 O endpoint atual que define um único default de recuperação permanece somente como
 compatibilidade temporária e é removido ao fim da migração. Ele não pode ser uma
 segunda fonte de verdade.
+
+O Dashboard Seller substitui a tabela atual de “Template padrão” por uma tela de
+vínculos de recuperação. Nesta fase ela possui exatamente duas linhas fixas:
+
+| Cenário | Campos editáveis |
+| --- | --- |
+| Recuperação de venda — estágio 1 com PIX | Template principal obrigatório e template reserva opcional. |
+| Recuperação de venda — estágio 2 com PIX | Template principal obrigatório e template reserva opcional. |
+
+A tela carrega vínculos e templates elegíveis do Notifications e salva cada
+vínculo por `scenario_code`, usando IDs de template — nunca nome de template. Ela
+deve impedir principal vazio e principal igual à reserva; a reserva pode ser
+limpa para deixar o cenário sem rotação futura. A edição preserva a alteração
+atômica do backend: a promoção automática principal→reserva continua sendo
+decidida exclusivamente pelo Notifications.
+
+O fluxo substitui o atual seletor global em:
+
+- `dashboard-seller/views/dashboard/admin/configs/whatsapp_notifications/index.php`;
+- `dashboard-seller/api/admin/whatsapp_meta_templates.php`;
+- rotas equivalentes no Gateway, Public API e Notifications.
+
+O contrato administrativo planejado deve expor listagem de vínculos e templates
+elegíveis, além de atualização por cenário, por exemplo:
+
+```text
+GET /admin/whatsapp-meta-template-bindings/sale-recovery
+PUT /admin/whatsapp-meta-template-bindings/sale-recovery/{scenario_code}
+```
+
+O `PUT` recebe somente `primary_template_id` e `backup_template_id`; o cenário é
+fixado pela rota e o Dashboard não envia regras de seleção, template names ou
+qualquer decisão de rotação.
 
 ## Migração por etapas
 
@@ -198,6 +233,19 @@ Saída: matriz de decisão aprovada e contrato versionado.
   automática desligada até a validação da etapa seguinte.
 
 Saída: Notifications resolve e audita a decisão sem alteração de Commerce.
+
+### Etapa 1.1 — administração de vínculos
+
+- Expor no Notifications a listagem e atualização administrativa dos dois
+  vínculos, com validação de principal, reserva e templates elegíveis.
+- Encaminhar as novas rotas pelo Public API e Gateway, preservando a autorização
+  administrativa atual.
+- Substituir no Dashboard Seller o seletor global pelos dois vínculos fixos;
+  remover o uso da API local e endpoint que atualizam
+  `sale-recovery-default`.
+
+Saída: o Dashboard Seller administra principal e reserva por estágio com PIX,
+sem acesso direto ao banco ou escolha de template pela fila.
 
 ### Etapa 2 — novo contrato e compatibilidade
 
@@ -243,6 +291,9 @@ Saída: RDC não possui dependência externa de template Meta.
 - Nova falha sem reserva mantém o principal oficial e não rotaciona.
 - A troca de um vínculo não altera qualquer outro, mesmo que ambos referenciem o
   mesmo template físico.
+- O Dashboard Seller exibe somente os dois cenários fixos, grava IDs de principal
+  e reserva e não permite principal vazio ou igual à reserva.
+- O Dashboard não chama nem exibe o endpoint/default global legado.
 - Outcomes, idempotência comercial, holds, consumo e liberação do RDC mantêm seus
   contratos atuais.
 
@@ -263,6 +314,7 @@ Saída: RDC não possui dependência externa de template Meta.
 | `services-notification` | Dono dos vínculos, resolução entre os dois pré-templates com PIX, ignorar sem PIX, template persistido, reserva, administração e observabilidade. |
 | `services-commerce-v2` | Publica ação/contexto semântico, aplica o skip de PIX/pix_automatic sem código e preserva as demais regras comerciais de RDC. |
 | `edge-public-api` e `edge-gateway` | Expõem administração autorizada de vínculos, sem decidir templates. |
+| `dashboard-seller` | Substitui o seletor global por edição dos dois vínculos, principal e reserva. |
 
 ## Referências confirmadas
 
