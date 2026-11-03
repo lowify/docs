@@ -52,11 +52,10 @@ presente. PIX ausente não é cenário nem fallback: o Notifications ignora a
 mensagem, sem criar mensagem Meta ou chamar o sender. Nenhum outro campo do
 payload decide o template.
 
-O único template mapeado e elegível nesta fase é `sale_recovering_ct_pix`. Ele
-deve estar aprovado na Meta como template com CTA de solicitação de pagamento PIX.
-Os nomes `sale_recovering_ct_pix_2` até `_8` não são tratados nem podem ser
-selecionados: qualquer template sem mapping é ignorado como `skipped`, sem chamada
-à Meta.
+Os templates mapeados e elegíveis nesta fase são `sale_recovering_ct_pix` e
+`sale_recovering_ct_pix_2` até `_8`. Todos possuem o mesmo texto e os mesmos
+componentes; portanto usam um único mapping de preenchimento. Qualquer nome fora
+dessa família não possui mapping e é ignorado como `skipped`, sem chamada à Meta.
 
 No Commerce, `payment_method` igual a `pix` ou `pix_automatic` exige `pix_code`:
 sem código, o dispatch é marcado como `skipped` antes de enfileirar. Outros meios
@@ -102,12 +101,13 @@ ausente, o Notifications encerra o consumo como ignorado, sem resolver vínculo.
 
 ### Mapping da família de templates PIX
 
-O catálogo de mapping desta fase contém somente o template abaixo. Um template só
-pode ser usado como principal ou reserva depois de possuir mapping explícito:
+O catálogo de mapping desta fase contém a família abaixo. Todos os nomes listados
+usam o mesmo mapping; um template fora dela só pode ser usado como principal ou
+reserva depois de possuir mapping explícito:
 
 | Templates elegíveis |
 | --- |
-| `sale_recovering_ct_pix` |
+| `sale_recovering_ct_pix`, `sale_recovering_ct_pix_2`, `sale_recovering_ct_pix_3`, `sale_recovering_ct_pix_4`, `sale_recovering_ct_pix_5`, `sale_recovering_ct_pix_6`, `sale_recovering_ct_pix_7`, `sale_recovering_ct_pix_8` |
 
 | Elemento do template aprovado | Origem do valor no payload |
 | --- | --- |
@@ -176,10 +176,9 @@ documenta erro quando o `code` do CTA está ausente ou o formato do botão está
 incorreto. Fontes: [Payment Request CTA — Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/payments/payments-br/payment-request-cta) e [referência de envio com PIX dinâmico](https://academy.insiderone.com/v1/docs/send-conversational-whatsapp-pix-payment-template-message).
 
 Antes de chamar a Meta, o Notifications valida que o template principal resolvido
-possui mapping. Se ele for qualquer nome fora do catálogo — incluindo
-`sale_recovering_ct_pix_2` até `_8` nesta fase — encerra como `skipped`/ignorado,
-publica o resultado terminal para Commerce liberar eventual hold e não tenta
-montar componentes genéricos.
+possui mapping. Se ele for qualquer nome fora do catálogo, encerra como
+`skipped`/ignorado, publica o resultado terminal para Commerce liberar eventual
+hold e não tenta montar componentes genéricos.
 
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
@@ -247,9 +246,9 @@ O limiar de falha deve ser contado por `binding_id` (recomendado), para que uma
 falha de um cenário não promova a reserva de outro cenário que use o mesmo
 template físico.
 
-Como só `sale_recovering_ct_pix` está mapeado neste recorte, a reserva inicial
-fica vazia e não há rotação ativa. A reserva só poderá ser configurada quando um
-segundo template receber mapping explícito e for validado no Notifications.
+Como toda a família PIX está mapeada neste recorte, principal e reserva podem usar
+nomes diferentes da família. A rotação é habilitada somente quando a reserva
+também possuir mapping — condição já atendida por `_2` até `_8`.
 
 Trocas de vínculo afetam apenas mensagens novas; mensagens já criadas mantêm o
 template persistido. Essa decisão evita alterar uma comunicação já aceita na fila.
@@ -282,10 +281,9 @@ limpa para deixar o cenário sem rotação futura. A edição preserva a altera�
 atômica do backend: a promoção automática principal→reserva continua sendo
 decidida exclusivamente pelo Notifications.
 
-Neste primeiro recorte, o catálogo exposto à tela contém somente
-`sale_recovering_ct_pix`; portanto os dois vínculos usam esse principal e a reserva
-permanece vazia. O controle de reserva só será habilitado quando houver outro
-template mapeado e elegível.
+Neste primeiro recorte, o catálogo exposto à tela contém toda a família
+`sale_recovering_ct_pix` até `_8`; o Dashboard pode escolher principal e reserva
+distintos dentro dela.
 
 O fluxo substitui o atual seletor global em:
 
@@ -324,9 +322,8 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 - Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
   dos vínculos.
-- Cadastrar os dois vínculos exigidos pelos cenários do resolver com
-  `sale_recovering_ct_pix` como único principal mapeado; reservas permanecem
-  vazias até existir outro mapping aprovado.
+- Cadastrar os dois vínculos exigidos pelos cenários do resolver, usando somente
+  templates da família mapeada `sale_recovering_ct_pix` até `_8`.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
   reescrever histórico.
 - Adaptar health/alertas para identificar falhas por vínculo, deixando a promoção
@@ -356,7 +353,7 @@ sem acesso direto ao banco ou escolha de template pela fila.
   especial de `sale_recovering_ct*`.
 - Rejeitar template físico no novo envelope e testar o contrato.
 
-Saída: Notifications usa o único template mapeado para os dois cenários com PIX e
+Saída: Notifications usa templates da família mapeada nos dois cenários com PIX e
 ignora casos sem PIX ou com template sem mapping.
 
 ### Etapa 3 — Commerce V2: recuperação de venda
@@ -367,7 +364,8 @@ ignora casos sem PIX ou com template sem mapping.
   adaptador confirmar que não há outro produtor dependente.
 - Preservar agendamento, pending/janela, contato, crédito, cobrança e callbacks
   no Commerce: apenas a escolha do template muda de dono.
-- Não ativar promoção principal→reserva enquanto só existir um template mapeado.
+- Ativar promoção principal→reserva somente quando ambos pertencerem à família
+  mapeada e forem distintos.
 
 Saída: RDC não possui dependência externa de template Meta.
 
@@ -384,7 +382,7 @@ Saída: RDC não possui dependência externa de template Meta.
 - Mensagem sem PIX é ignorada e retorna resultado terminal ao Commerce, sem criar
   mensagem Meta; `pix`/`pix_automatic` sem código é `skipped` antes da fila.
 - Template principal sem mapping é ignorado como `skipped`, sem criar mensagem
-  Meta; isso inclui `sale_recovering_ct_pix_2` até `_8` neste recorte.
+  Meta; todos os nomes da família `sale_recovering_ct_pix` até `_8` são mapeados.
 - Payload inválido, cenário com PIX sem vínculo ou principal ausente falham de forma
   observável, sem fallback.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
