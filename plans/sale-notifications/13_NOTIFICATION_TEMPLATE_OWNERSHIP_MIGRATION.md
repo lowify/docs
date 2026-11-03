@@ -42,7 +42,7 @@ Exemplo conceitual:
 
 | Pré-template/vínculo | Regra aplicada pelo resolver | Principal | Reserva |
 | --- | --- | --- | --- |
-| Recuperação 1 — sem PIX | `stage=1` e `has_pix_code=false` | template X | template Y |
+| Recuperação 1 — sem PIX | `stage=1` e `pix_code` vazio | template X | template Y |
 | Recuperação 1 — oficial | `stage=1` | template A | vazio |
 | Recuperação 2 — oferta expirando | `stage=2` | template B | template C |
 
@@ -61,7 +61,7 @@ marcado como inelegível.
   "context": {
     "stage": 1,
     "payment_state": "pending",
-    "has_pix_code": false
+    "pix_code": "000201..."
   },
   "params": {
     "first_name": "...",
@@ -75,9 +75,14 @@ marcado como inelegível.
 | Campo | Responsabilidade |
 | --- | --- |
 | `action` | Valor fechado: `sale_recovery`; não é nome de template. |
-| `context` | Fatos de negócio usados pelo resolver em código para selecionar um cenário conhecido. Não contém provider, nome ou ID Meta. |
+| `context` | Fatos de negócio usados pelo resolver em código para selecionar um cenário conhecido. Inclui o valor literal de `pix_code`, nunca o booleano derivado `has_pix_code`; não contém provider, nome ou ID Meta. |
 | `params` | Dados autorizados para renderização e correlação/outcome. |
 | template final | Resolvido somente pelo Notifications. |
+
+O produtor envia `pix_code` literalmente, preservando o valor disponibilizado pela
+venda. O contrato não cria nem aceita `has_pix_code`; o resolver trata o conteúdo
+de `pix_code` conforme a regra do cenário. A representação de ausência (`null` ou
+string vazia) deve ser única e definida no contrato antes da implementação.
 
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
