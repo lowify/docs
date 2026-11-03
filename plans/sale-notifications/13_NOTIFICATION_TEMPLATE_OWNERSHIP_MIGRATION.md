@@ -112,13 +112,13 @@ reserva depois de possuir mapping explícito:
 | --- | --- |
 | Corpo `{{first_name}}` | Primeiro nome do cliente. |
 | Corpo `{{product_name}}` | Título do item principal da venda. |
-| Corpo `{{until}}` | Texto de urgência preenchido internamente pelo resolver do Notifications conforme o estágio; não vem da fila. |
+| Corpo `{{until}}` | Valor genérico `em breve`, preenchido internamente pelo Notifications; não vem da fila. |
 | Botão URL dinâmico, índice `0` | `button_link`: token que substitui o `{{1}}` da URL aprovada. No fluxo atual, é o `order_id` usado como código da URL RDC. |
 | Botão de solicitação de pagamento PIX, índice `1` | Valor literal de `pix_code`. |
 
 `until` é dado derivado do Notifications: o produtor não o envia e não pode
-sobrescrevê-lo. O resolver define o texto correspondente ao estágio antes de
-montar os parâmetros do corpo.
+sobrescrevê-lo. O resolver sempre usa o texto genérico `em breve` antes de montar
+os parâmetros do corpo.
 
 O corpo segue este texto:
 
