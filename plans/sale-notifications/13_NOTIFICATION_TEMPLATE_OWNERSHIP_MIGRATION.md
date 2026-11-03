@@ -52,9 +52,11 @@ presente. PIX ausente não é cenário nem fallback: o Notifications ignora a
 mensagem, sem criar mensagem Meta ou chamar o sender. Nenhum outro campo do
 payload decide o template.
 
-Os templates elegíveis para esses vínculos são `sale_recovering_ct_pix` e
-`sale_recovering_ct_pix_2` até `sale_recovering_ct_pix_8`. Todos devem estar
-aprovados na Meta como template com CTA de solicitação de pagamento PIX.
+O único template mapeado e elegível nesta fase é `sale_recovering_ct_pix`. Ele
+deve estar aprovado na Meta como template com CTA de solicitação de pagamento PIX.
+Os nomes `sale_recovering_ct_pix_2` até `_8` não são tratados nem podem ser
+selecionados: qualquer template sem mapping é ignorado como `skipped`, sem chamada
+à Meta.
 
 No Commerce, `payment_method` igual a `pix` ou `pix_automatic` exige `pix_code`:
 sem código, o dispatch é marcado como `skipped` antes de enfileirar. Outros meios
@@ -100,12 +102,12 @@ ausente, o Notifications encerra o consumo como ignorado, sem resolver vínculo.
 
 ### Mapping da família de templates PIX
 
-Todos os templates da família abaixo usam o mesmo contrato de preenchimento;
-somente a escolha de qual deles será principal ou reserva varia por vínculo:
+O catálogo de mapping desta fase contém somente o template abaixo. Um template só
+pode ser usado como principal ou reserva depois de possuir mapping explícito:
 
 | Templates elegíveis |
 | --- |
-| `sale_recovering_ct_pix`, `sale_recovering_ct_pix_2`, `sale_recovering_ct_pix_3`, `sale_recovering_ct_pix_4`, `sale_recovering_ct_pix_5`, `sale_recovering_ct_pix_6`, `sale_recovering_ct_pix_7`, `sale_recovering_ct_pix_8` |
+| `sale_recovering_ct_pix` |
 
 | Elemento do template aprovado | Origem do valor no payload |
 | --- | --- |
@@ -173,6 +175,12 @@ de componente obrigatório documentado pela Meta e de uma implementação de API
 documenta erro quando o `code` do CTA está ausente ou o formato do botão está
 incorreto. Fontes: [Payment Request CTA — Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/payments/payments-br/payment-request-cta) e [referência de envio com PIX dinâmico](https://academy.insiderone.com/v1/docs/send-conversational-whatsapp-pix-payment-template-message).
 
+Antes de chamar a Meta, o Notifications valida que o template principal resolvido
+possui mapping. Se ele for qualquer nome fora do catálogo — incluindo
+`sale_recovering_ct_pix_2` até `_8` nesta fase — encerra como `skipped`/ignorado,
+publica o resultado terminal para Commerce liberar eventual hold e não tenta
+montar componentes genéricos.
+
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
 um adaptador traduz os eventos legados conhecidos; o resolvedor novo nunca recebe
@@ -215,9 +223,11 @@ reprocessamento representam o template que realmente foi enviado.
 3. Com `pix_code`, o resolver de RDC, escrito no Notifications, usa o estágio e
    devolve `recovery_stage_1_with_pix` ou `recovery_stage_2_with_pix`; outro
    estágio falha.
-4. Na transação que cria a mensagem, grava o principal resolvido no
+4. Valida que o principal possui mapping; sem mapping, encerra como `skipped` e
+   publica outcome terminal sem criar `whatsapp_meta`.
+5. Na transação que cria a mensagem, grava o principal mapeado no
    `whatsapp_meta` e o snapshot do vínculo.
-5. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
+6. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
    nem nomes legados de template.
 
 A rotação por sufixos (`sale_recovering_ct_3` a `_7`) será removida. A reserva
@@ -236,6 +246,10 @@ vínculos. Uma nova reserva só é cadastrada por ação administrativa explíci
 O limiar de falha deve ser contado por `binding_id` (recomendado), para que uma
 falha de um cenário não promova a reserva de outro cenário que use o mesmo
 template físico.
+
+Como só `sale_recovering_ct_pix` está mapeado neste recorte, a reserva inicial
+fica vazia e não há rotação ativa. A reserva só poderá ser configurada quando um
+segundo template receber mapping explícito e for validado no Notifications.
 
 Trocas de vínculo afetam apenas mensagens novas; mensagens já criadas mantêm o
 template persistido. Essa decisão evita alterar uma comunicação já aceita na fila.
@@ -267,6 +281,11 @@ deve impedir principal vazio e principal igual à reserva; a reserva pode ser
 limpa para deixar o cenário sem rotação futura. A edição preserva a alteração
 atômica do backend: a promoção automática principal→reserva continua sendo
 decidida exclusivamente pelo Notifications.
+
+Neste primeiro recorte, o catálogo exposto à tela contém somente
+`sale_recovering_ct_pix`; portanto os dois vínculos usam esse principal e a reserva
+permanece vazia. O controle de reserva só será habilitado quando houver outro
+template mapeado e elegível.
 
 O fluxo substitui o atual seletor global em:
 
@@ -305,8 +324,9 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 - Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
   dos vínculos.
-- Cadastrar os dois vínculos exigidos pelos cenários do resolver; reservas são
-  explícitas e inicialmente opcionais.
+- Cadastrar os dois vínculos exigidos pelos cenários do resolver com
+  `sale_recovering_ct_pix` como único principal mapeado; reservas permanecem
+  vazias até existir outro mapping aprovado.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
   reescrever histórico.
 - Adaptar health/alertas para identificar falhas por vínculo, deixando a promoção
@@ -336,7 +356,8 @@ sem acesso direto ao banco ou escolha de template pela fila.
   especial de `sale_recovering_ct*`.
 - Rejeitar template físico no novo envelope e testar o contrato.
 
-Saída: Notifications escolhe entre os dois pré-templates com PIX e ignora os casos sem PIX.
+Saída: Notifications usa o único template mapeado para os dois cenários com PIX e
+ignora casos sem PIX ou com template sem mapping.
 
 ### Etapa 3 — Commerce V2: recuperação de venda
 
@@ -346,8 +367,7 @@ Saída: Notifications escolhe entre os dois pré-templates com PIX e ignora os c
   adaptador confirmar que não há outro produtor dependente.
 - Preservar agendamento, pending/janela, contato, crédito, cobrança e callbacks
   no Commerce: apenas a escolha do template muda de dono.
-- Ativar a promoção principal→reserva somente para vínculos que tenham reserva
-  aprovada.
+- Não ativar promoção principal→reserva enquanto só existir um template mapeado.
 
 Saída: RDC não possui dependência externa de template Meta.
 
@@ -363,6 +383,8 @@ Saída: RDC não possui dependência externa de template Meta.
   definidos no código e, então, o mesmo vínculo registrado.
 - Mensagem sem PIX é ignorada e retorna resultado terminal ao Commerce, sem criar
   mensagem Meta; `pix`/`pix_automatic` sem código é `skipped` antes da fila.
+- Template principal sem mapping é ignorado como `skipped`, sem criar mensagem
+  Meta; isso inclui `sale_recovering_ct_pix_2` até `_8` neste recorte.
 - Payload inválido, cenário com PIX sem vínculo ou principal ausente falham de forma
   observável, sem fallback.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
@@ -391,7 +413,7 @@ Saída: RDC não possui dependência externa de template Meta.
 
 | Componente | Papel |
 | --- | --- |
-| `services-notification` | Dono dos vínculos, resolução entre os dois pré-templates com PIX, ignorar sem PIX, template persistido, reserva, administração e observabilidade. |
+| `services-notification` | Dono dos vínculos, dos dois cenários com PIX, do catálogo de mapping, do ignore sem PIX/sem mapping, template persistido, reserva, administração e observabilidade. |
 | `services-commerce-v2` | Publica ação/contexto semântico, aplica o skip de PIX/pix_automatic sem código e preserva as demais regras comerciais de RDC. |
 | `edge-public-api` e `edge-gateway` | Expõem administração autorizada de vínculos, sem decidir templates. |
 | `dashboard-seller` | Substitui o seletor global por edição dos dois vínculos, principal e reserva. |
