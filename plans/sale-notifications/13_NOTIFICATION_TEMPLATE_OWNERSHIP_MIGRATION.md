@@ -33,29 +33,30 @@ ação `sale_recovery` autorizada, mas jamais escolher o template físico.
 ## Resultado esperado
 
 Não existirá uma relação 1:1 entre `sale_recovery` e um único template default.
-O Notifications manterá exatamente quatro cenários iniciais de recuperação. Para
-cada mensagem, um resolver escrito no código avalia o payload e devolve um
-`scenario_code` conhecido; o vínculo desse cenário determina o template principal.
-Os critérios não são configuráveis no banco.
+O Notifications manterá exatamente dois cenários iniciais de recuperação: estágio
+1 com PIX e estágio 2 com PIX. Para uma mensagem com `pix_code`, um resolver
+escrito no código devolve um `scenario_code` conhecido; o vínculo desse cenário
+determina o template principal. Mensagens sem `pix_code` são ignoradas pelo
+Notifications e não selecionam template. Os critérios não são configuráveis no
+banco.
 
 Exemplo conceitual:
 
 | Pré-template/vínculo | Regra aplicada pelo resolver | Principal | Reserva |
 | --- | --- | --- | --- |
 | Recuperação 1 — com PIX | `stage=1` e `pix_code` presente | template X | template Y |
-| Recuperação 1 — sem PIX | `stage=1` e `pix_code` ausente | template A | vazio |
 | Recuperação 2 — com PIX | `stage=2` e `pix_code` presente | template B | template C |
-| Recuperação 2 — sem PIX | `stage=2` e `pix_code` ausente | template D | vazio |
 
-Os quatro cenários são fechados para esta fase: estágio 1 ou 2, combinado com
-PIX presente ou ausente. Nenhum outro campo do payload decide o template e não há
-fallback para outro cenário.
+Os dois cenários são fechados para esta fase: estágio 1 ou 2 com `pix_code`
+presente. PIX ausente não é cenário nem fallback: o Notifications ignora a
+mensagem, sem criar mensagem Meta ou chamar o sender. Nenhum outro campo do
+payload decide o template.
 
-“Sem PIX” é o exemplo de nome de negócio, não um template Meta. Hoje o Commerce
-descarta RDC sem código PIX; antes de cadastrar esse vínculo, será preciso decidir se
-o caso muda a elegibilidade da recuperação ou se apenas classifica mensagens que
-já seriam elegíveis. O Notifications não deve liberar um envio que Commerce tenha
-marcado como inelegível.
+No Commerce, `payment_method` igual a `pix` ou `pix_automatic` exige `pix_code`:
+sem código, o dispatch é marcado como `skipped` antes de enfileirar. Outros meios
+de pagamento podem ser enfileirados sem código; nesse caso, o Notifications os
+ignora. O Notifications não deve liberar um envio que Commerce tenha marcado como
+inelegível.
 
 ## Contrato-alvo da fila
 
@@ -87,7 +88,8 @@ marcado como inelegível.
 O produtor envia `pix_code` literalmente, preservando o valor disponibilizado pela
 venda. O contrato não cria nem aceita `has_pix_code`; o resolver trata o conteúdo
 de `pix_code` conforme a regra do cenário. A representação de ausência (`null` ou
-string vazia) deve ser única e definida no contrato antes da implementação.
+string vazia) deve ser única e definida no contrato antes da implementação. Quando
+ausente, o Notifications encerra o consumo como ignorado, sem resolver vínculo.
 
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
@@ -103,8 +105,8 @@ separada de `whatsapp_meta_templates`.
 | --- | --- |
 | `id` | Identidade interna do vínculo. |
 | `action` | Inicialmente sempre `sale_recovery`; mantém o modelo extensível sem ampliar o escopo. |
-| `scenario_code` | Chave estável, por exemplo `recovery_stage_1_without_pix`; não é nome Meta. |
-| `label` | Rótulo administrativo: “Recuperação 1 — sem PIX”. |
+| `scenario_code` | Chave estável, por exemplo `recovery_stage_1_with_pix`; não é nome Meta. |
+| `label` | Rótulo administrativo: “Recuperação 1 — com PIX”. |
 | `primary_template_id` | Template oficial atual. FK para `whatsapp_meta_templates`. |
 | `backup_template_id` | Template reserva de uso único; FK anulável. |
 | timestamps | Auditoria de criação e alteração. |
@@ -125,11 +127,15 @@ reprocessamento representam o template que realmente foi enviado.
 ## Seleção e regra de reserva
 
 1. O consumer recebe `sale_recovery`, valida o contrato e o `context`.
-2. O resolver de RDC, escrito no Notifications, aplica as regras de negócio ao
-   payload e devolve um `scenario_code` conhecido; se não houver cenário, falha.
-3. Na transação que cria a mensagem, grava o principal resolvido no
+2. Sem `pix_code`, o Notifications ignora a mensagem sem resolver cenário ou
+   template e publica o resultado terminal necessário para o Commerce encerrar o
+   dispatch e liberar eventual hold.
+3. Com `pix_code`, o resolver de RDC, escrito no Notifications, usa o estágio e
+   devolve `recovery_stage_1_with_pix` ou `recovery_stage_2_with_pix`; outro
+   estágio falha.
+4. Na transação que cria a mensagem, grava o principal resolvido no
    `whatsapp_meta` e o snapshot do vínculo.
-4. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
+5. O sender usa somente esse `template_id`; não interpreta ação, payload de venda
    nem nomes legados de template.
 
 A rotação por sufixos (`sale_recovering_ct_3` a `_7`) será removida. A reserva
@@ -169,9 +175,11 @@ segunda fonte de verdade.
 
 ### Etapa 0 — decisão funcional e inventário
 
-- Implementar no resolver de código os quatro cenários fechados: estágio 1/2 ×
-  PIX presente/ausente, sem cenário fallback.
-- Decidir o comportamento de “sem PIX” frente à elegibilidade atual.
+- Implementar no resolver de código os dois cenários fechados: estágio 1/2 com
+  PIX. PIX ausente é ignorado pelo Notifications, sem cenário fallback.
+- Alterar a elegibilidade do Commerce: `pix`/`pix_automatic` sem `pix_code` é
+  `skipped`; demais métodos sem código são enfileirados e ignorados pelo
+  Notifications.
 - Inventariar produtores de `stream:notifications:whatsapp_meta`, eventos legados,
   variáveis de ambiente, templates Meta, mensagens pendentes e relatórios que
   usam `template_id`.
@@ -182,7 +190,7 @@ Saída: matriz de decisão aprovada e contrato versionado.
 
 - Criar schema, modelo, repositório, resolver de cenários e histórico/auditoria
   dos vínculos.
-- Cadastrar os quatro vínculos exigidos pelos cenários do resolver; reservas são
+- Cadastrar os dois vínculos exigidos pelos cenários do resolver; reservas são
   explícitas e inicialmente opcionais.
 - Evoluir `whatsapp_meta` para guardar template resolvido e vínculo/cenário, sem
   reescrever histórico.
@@ -200,7 +208,7 @@ Saída: Notifications resolve e audita a decisão sem alteração de Commerce.
   especial de `sale_recovering_ct*`.
 - Rejeitar template físico no novo envelope e testar o contrato.
 
-Saída: Notifications escolhe entre os quatro pré-templates para contratos novos e legados.
+Saída: Notifications escolhe entre os dois pré-templates com PIX e ignora os casos sem PIX.
 
 ### Etapa 3 — Commerce V2: recuperação de venda
 
@@ -223,9 +231,11 @@ Saída: RDC não possui dependência externa de template Meta.
 
 ## Testes e aceite
 
-- O mesmo payload resolve o mesmo `scenario_code` dentre os quatro cenários
+- O mesmo payload com PIX resolve o mesmo `scenario_code` dentre os dois cenários
   definidos no código e, então, o mesmo vínculo registrado.
-- Payload inválido, cenário sem vínculo ou principal ausente falham de forma
+- Mensagem sem PIX é ignorada e retorna resultado terminal ao Commerce, sem criar
+  mensagem Meta; `pix`/`pix_automatic` sem código é `skipped` antes da fila.
+- Payload inválido, cenário com PIX sem vínculo ou principal ausente falham de forma
   observável, sem fallback.
 - Um produtor não consegue alterar template ao enviar nome ou ID no novo contrato.
 - A mensagem persiste o template e vínculo efetivamente resolvidos antes do sender.
@@ -239,7 +249,7 @@ Saída: RDC não possui dependência externa de template Meta.
 ## Decisões pendentes
 
 - Representação única de PIX ausente (`null` ou string vazia) no contrato, para
-  distinguir com precisão os quatro cenários do resolver.
+  o Notifications ignorar a mensagem de modo determinístico.
 - Política que qualifica “cair” (falha imediata, limiar consecutivo etc.); o plano
   pressupõe transição idempotente por vínculo.
 - Formato do erro/outcome para principal ausente ou payload sem cenário elegível.
@@ -250,8 +260,8 @@ Saída: RDC não possui dependência externa de template Meta.
 
 | Componente | Papel |
 | --- | --- |
-| `services-notification` | Dono dos vínculos, resolução entre os quatro pré-templates, template persistido, reserva, administração e observabilidade. |
-| `services-commerce-v2` | Publica ação/contexto semântico e preserva regras comerciais de RDC. |
+| `services-notification` | Dono dos vínculos, resolução entre os dois pré-templates com PIX, ignorar sem PIX, template persistido, reserva, administração e observabilidade. |
+| `services-commerce-v2` | Publica ação/contexto semântico, aplica o skip de PIX/pix_automatic sem código e preserva as demais regras comerciais de RDC. |
 | `edge-public-api` e `edge-gateway` | Expõem administração autorizada de vínculos, sem decidir templates. |
 
 ## Referências confirmadas
