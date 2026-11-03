@@ -52,6 +52,10 @@ presente. PIX ausente não é cenário nem fallback: o Notifications ignora a
 mensagem, sem criar mensagem Meta ou chamar o sender. Nenhum outro campo do
 payload decide o template.
 
+Os templates elegíveis para esses vínculos são `sale_recovering_ct_pix` e
+`sale_recovering_ct_pix_2` até `sale_recovering_ct_pix_8`. Todos devem estar
+aprovados na Meta como template com CTA de solicitação de pagamento PIX.
+
 No Commerce, `payment_method` igual a `pix` ou `pix_automatic` exige `pix_code`:
 sem código, o dispatch é marcado como `skipped` antes de enfileirar. Outros meios
 de pagamento podem ser enfileirados sem código; nesse caso, o Notifications os
@@ -92,6 +96,49 @@ venda. O contrato não cria nem aceita `has_pix_code`; o resolver trata o conte�
 de `pix_code` conforme a regra do cenário. A representação de ausência (`null` ou
 string vazia) deve ser única e definida no contrato antes da implementação. Quando
 ausente, o Notifications encerra o consumo como ignorado, sem resolver vínculo.
+
+### CTA “Copiar código Pix”
+
+O botão não é URL nem recebe `pix_code` como variável do corpo. Para um template
+aprovado com botão `PAYMENT_REQUEST` de PIX dinâmico no índice `0`, o sender deve
+incluir este componente ao chamar a Cloud API:
+
+```json
+{
+  "type": "button",
+  "sub_type": "payment_request",
+  "index": "0",
+  "parameters": [
+    {
+      "type": "action",
+      "action": {
+        "payment_request": {
+          "payment_setting": {
+            "type": "pix_dynamic_code",
+            "pix_dynamic_code": {
+              "code": "<pix_code_literal_da_venda>"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+O corpo usa somente `first_name`, `product_name` e `until`, conforme o texto:
+
+```text
+Olá, {{first_name}}! O pagamento PIX do produto {{product_name}} ainda está pendente {{until}}
+
+Finalize agora
+```
+
+O texto do botão é definido pelo tipo de CTA aprovado na Meta (“Copiar código
+Pix” na interface localizada); não é um texto que o payload define. O sender atual
+monta apenas botão `url` para `button_link`, portanto esta migração prevê suporte
+explícito a `payment_request` e deve impedir que `pix_code` seja serializado como
+parâmetro do corpo. Referência: [Payment Request CTA — Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/payments/payments-br/payment-request-cta).
 
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
