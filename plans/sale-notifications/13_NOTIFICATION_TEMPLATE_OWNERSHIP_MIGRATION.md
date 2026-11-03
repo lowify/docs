@@ -78,7 +78,6 @@ inelegível.
   "params": {
     "first_name": "...",
     "product_name": "...",
-    "until": "...",
     "button_link": "...",
     "notification_outcome": { "...": "..." }
   }
@@ -113,9 +112,13 @@ reserva depois de possuir mapping explícito:
 | --- | --- |
 | Corpo `{{first_name}}` | Primeiro nome do cliente. |
 | Corpo `{{product_name}}` | Título do item principal da venda. |
-| Corpo `{{until}}` | Texto de urgência definido pelo resolver para cada estágio; deve ser obrigatório e explícito, sem valor implícito. |
+| Corpo `{{until}}` | Texto de urgência preenchido internamente pelo resolver do Notifications conforme o estágio; não vem da fila. |
 | Botão URL dinâmico, índice `0` | `button_link`: token que substitui o `{{1}}` da URL aprovada. No fluxo atual, é o `order_id` usado como código da URL RDC. |
 | Botão de solicitação de pagamento PIX, índice `1` | Valor literal de `pix_code`. |
+
+`until` é dado derivado do Notifications: o produtor não o envia e não pode
+sobrescrevê-lo. O resolver define o texto correspondente ao estágio antes de
+montar os parâmetros do corpo.
 
 O corpo segue este texto:
 
