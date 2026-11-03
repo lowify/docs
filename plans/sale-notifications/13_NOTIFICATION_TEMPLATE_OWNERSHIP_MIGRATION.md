@@ -77,6 +77,7 @@ inelegível.
   "params": {
     "first_name": "...",
     "product_name": "...",
+    "until": "...",
     "button_link": "...",
     "notification_outcome": { "...": "..." }
   }
@@ -97,36 +98,24 @@ de `pix_code` conforme a regra do cenário. A representação de ausência (`nul
 string vazia) deve ser única e definida no contrato antes da implementação. Quando
 ausente, o Notifications encerra o consumo como ignorado, sem resolver vínculo.
 
-### CTA “Copiar código Pix”
+### Mapping da família de templates PIX
 
-O botão não é URL nem recebe `pix_code` como variável do corpo. Para um template
-aprovado com botão `PAYMENT_REQUEST` de PIX dinâmico no índice `0`, o sender deve
-incluir este componente ao chamar a Cloud API:
+Todos os templates da família abaixo usam o mesmo contrato de preenchimento;
+somente a escolha de qual deles será principal ou reserva varia por vínculo:
 
-```json
-{
-  "type": "button",
-  "sub_type": "payment_request",
-  "index": "0",
-  "parameters": [
-    {
-      "type": "action",
-      "action": {
-        "payment_request": {
-          "payment_setting": {
-            "type": "pix_dynamic_code",
-            "pix_dynamic_code": {
-              "code": "<pix_code_literal_da_venda>"
-            }
-          }
-        }
-      }
-    }
-  ]
-}
-```
+| Templates elegíveis |
+| --- |
+| `sale_recovering_ct_pix`, `sale_recovering_ct_pix_2`, `sale_recovering_ct_pix_3`, `sale_recovering_ct_pix_4`, `sale_recovering_ct_pix_5`, `sale_recovering_ct_pix_6`, `sale_recovering_ct_pix_7`, `sale_recovering_ct_pix_8` |
 
-O corpo usa somente `first_name`, `product_name` e `until`, conforme o texto:
+| Elemento do template aprovado | Origem do valor no payload |
+| --- | --- |
+| Corpo `{{first_name}}` | Primeiro nome do cliente. |
+| Corpo `{{product_name}}` | Título do item principal da venda. |
+| Corpo `{{until}}` | Texto de urgência definido pelo resolver para cada estágio; deve ser obrigatório e explícito, sem valor implícito. |
+| Botão URL dinâmico, índice `0` | `button_link`: token que substitui o `{{1}}` da URL aprovada. No fluxo atual, é o `order_id` usado como código da URL RDC. |
+| Botão de solicitação de pagamento PIX, índice `1` | Valor literal de `pix_code`. |
+
+O corpo segue este texto:
 
 ```text
 Olá, {{first_name}}! O pagamento PIX do produto {{product_name}} ainda está pendente {{until}}
@@ -134,11 +123,55 @@ Olá, {{first_name}}! O pagamento PIX do produto {{product_name}} ainda está pe
 Finalize agora
 ```
 
+### CTA URL e “Copiar código Pix”
+
+Pela configuração aprovada mostrada, o template tem dois botões fixos. O sender
+deve enviar ambos os componentes, respeitando seus índices:
+
+```json
+[
+  {
+    "type": "button",
+    "sub_type": "url",
+    "index": "0",
+    "parameters": [{ "type": "text", "text": "<button_link>" }]
+  },
+  {
+    "type": "button",
+    "sub_type": "payment_request",
+    "index": "1",
+    "parameters": [
+      {
+        "type": "action",
+        "action": {
+          "payment_request": {
+            "payment_setting": {
+              "type": "pix_dynamic_code",
+              "pix_dynamic_code": {
+                "code": "<pix_code_literal_da_venda>"
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+]
+```
+
 O texto do botão é definido pelo tipo de CTA aprovado na Meta (“Copiar código
 Pix” na interface localizada); não é um texto que o payload define. O sender atual
-monta apenas botão `url` para `button_link`, portanto esta migração prevê suporte
-explícito a `payment_request` e deve impedir que `pix_code` seja serializado como
-parâmetro do corpo. Referência: [Payment Request CTA — Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/payments/payments-br/payment-request-cta).
+monta apenas o botão `url` para `button_link`, portanto esta migração prevê suporte
+explícito ao `payment_request` no índice `1` e deve impedir que `pix_code` seja
+serializado como parâmetro do corpo.
+
+Não é possível abstrair/remover dinamicamente um botão de um template aprovado:
+se o template possui CTA de pagamento PIX, o envio deve conter o `pix_dynamic_code`
+exigido por ele. Logo, sem `pix_code`, o Notifications não chama a Meta; ele ignora
+a mensagem antes da montagem dos componentes. Isso é uma inferência do contrato
+de componente obrigatório documentado pela Meta e de uma implementação de API que
+documenta erro quando o `code` do CTA está ausente ou o formato do botão está
+incorreto. Fontes: [Payment Request CTA — Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/payments/payments-br/payment-request-cta) e [referência de envio com PIX dinâmico](https://academy.insiderone.com/v1/docs/send-conversational-whatsapp-pix-payment-template-message).
 
 O novo contrato deve rejeitar ou registrar como erro qualquer campo de seleção
 externa como `template`, `template_name` ou `template_id`. Durante a transição,
