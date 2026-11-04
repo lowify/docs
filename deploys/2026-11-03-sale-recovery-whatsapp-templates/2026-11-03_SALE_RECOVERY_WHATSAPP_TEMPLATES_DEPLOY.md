@@ -137,7 +137,7 @@ git pull --ff-only origin feat/sale-recovery-whatsapp-templates
 git rev-parse --short HEAD
 ~~~
 
-O commit deve ser c74c245a. Não há build de frontend novo nesta entrega; aplicar o procedimento usual de reload do PHP-FPM/opcache do ambiente, se ele existir.
+O commit deve ser c74c245a. Não há build nem reload adicional do Dashboard Seller nesta entrega.
 
 ### 6. Construir todas as imagens Docker
 
