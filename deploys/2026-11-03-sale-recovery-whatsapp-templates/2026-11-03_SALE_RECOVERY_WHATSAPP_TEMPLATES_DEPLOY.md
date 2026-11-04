@@ -56,9 +56,9 @@ Confirmar que a migration 2026_10_08_000061 está aplicada e que a 2026_11_03_00
 
 ## Sequência de deploy
 
-Modo de rebuild: incremental.
+Modo de rebuild: completo para os quatro componentes Docker. Primeiro atualizar os cinco repositórios, depois construir todas as quatro imagens e somente então subir os containers na ordem segura. O Dashboard Seller recebe somente pull.
 
-Publicar o Notifications e aplicar a migration antes do Commerce V2, pois o Commerce passará a produzir o contrato v2. Depois publicar as edges e, por último, o Dashboard Seller.
+O Notifications deve subir e aplicar a migration antes do Commerce V2, pois o Commerce passará a produzir o contrato v2.
 
 ### Pré-checagem completa
 
@@ -74,7 +74,7 @@ git show-ref --verify --quiet refs/remotes/origin/feat/sale-recovery-whatsapp-te
 
 Se qualquer comando falhar ou o status tiver saída, interrompa toda a operação. Não faça stash, reset, limpeza ou troca de branch para contornar o estado encontrado.
 
-### 1. services-notification
+### 1. Atualizar services-notification
 
 ~~~bash
 cd /opt/lowify/services/services-notifications
@@ -83,16 +83,11 @@ git fetch origin --prune
 git switch feat/sale-recovery-whatsapp-templates
 git pull --ff-only origin feat/sale-recovery-whatsapp-templates
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose exec -T services-notifications php bin/hyperf.php migrate --force --path=migrations/2026_11_03_000062_create_sale_recovery_template_bindings.php
-docker compose exec -T services-notifications php bin/hyperf.php migrate:status
-docker compose ps
-docker compose logs --tail=100 services-notifications
 ~~~
 
-O commit deve ser 8010a90. Não prossiga se a migration ou o container falhar.
+O commit deve ser 8010a90.
 
-### 2. services-commerce-v2
+### 2. Atualizar services-commerce-v2
 
 ~~~bash
 cd /opt/lowify/services/service-commerce-v2
@@ -101,14 +96,11 @@ git fetch origin --prune
 git switch feat/sale-recovery-whatsapp-templates
 git pull --ff-only origin feat/sale-recovery-whatsapp-templates
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 service-commerce-v2
 ~~~
 
 O commit deve ser 28ed8f7.
 
-### 3. edge-public-api
+### 3. Atualizar edge-public-api
 
 ~~~bash
 cd /opt/lowify/edge/edge-public-api
@@ -117,14 +109,11 @@ git fetch origin --prune
 git switch feat/sale-recovery-whatsapp-templates
 git pull --ff-only origin feat/sale-recovery-whatsapp-templates
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 edge-public-api
 ~~~
 
 O commit deve ser 8d77e29.
 
-### 4. edge-gateway
+### 4. Atualizar edge-gateway
 
 ~~~bash
 cd /opt/lowify/edge/edge-gateway
@@ -133,14 +122,11 @@ git fetch origin --prune
 git switch feat/sale-recovery-whatsapp-templates
 git pull --ff-only origin feat/sale-recovery-whatsapp-templates
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 edge-gateway
 ~~~
 
 O commit deve ser bf341d9.
 
-### 5. dashboard-seller
+### 5. Atualizar dashboard-seller
 
 ~~~bash
 cd /opt/lowify/front/dashboard-seller
@@ -152,6 +138,52 @@ git rev-parse --short HEAD
 ~~~
 
 O commit deve ser c74c245a. Não há build de frontend novo nesta entrega; aplicar o procedimento usual de reload do PHP-FPM/opcache do ambiente, se ele existir.
+
+### 6. Construir todas as imagens Docker
+
+Execute todos os builds antes de subir qualquer container. Se qualquer build falhar, interrompa; nenhum dos quatro containers deve ser iniciado com a nova versão.
+
+~~~bash
+cd /opt/lowify/services/services-notifications
+docker compose build
+
+cd /opt/lowify/services/service-commerce-v2
+docker compose build
+
+cd /opt/lowify/edge/edge-public-api
+docker compose build
+
+cd /opt/lowify/edge/edge-gateway
+docker compose build
+~~~
+
+### 7. Subir os componentes e aplicar a migration
+
+~~~bash
+cd /opt/lowify/services/services-notifications
+docker compose up -d
+docker compose exec -T services-notifications php bin/hyperf.php migrate --force --path=migrations/2026_11_03_000062_create_sale_recovery_template_bindings.php
+docker compose exec -T services-notifications php bin/hyperf.php migrate:status
+docker compose ps
+docker compose logs --tail=100 services-notifications
+
+cd /opt/lowify/services/service-commerce-v2
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 service-commerce-v2
+
+cd /opt/lowify/edge/edge-public-api
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 edge-public-api
+
+cd /opt/lowify/edge/edge-gateway
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 edge-gateway
+~~~
+
+Não prossiga se a migration ou qualquer container falhar.
 
 ## Validação pós-deploy
 
