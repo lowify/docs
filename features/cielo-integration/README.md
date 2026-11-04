@@ -6,7 +6,7 @@
 
 ## Objetivo
 
-Permitir onboarding de contas, cobrança por cartão, liquidação, disputas e webhooks pelos providers Cielo E-commerce e Pagar.me. A ativação efetiva de cada conta permanece condicionada à aprovação da conta bancária. Um seller só pode iniciar ou alterar o cadastro da conta de cartão com o cash-in ativo; se o cash-in for desativado depois do cadastro, a conta existente continua consultável, mas o Checkout Lowify não gera novas vendas.
+Permitir onboarding de contas, cobrança por cartão, liquidação, disputas e webhooks pelos providers Cielo E-commerce e Pagar.me. A ativação efetiva de cada conta permanece condicionada à aprovação da conta bancária. Novos sellers já recebem a permissão de integração de cartão, mas só podem iniciar ou alterar o cadastro da conta com o cash-in ativo; se o cash-in for desativado depois do cadastro, a conta existente continua consultável, mas o Checkout Lowify não gera novas vendas.
 
 ## Fluxo principal
 
