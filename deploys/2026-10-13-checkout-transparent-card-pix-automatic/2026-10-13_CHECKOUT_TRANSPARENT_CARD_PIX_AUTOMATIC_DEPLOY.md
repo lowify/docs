@@ -188,7 +188,16 @@ Em cada bloco, `git rev-parse --short HEAD` deve resultar na revisão aprovada d
 
 ## Variáveis de ambiente
 
-Não há segredo novo a cadastrar para os meios desta entrega. O fluxo normal usa as variáveis e as chaves de cifragem já existentes no Checkout Transparente.
+Além das credenciais dos meios de pagamento, o Commerce V2 precisa conseguir confirmar para a CT API que criou uma venda de parcela recorrente. Declarar no Commerce V2, antes do rebuild:
+
+```text
+CHECKOUT_TRANSPARENT_INTERNAL_API_BASE_URL=<URL interna da CT API>
+CHECKOUT_TRANSPARENT_INTERNAL_API_TOKEN=<mesmo valor de CHECKOUT_API_INTERNAL_TOKEN da CT API>
+CHECKOUT_TRANSPARENT_INTERNAL_API_HMAC_SECRET=<mesmo valor de CHECKOUT_API_HMAC_SECRET da CT API>
+CHECKOUT_TRANSPARENT_INTERNAL_API_TIMEOUT_SECONDS=5
+```
+
+Não registrar os valores dos segredos neste documento, em logs ou no Git. A URL deve alcançar a rota interna da CT API sem depender de DNS público. A ausência de qualquer uma dessas variáveis mantém a parcela sem billing e a recuperação do CT volta a tentar a entrega; não liberar recorrência enquanto o callback não for validado.
 
 O Pix Automático Efí é iniciado pelos processos da CT API e vem habilitado por padrão. Só verificar `CHECKOUT_EFIBANK_PIX_AUTOMATIC_ENABLED` se esse ambiente já possuir a variável definida como `false`; nesse caso, removê-la ou ajustá-la para `true` antes de reiniciar a CT API. As demais variáveis `CHECKOUT_EFIBANK_PIX_AUTOMATIC_*` são ajustes operacionais opcionais e não devem ser criadas para o deploy padrão.
 

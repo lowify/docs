@@ -61,6 +61,7 @@ O checkout normal aplica `CheckoutCardFailureRateLimitService` e registra recusa
 
 - Manter o limite comercial de falhas por contexto seguro da tentativa (seller/cliente/produto, conforme política existente), sem PAN, CVV, token ou envelope de cartão na chave.
 - A Public API resolve o IP efetivo do comprador em proxy/borda confiável e o encaminha no contrato interno para o CT API.
+- Configurar `CHECKOUT_TRUSTED_PROXY_CIDRS` na Public API com os CIDRs/IPs da borda autorizada. Sem isso, `X-Forwarded-For` e `X-Real-IP` são ignorados e o CT recebe apenas o endereço remoto.
 - O CT API aplica rate limit por IP antes de chamar o provedor.
 - Não usar `X-Forwarded-For` recebido diretamente do navegador como fonte confiável.
 - Registrar recusa CT no limitador; aprovação e expiração devem seguir a política já adotada no checkout normal.
@@ -111,6 +112,13 @@ O CT publica os itens de billing depois de o edge aceitar a notificação de pag
 ## Fora deste corte
 
 A reconciliação automática de uma criação externa cuja resposta se perdeu permanece planejada separadamente: [Plano de recuperação de operações incertas](04_RECUPERACAO_DE_OPERACOES_INCERTAS.md). Ela não autoriza reenviar criação de autorização/cobrança sem antes consultar o provedor.
+
+## Evidência de homologação — RC05 (2026-10-22)
+
+- A parcela CT `538` foi confirmada e manteve o billing bloqueado até o Commerce criar a venda recorrente `9901434` e confirmar a associação. Depois do retorno autenticado, a operação CT `37040` foi concluída e criou exatamente um item de billing para a parcela.
+- O reenvio da mesma ação após a conclusão preservou uma venda, uma parcela e um item de billing.
+- Na parcela CT `539`, um callback com assinatura HMAC inválida criou a venda `9901435`, mas não faturou a parcela. Após restaurar a assinatura, a recuperação durável do CT reenviou a entrega com novo `external_event_id`; o Commerce confirmou a venda existente e a operação CT `37083` terminou com um único item de billing.
+- O retorno Commerce → CT usa Bearer, timestamp RFC 3339 e HMAC. A tentativa de entrega integra o identificador externo apenas para atravessar a deduplicação de transporte; a venda permanece única por `end_to_end_id` e o billing por `subscription_charge`.
 
 ## Entrega esperada
 

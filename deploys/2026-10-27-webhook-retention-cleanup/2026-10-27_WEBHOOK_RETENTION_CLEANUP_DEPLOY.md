@@ -76,6 +76,17 @@ WHERE TABLE_SCHEMA = 'services-webhook'
    docker compose ps
    ```
 
+## Homologação realizada
+
+Em 27/10/2026, a VPS de homologação recebeu somente o `edge-webhook` na branch
+`feat/webhook-retention-cleanup`, commit `ae5884a`.
+
+- O estado anterior era `feat/checkout-transparent-card`, commit `1be89c8`.
+- A migration do índice foi aplicada com sucesso.
+- O container foi recriado e o processo `webhook:retention-cleanup` ficou em execução.
+- O endpoint interno `/up` respondeu **Application up**.
+- Os demais componentes da VPS foram mantidos como estavam.
+
 ## Validação pós-deploy
 
 1. Abra `https://webhook.lowify.com.br/api/health` no navegador. Deve aparecer a confirmação de que o serviço está disponível.
