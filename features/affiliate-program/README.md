@@ -1,7 +1,7 @@
 # Feature — Programa de afiliados
 
 > Status: em evolução
-> Última atualização: 2026-10-05
+> Última atualização: 2026-11-04
 > Confiança: confirmada no código
 
 ## Objetivo
@@ -42,7 +42,9 @@ O produtor pode bloquear um afiliado em um produto, informando um motivo de uso 
 
 `affiliates` registra produto, produtor, afiliado, estado, comissão e código. A migration `20261005180000_create_affiliate_bans_tables.php` cria `affiliate_bans`, com unicidade por produto, produtor e afiliado, e `affiliate_ban_events`, que audita bloqueios e reversões. A venda recebe `affiliate_id`. `sales_affiliates` possui unicidade por venda e registra valor, percentual, estado, taxas e método de liquidação.
 
-Para carteira, o evento de pagamento coloca a comissão em retenção até a data de liberação; o processo de liberação publica uma operação de extrato e marca o registro como liberado de forma condicional. Para `gateway_split`, o checkout cria o settlement e o evento pago marca a comissão como liberada no fluxo do split. O valor da comissão é calculado a partir da venda e do percentual gravado para a afiliação no momento da criação do registro.
+Para carteira, o evento de pagamento coloca a comissão em retenção até a data de liberação; o processo de liberação publica uma operação de extrato e marca o registro como liberado de forma condicional. Para `gateway_split`, o checkout cria o settlement com destinatários de produtor e afiliado e o evento pago apenas marca a comissão como liberada no fluxo do split, sem crédito na carteira Lowify. O valor da comissão é calculado a partir da venda e do percentual gravado para a afiliação no momento da criação do registro.
+
+Em disputa de cartão Cielo ou Pagar.me com `gateway_split`, o Commerce V2 registra valores bloqueados como zero e não cria débito de carteira do seller. Nos demais métodos de liquidação, preserva o bloqueio normal.
 
 ## Operação e validação
 
@@ -54,6 +56,7 @@ O plano de validação integrada e carga controlada está em [Plano de QA do pro
 - A performance sob volume ainda precisa ser medida formalmente na rodada de QA.
 - A regra operacional para programas desativados com links históricos deve ser confirmada nos testes integrados antes de qualquer decisão comercial baseada nela.
 - O bloqueio global por seller não faz parte desta entrega; o escopo atual é somente a afiliação por produto.
+- **Reembolso de cartão com `gateway_split` ainda não está alinhado a esse modelo:** apesar de o Banking V2 solicitar o estorno diretamente ao gateway, o Commerce V2 exige saldo disponível na carteira antes da solicitação e, após a confirmação, publica operações de débito de reembolso e de estorno de comissão na carteira. A guarda por `settlement_method` existe para chargeback, mas não para esse caminho de reembolso.
 
 ## Referências
 
@@ -64,5 +67,9 @@ O plano de validação integrada e carga controlada está em [Plano de QA do pro
 - `services-commerce-v2/app/Application/UseCase/Product/ProcessProductCheckoutUseCase.php`
 - `services-commerce-v2/app/Application/UseCase/Sale/ProcessPaidSaleEventTransferUseCase.php`
 - `services-commerce-v2/app/Application/UseCase/Sale/ReleaseDueSaleAffiliateTransfersUseCase.php`
+- `services-commerce-v2/app/Application/UseCase/Sale/RequestSaleRefundUseCase.php`
+- `services-commerce-v2/app/Application/UseCase/Sale/ProcessRefundedSaleEventUseCase.php`
+- `services-commerce-v2/app/Application/UseCase/Sale/ProcessRefundedSaleEventAffiliateUseCase.php`
+- `services-commerce-v2/app/Application/UseCase/Dispute/ProcessSaleDisputeEventUseCase.php`
 - `edge-public-api/app/Http/Controllers/AffiliateController.php`
 - `dashboard-seller/app/services/AffiliateDashboardService.php`

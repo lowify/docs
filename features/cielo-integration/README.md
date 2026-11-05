@@ -1,7 +1,7 @@
 # Feature — integração Cielo
 
 > Status: em evolução
-> Última atualização: 2026-10-14
+> Última atualização: 2026-11-04
 > Confiança: parcialmente confirmada
 
 ## Objetivo
@@ -57,6 +57,7 @@ Para cartão, a taxa de plataforma é R$ 1,49 fixos mais o MDR percentual aplic�
 
 - 3DS permanece desabilitado até que todas as credenciais correspondentes sejam configuradas.
 - A validação funcional de webhooks e de transações depende de credenciais e dados de teste válidos no ambiente.
+- Para vendas de cartão com afiliado e `gateway_split`, o chargeback Cielo não bloqueia a carteira interna do seller. Já o reembolso continua inconsistente com a liquidação direta: o Banking V2 solicita o cancelamento no gateway, mas o Commerce V2 ainda exige saldo de carteira e publica o débito de reembolso após a confirmação. Esse caminho precisa de correção antes de ser considerado resolvido.
 
 ## Referências
 
