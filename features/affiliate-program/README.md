@@ -56,7 +56,7 @@ O plano de validação integrada e carga controlada está em [Plano de QA do pro
 - A performance sob volume ainda precisa ser medida formalmente na rodada de QA.
 - A regra operacional para programas desativados com links históricos deve ser confirmada nos testes integrados antes de qualquer decisão comercial baseada nela.
 - O bloqueio global por seller não faz parte desta entrega; o escopo atual é somente a afiliação por produto.
-- **Reembolso de cartão com `gateway_split` ainda não está alinhado a esse modelo:** apesar de o Banking V2 solicitar o estorno diretamente ao gateway, o Commerce V2 exige saldo disponível na carteira antes da solicitação e, após a confirmação, publica operações de débito de reembolso e de estorno de comissão na carteira. A guarda por `settlement_method` existe para chargeback, mas não para esse caminho de reembolso.
+- Para comissão liquidada em carteira, o reembolso aprovado reparte o valor do produto proporcionalmente entre produtor e afiliado: cada carteira recebe seu próprio débito, e a parte do afiliado não é acrescida novamente pela taxa do produtor. Em reembolsos parciais, a repartição também é proporcional. Para `gateway_split`, a confirmação do reembolso não cria operação de carteira, pois o gateway reverte as duas partes do split.
 - **UTMify não aplica a repartição de afiliado à comissão enviada:** o Commerce V2 disponibiliza `affiliate.commission_amount` no dado da venda, mas o sender da UTMify ignora esse campo e preenche `commission.userCommissionInCents` com o total líquido da venda. Portanto, uma venda de afiliado é atribuída integralmente ao produtor na UTMify, em vez de considerar apenas a parcela do produtor.
 
 ## Referências
