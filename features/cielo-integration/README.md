@@ -57,7 +57,7 @@ Para cartão, a taxa de plataforma é R$ 1,49 fixos mais o MDR percentual aplic�
 
 - 3DS permanece desabilitado até que todas as credenciais correspondentes sejam configuradas.
 - A validação funcional de webhooks e de transações depende de credenciais e dados de teste válidos no ambiente.
-- Para vendas de cartão com afiliado e `gateway_split`, o chargeback Cielo não bloqueia a carteira interna do seller e o reembolso confirmado não cria débito em carteira: o gateway reverte os dois recebedores do split. A solicitação continua condicionada às validações de disponibilidade do gateway.
+- Para vendas de cartão Cielo/Pagar.me, o chargeback Cielo não bloqueia a carteira interna do seller quando existe `gateway_split`. O reembolso não consulta nem cria débito na carteira Lowify: o gateway reverte os recebedores do split e aplica suas próprias validações de disponibilidade.
 
 ## Referências
 
