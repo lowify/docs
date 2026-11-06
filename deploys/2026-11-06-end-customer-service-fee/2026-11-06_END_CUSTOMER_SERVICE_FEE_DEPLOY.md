@@ -200,6 +200,23 @@ Se qualquer valor ficar duplicado, ausente ou incluir a taxa indevidamente, inte
 3. Retornar cada componente ao commit registrado antes do deploy, seguindo o processo operacional aprovado, e reconstruir somente o Commerce V2 quando seu código for revertido.
 4. Não remover `service_fee_amount`, `charged_amount`, `sales_refund`, migrations, filas Redis, extratos ou configurações de seller. As colunas são aditivas e versões anteriores as ignoram.
 
+## Registro de homologação
+
+### 2026-11-06 — pré-checagem e validação remota
+
+Escopo solicitado: somente `services-commerce-v2`, `front-checkout`, `front-member-area` e `dashboard-seller`. Todos os outros targets oficiais foram mantidos como estavam por solicitação explícita; não receberam Git, Docker ou pré-checagem.
+
+| Target | Estado inicial na VPS | Resultado da pré-checagem | Referência remota da feature | Resultado |
+| --- | --- | --- | --- | --- |
+| `services-commerce-v2` | `feat/checkout-apple-google-pay` | limpo | `664748e` | bloqueado: não contém `ab866fc` |
+| `front-checkout` | `feat/checkout-apple-google-pay` | limpo | `4e9ae77` | bloqueado: não contém `ba780eb` |
+| `front-member-area` | `feat/end-customer-service-fee` | limpo | `f152c24` | apto; contém o commit esperado |
+| `dashboard-seller` | `feat/checkout-apple-google-pay` | limpo | `cabb114c` | bloqueado: não contém `e5c9dd08` |
+
+Foi executado `git fetch origin --prune` apenas nos quatro participantes. A operação foi interrompida antes de `git switch`, `git pull`, DDL, alteração de `.env`, Docker ou testes de compatibilidade, pois os commits necessários ainda não foram publicados em `origin`.
+
+Para retomar, publicar as branches `feat/end-customer-service-fee` de `services-commerce-v2`, `front-checkout` e `dashboard-seller` contendo ao menos os commits listados na tabela **Componentes e referências**. Depois, reiniciar a pré-checagem completa dos quatro targets; não reutilizar este resultado como autorização para pular validações.
+
 ## Referências
 
 - [Plano da taxa de serviço](../../plans/end-customer-service-fee/README.md)
