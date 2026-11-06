@@ -15,15 +15,17 @@ o cache de completude. Checkout no Commerce V2 não é alterado nesta entrega.
 | Repositório | Diretório na VPS | Branch de deploy | Commit |
 | --- | --- | --- | --- |
 | `services-account` | `/opt/lowify/services/services-account` | `feat/account-phase-one-migration` | `96f393764478e983c5fda87d4f446de49c0136e6` |
-| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/account-phase-one-migration` | `293bc896266f2c5eb535bec606e1f687b15c17c7` |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/account-phase-one-migration` | `f85882e` |
 | `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/account-phase-one-migration` | `2c12e2336e59f55f7fbac2607a08182ef3fe2258` |
 | `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/account-phase-one-migration` | `a3f2327d228cc0a985ba1fa3896edf0f6bccc7fc` |
 
 ## Alterações incluídas
 
 1. O Account expõe internamente `POST /admin/users/{user_id}/phase-one-migration`.
-2. O Public API valida JWT administrativo (`permissao` 1, 2 ou 4) e encaminha
-   a rota; o Gateway encaminha a mesma rota ao Public API.
+2. O Public API valida JWT administrativo de ator não colaborador (permissão
+   `1`, `2` ou `4`) e encaminha a rota; o Gateway encaminha a mesma rota ao
+   Public API. A mesma regra protege as revisões de conta e de conta bancária
+   que usam o proxy-base.
 3. O Dashboard conserva a permissão `user_migrate_v2`, mas deixa de modificar
    diretamente os dados de migração; ele consulta/executa pelo endpoint.
 4. Para PF, a migração preserva dados pessoais, define `pj_migrate=127` quando
@@ -54,8 +56,9 @@ implicitamente.
 2. Confirmar saúde do Account e que o processo
    `PROFILE_COMPLETION_REFRESH_PROCESS_ENABLED` está ativo. Ele consome a fila
    `accounts:complete:refresh` após cada migração.
-3. Usar uma conta administrativa com permissão `user_migrate_v2` para a ação
-   pelo Dashboard. A API também exige JWT com permissão administrativa.
+3. Usar uma conta administrativa não colaboradora, com permissão
+   `user_migrate_v2`, para a ação pelo Dashboard. A API também exige JWT com
+   permissão administrativa `1`, `2` ou `4`.
 4. Preparar uma lista explícita de IDs de sellers para o primeiro lote. Não
    executar o comando de aplicação em toda a base sem a prévia revisada.
 5. Não alterar segredos, não limpar Redis e não manipular mensagens das filas
