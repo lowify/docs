@@ -120,8 +120,6 @@ git fetch origin --prune
 git switch feat/account-phase-one-migration
 git pull --ff-only origin feat/account-phase-one-migration
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
 ```
 
 ## Testes de compatibilidade em homologação
