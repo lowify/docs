@@ -221,6 +221,27 @@ Para retomar, publicar as branches `feat/end-customer-service-fee` de `services-
 
 O Front Checkout foi publicado como `cecfc86`, com histórico diferente do commit local originalmente registrado (`ba780eb`). A comparação direta entre as árvores dos dois commits não apresentou diferença. A referência de deploy foi atualizada para `cecfc86` e a validação completa deve ser repetida antes de qualquer alteração na VPS.
 
+### 2026-11-06 — atualização técnica concluída na homologação
+
+Escopo aplicado: apenas `services-commerce-v2`, `front-checkout`, `front-member-area` e `dashboard-seller`. Todos os demais targets oficiais foram mantidos como estavam, sem Git, Docker ou pré-checagem, conforme solicitação explícita.
+
+| Target | Antes | Depois | Rebuild | Resultado |
+| --- | --- | --- | --- | --- |
+| `services-commerce-v2` | `feat/checkout-apple-google-pay` em `1dd6d13` | `feat/end-customer-service-fee` em `ab866fc` | executado | container novo `Up`; HTTP e processo `commerce_refund_actions_queue` iniciados |
+| `front-checkout` | `feat/checkout-apple-google-pay` em `6b03415` | `feat/end-customer-service-fee` em `cecfc86` | não executado por solicitação; front opera por bind mount | container já existente permaneceu `Up` |
+| `front-member-area` | `feat/end-customer-service-fee` em `f152c24` | sem mudança | não necessário | container já existente permaneceu `Up` |
+| `dashboard-seller` | `feat/checkout-apple-google-pay` em `f1308348` | `feat/end-customer-service-fee` em `e5c9dd08` | não executado por solicitação; front opera por bind mount | container já existente permaneceu `Up` |
+
+Pré-condições confirmadas antes da atualização:
+
+- os quatro worktrees estavam limpos;
+- `sales.service_fee_amount` e `sales.charged_amount` já existiam com o schema esperado; nenhum DDL foi executado;
+- o índice único de `sales_refund` para `banking_refund_id` já existia;
+- `system_vars.checkout_service_fee_default` ainda não existe;
+- no Commerce foram definidos `CHECKOUT_SERVICE_FEE_AMOUNT=0.00` e `REFUND_SERVICE_FEE_ON_EXCEPTION=false`.
+
+Não foram executadas vendas, Pix, reembolsos, disputas, gravações de fila ou testes automatizados. As validações de interface e do seller piloto da seção **Validação pós-deploy** permanecem pendentes e devem ser feitas antes de ativar a taxa global.
+
 ## Referências
 
 - [Plano da taxa de serviço](../../plans/end-customer-service-fee/README.md)
