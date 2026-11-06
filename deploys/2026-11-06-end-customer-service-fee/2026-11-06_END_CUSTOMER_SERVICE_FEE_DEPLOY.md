@@ -242,6 +242,16 @@ Pré-condições confirmadas antes da atualização:
 
 Não foram executadas vendas, Pix, reembolsos, disputas, gravações de fila ou testes automatizados. As validações de interface e do seller piloto da seção **Validação pós-deploy** permanecem pendentes e devem ser feitas antes de ativar a taxa global.
 
+### 2026-11-06 — configuração global ativada para validação
+
+Após a atualização técnica, a configuração foi salva pela tela administrativa. A consulta direta e somente-leitura na homologação confirmou:
+
+```text
+system_vars.checkout_service_fee_default = 0.94
+```
+
+O valor permaneceu visível no formulário após salvar. Com isso, novas vendas elegíveis de sellers sem override devem receber taxa de serviço de `R$ 0,94`; Checkout Transparent e sellers com override continuam seguindo suas regras de prioridade. Ainda não foram criadas vendas de validação.
+
 ## Referências
 
 - [Plano da taxa de serviço](../../plans/end-customer-service-fee/README.md)
