@@ -11,7 +11,7 @@ A taxa inicia desativada. Ela só deve ser ativada depois da validação por mei
 | Repositório | Branch de deploy | Commit mínimo | Papel |
 | --- | --- | --- | --- |
 | `services-commerce-v2` | `feat/end-customer-service-fee` | `ab866fc` | Calcula, persiste e cobra a taxa; controla reembolso, rateio, disputa, split e recuperação de pagamento. |
-| `front-checkout` | `feat/end-customer-service-fee` | `ba780eb` | Exibe a composição no checkout, RDC e upsell; calcula parcelas sobre o total cobrado. |
+| `front-checkout` | `feat/end-customer-service-fee` | `cecfc86` | Exibe a composição no checkout, RDC e upsell; calcula parcelas sobre o total cobrado. |
 | `front-member-area` | `feat/end-customer-service-fee` | `f152c24` | Obtém a cotação canônica e apresenta a taxa na compra Pix da Área de Membros. |
 | `dashboard-seller` | `feat/end-customer-service-fee` | `e5c9dd08` | Configura taxa global e override por seller; exibe valores no detalhe administrativo e no cashflow. |
 
@@ -142,7 +142,7 @@ git pull --ff-only origin feat/end-customer-service-fee
 git rev-parse --short HEAD
 ```
 
-Confirmar o commit `ba780eb` ou descendente aprovado.
+Confirmar o commit `cecfc86` ou descendente aprovado.
 
 ### 4. Área de Membros
 
@@ -209,13 +209,17 @@ Escopo solicitado: somente `services-commerce-v2`, `front-checkout`, `front-memb
 | Target | Estado inicial na VPS | Resultado da pré-checagem | Referência remota da feature | Resultado |
 | --- | --- | --- | --- | --- |
 | `services-commerce-v2` | `feat/checkout-apple-google-pay` | limpo | `664748e` | bloqueado: não contém `ab866fc` |
-| `front-checkout` | `feat/checkout-apple-google-pay` | limpo | `4e9ae77` | bloqueado: não contém `ba780eb` |
+| `front-checkout` | `feat/checkout-apple-google-pay` | limpo | `4e9ae77` | bloqueado inicialmente: não continha a referência então documentada |
 | `front-member-area` | `feat/end-customer-service-fee` | limpo | `f152c24` | apto; contém o commit esperado |
 | `dashboard-seller` | `feat/checkout-apple-google-pay` | limpo | `cabb114c` | bloqueado: não contém `e5c9dd08` |
 
 Foi executado `git fetch origin --prune` apenas nos quatro participantes. A operação foi interrompida antes de `git switch`, `git pull`, DDL, alteração de `.env`, Docker ou testes de compatibilidade, pois os commits necessários ainda não foram publicados em `origin`.
 
 Para retomar, publicar as branches `feat/end-customer-service-fee` de `services-commerce-v2`, `front-checkout` e `dashboard-seller` contendo ao menos os commits listados na tabela **Componentes e referências**. Depois, reiniciar a pré-checagem completa dos quatro targets; não reutilizar este resultado como autorização para pular validações.
+
+### 2026-11-06 — correção da referência do Front Checkout
+
+O Front Checkout foi publicado como `cecfc86`, com histórico diferente do commit local originalmente registrado (`ba780eb`). A comparação direta entre as árvores dos dois commits não apresentou diferença. A referência de deploy foi atualizada para `cecfc86` e a validação completa deve ser repetida antes de qualquer alteração na VPS.
 
 ## Referências
 
