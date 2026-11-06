@@ -64,6 +64,46 @@ da seleção. Resultado consolidado após a execução:
    respectivos IDs, confirmando proteção contra promoção duplicada.
 6. A consulta consolidada final confirmou 50/50 IDs na fase 2.
 
+## Testes adicionais após os lotes
+
+### Auditoria dos PJ-CPF migrados
+
+Foi feita uma auditoria individual dos 12 sellers PJ-CPF gerados pelos lotes.
+Todos possuíam exatamente um sócio ativo. Nos casos com documentos pessoais
+enviados antes da migração, a quantidade de documentos válidos no sócio ficou
+igual à quantidade registrada no usuário original:
+
+| Seller | Documentos no usuário | Documentos no sócio | KYC do sócio |
+| --- | ---: | ---: | --- |
+| 760 | 2 | 2 | `approved` |
+| 1833 | 2 | 2 | `approved` |
+| 2512 | 3 | 3 | `approved` |
+| 2686 | 2 | 2 | `approved` |
+| 3048 | 3 | 3 | `approved` |
+
+Os sete demais PJ-CPF não tinham documentos pessoais válidos enviados no
+usuário de origem. Eles receberam sócio ativo com KYC `pending`, que é o
+estado esperado para solicitar envio/reenvio de documentos.
+
+### Teste manual pelo Dashboard
+
+Foi selecionado o seller PF `1417`, que ainda estava na fase 1, e a migração
+foi acionada manualmente pela interface administrativa.
+
+Resultado conferido diretamente no Account:
+
+- `account_phase=2` e `pj_migrate=127`;
+- documentos completos: selfie e RG frente/verso aprovados;
+- revisão de conta criada com status `pending`;
+- evento `complete_register` processado com status `success`;
+- diagnóstico de completude: cadastro estruturalmente completo, aguardando
+  somente a aprovação da identidade/revisão.
+
+Esse teste confirmou o caminho de migração manual, o enfileiramento de
+completude e a criação posterior da revisão. Reexecutar o comando nos IDs já
+migrados retornou `account_not_in_phase_one`, confirmando que o comando não
+repete a promoção nem cria sócios duplicados.
+
 ## Pendências de validação manual
 
 Como o `dashboard-seller` não foi reconstruído nesta operação, ainda é
