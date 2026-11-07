@@ -62,22 +62,6 @@ O Admin pode alterar o valor global em **Configurações → Pagamentos → Chec
 - Reembolsos externos confirmados pela Cielo passam por fila confiável, refletem `sales_refund` e têm deduplicação por `banking_refund_id`.
 - Recuperação de venda passa a exigir código Pix apenas para Pix/Pix Automático e libera crédito/saldo reservado quando um envio é ignorado.
 
-## Pré-requisitos
-
-1. Confirmar que as quatro branches e seus commits mínimos estão publicados em `origin`.
-2. Registrar os commits atualmente ativos de cada componente para rollback.
-3. Garantir acesso administrativo ao banco `lowify` e ao Admin para configurar a taxa global após a publicação.
-4. Configurar no Commerce, antes do restart:
-
-```env
-CHECKOUT_SERVICE_FEE_AMOUNT=0.00
-REFUND_SERVICE_FEE_ON_EXCEPTION=false
-```
-
-Não omitir `CHECKOUT_SERVICE_FEE_AMOUNT`: embora o fallback interno atual seja zero, o valor explícito evita ativação inesperada por configuração antiga do ambiente.
-
-5. Confirmar que Redis e os consumidores de extrato de `services-wallet` estão saudáveis. Não limpar filas, chaves Redis ou extratos.
-
 ## Banco de dados
 
 ### Colunas de vendas
@@ -113,7 +97,7 @@ A branch também contém a migration `20261029190000_add_sales_refund_banking_re
 
 1. Executar e validar o pré-check de `sales`.
 2. Aplicar o DDL somente se ele for necessário.
-3. Definir as duas variáveis do Commerce conforme os pré-requisitos, mantendo taxa e devolução de taxa desativadas.
+3. Manter as variáveis do Commerce já configuradas, com taxa e devolução de taxa desativadas.
 
 ### 2. Commerce V2
 
@@ -180,19 +164,6 @@ Confirmar o commit `e5c9dd08` ou descendente aprovado. Se o ambiente executar o 
 4. Validar os cenários abaixo.
 5. Somente após aceite técnico, financeiro, jurídico e operacional, definir o valor global aprovado na tela de configurações. Para interromper novas cobranças, retornar esse valor para `R$ 0,00`.
 
-## Validação pós-deploy
-
-1. No Admin, abra as configurações de pagamento, defina temporariamente `R$ 0,00` e salve. Reabra a tela e confirme que o valor persistiu.
-2. Crie uma venda Pix de teste para seller sem override. Confirme que o comprador vê somente o valor dos produtos e que o total cobrado é igual a ele.
-3. Defina um override piloto maior que zero no seller. Crie uma nova venda Pix e uma nova venda de cartão. Confirme que a interface mostra taxa e total, e que o valor do Pix/parcelas corresponde ao total cobrado.
-4. Abra o detalhe administrativo da venda e confirme produtos, taxa do cliente e total. O detalhe no contexto do seller não deve exibir essa taxa.
-5. Abra o RDC de uma venda pendente e a compra Pix da Área de Membros. Confirme que ambos mostram o mesmo total registrado na venda, sem recotar um Pix pendente.
-6. Para uma venda de carteira com afiliado e comissão liberada, solicite reembolso total em ambiente de homologação. Confirme que seller e afiliado recebem débitos proporcionais cuja soma é o valor comercial da venda.
-7. Para uma venda de cartão Cielo/Pagar.me com split, solicite reembolso no sandbox. Confirme que não há débito na carteira Lowify de seller ou afiliado; a reversão deve aparecer no gateway.
-8. Reenvie uma confirmação de reembolso de teste e confirme que não há lançamento duplicado para seller nem afiliado.
-
-Se qualquer valor ficar duplicado, ausente ou incluir a taxa indevidamente, interromper a ativação global e preservar IDs de venda/reembolso para conciliação. Não ajustar saldos manualmente.
-
 ## Rollback
 
 1. Definir imediatamente a taxa global como `R$ 0,00` no Admin e manter `CHECKOUT_SERVICE_FEE_AMOUNT=0.00`.
@@ -200,60 +171,9 @@ Se qualquer valor ficar duplicado, ausente ou incluir a taxa indevidamente, inte
 3. Retornar cada componente ao commit registrado antes do deploy, seguindo o processo operacional aprovado, e reconstruir somente o Commerce V2 quando seu código for revertido.
 4. Não remover `service_fee_amount`, `charged_amount`, `sales_refund`, migrations, filas Redis, extratos ou configurações de seller. As colunas são aditivas e versões anteriores as ignoram.
 
-## Registro de homologação
-
-### 2026-11-06 — pré-checagem e validação remota
-
-Escopo solicitado: somente `services-commerce-v2`, `front-checkout`, `front-member-area` e `dashboard-seller`. Todos os outros targets oficiais foram mantidos como estavam por solicitação explícita; não receberam Git, Docker ou pré-checagem.
-
-| Target | Estado inicial na VPS | Resultado da pré-checagem | Referência remota da feature | Resultado |
-| --- | --- | --- | --- | --- |
-| `services-commerce-v2` | `feat/checkout-apple-google-pay` | limpo | `664748e` | bloqueado: não contém `ab866fc` |
-| `front-checkout` | `feat/checkout-apple-google-pay` | limpo | `4e9ae77` | bloqueado inicialmente: não continha a referência então documentada |
-| `front-member-area` | `feat/end-customer-service-fee` | limpo | `f152c24` | apto; contém o commit esperado |
-| `dashboard-seller` | `feat/checkout-apple-google-pay` | limpo | `cabb114c` | bloqueado: não contém `e5c9dd08` |
-
-Foi executado `git fetch origin --prune` apenas nos quatro participantes. A operação foi interrompida antes de `git switch`, `git pull`, DDL, alteração de `.env`, Docker ou testes de compatibilidade, pois os commits necessários ainda não foram publicados em `origin`.
-
-Para retomar, publicar as branches `feat/end-customer-service-fee` de `services-commerce-v2`, `front-checkout` e `dashboard-seller` contendo ao menos os commits listados na tabela **Componentes e referências**. Depois, reiniciar a pré-checagem completa dos quatro targets; não reutilizar este resultado como autorização para pular validações.
-
-### 2026-11-06 — correção da referência do Front Checkout
-
-O Front Checkout foi publicado como `cecfc86`, com histórico diferente do commit local originalmente registrado (`ba780eb`). A comparação direta entre as árvores dos dois commits não apresentou diferença. A referência de deploy foi atualizada para `cecfc86` e a validação completa deve ser repetida antes de qualquer alteração na VPS.
-
-### 2026-11-06 — atualização técnica concluída na homologação
-
-Escopo aplicado: apenas `services-commerce-v2`, `front-checkout`, `front-member-area` e `dashboard-seller`. Todos os demais targets oficiais foram mantidos como estavam, sem Git, Docker ou pré-checagem, conforme solicitação explícita.
-
-| Target | Antes | Depois | Rebuild | Resultado |
-| --- | --- | --- | --- | --- |
-| `services-commerce-v2` | `feat/checkout-apple-google-pay` em `1dd6d13` | `feat/end-customer-service-fee` em `ab866fc` | executado | container novo `Up`; HTTP e processo `commerce_refund_actions_queue` iniciados |
-| `front-checkout` | `feat/checkout-apple-google-pay` em `6b03415` | `feat/end-customer-service-fee` em `cecfc86` | não executado por solicitação; front opera por bind mount | container já existente permaneceu `Up` |
-| `front-member-area` | `feat/end-customer-service-fee` em `f152c24` | sem mudança | não necessário | container já existente permaneceu `Up` |
-| `dashboard-seller` | `feat/checkout-apple-google-pay` em `f1308348` | `feat/end-customer-service-fee` em `e5c9dd08` | não executado por solicitação; front opera por bind mount | container já existente permaneceu `Up` |
-
-Pré-condições confirmadas antes da atualização:
-
-- os quatro worktrees estavam limpos;
-- `sales.service_fee_amount` e `sales.charged_amount` já existiam com o schema esperado; nenhum DDL foi executado;
-- o índice único de `sales_refund` para `banking_refund_id` já existia;
-- `system_vars.checkout_service_fee_default` ainda não existe;
-- no Commerce foram definidos `CHECKOUT_SERVICE_FEE_AMOUNT=0.00` e `REFUND_SERVICE_FEE_ON_EXCEPTION=false`.
-
-Não foram executadas vendas, Pix, reembolsos, disputas, gravações de fila ou testes automatizados. As validações de interface e do seller piloto da seção **Validação pós-deploy** permanecem pendentes e devem ser feitas antes de ativar a taxa global.
-
-### 2026-11-06 — configuração global ativada para validação
-
-Após a atualização técnica, a configuração foi salva pela tela administrativa. A consulta direta e somente-leitura na homologação confirmou:
-
-```text
-system_vars.checkout_service_fee_default = 0.94
-```
-
-O valor permaneceu visível no formulário após salvar. Com isso, novas vendas elegíveis de sellers sem override devem receber taxa de serviço de `R$ 0,94`; Checkout Transparent e sellers com override continuam seguindo suas regras de prioridade. Ainda não foram criadas vendas de validação.
-
 ## Referências
 
+- [Relatório de validações e testes](2026-11-06_END_CUSTOMER_SERVICE_FEE_VALIDATION.md)
 - [Plano da taxa de serviço](../../plans/end-customer-service-fee/README.md)
 - [Deploy anterior da taxa de serviço](../2026-11-03-end-customer-service-fee/2026-11-03_END_CUSTOMER_SERVICE_FEE_DEPLOY.md)
 - [Deploy de rateio de reembolso](../2026-11-04-card-refund-wallet-allocation/2026-11-04_CARD_REFUND_WALLET_ALLOCATION_DEPLOY.md)
