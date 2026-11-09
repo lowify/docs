@@ -2,30 +2,21 @@
 
 ## Objetivo
 
-No Commerce V2, marcar `rdc = 1` quando a Meta confirmar que uma mensagem de
-recuperação de venda foi lida. Isso é sinal de leitura, não de clique, cópia do
-Pix ou pagamento.
-
-A atualização é atômica e só ocorre enquanto a venda estiver `pending`; uma
-leitura tardia não altera venda paga, cancelada ou expirada.
+Marcar `rdc = 1` quando a Meta confirmar leitura de recuperação WhatsApp. O
+webhook marca somente vendas `pending`; o comando cobre leituras históricas,
+inclusive as recebidas depois do pagamento.
 
 ## Componente publicado
 
-| Repositório | Diretório de produção | Branch | Commit mínimo |
+| Repositório | Diretório de produção | Branch | Revisão |
 | --- | --- | --- | --- |
-| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/rdc-whatsapp-read` | `d7cad57` |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/rdc-whatsapp-read` | A definir — comando ainda sem commit/push |
 
-`services-notifications` e `edge-webhook` não recebem código. Eles já devem
-estar operacionais no fluxo existente `Meta -> Edge -> Notification -> Commerce`.
-
-Não há DDL, migration, env, template Meta, fila ou mudança financeira.
+Não há DDL, env, migration ou alteração em Notification e Edge.
 
 ## Pré-checagem
 
-Não usar `reset`, `clean`, `stash` ou checkout forçado. Não limpar filas,
-Redis, vendas, dispatches ou eventos. Se já houver outcomes `read` pendentes,
-registrar a decisão operacional antes do deploy: eles podem ser consumidos pela
-regra nova.
+Não usar `reset`, `clean`, `stash` ou checkout forçado.
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
@@ -42,39 +33,34 @@ docker compose config --quiet
 cd /opt/lowify/services/service-commerce-v2
 git switch feat/rdc-whatsapp-read
 git pull --ff-only origin feat/rdc-whatsapp-read
-git merge-base --is-ancestor d7cad57 HEAD
+# substituir pelo SHA aprovado que incluir o comando
+git merge-base --is-ancestor <sha-aprovado> HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-Prosseguir somente se o commit mínimo estiver presente, o serviço estiver `Up`
-e não houver erro de inicialização, Redis ou fila.
+Prosseguir se o serviço estiver `Up` e sem erro de inicialização.
+
+## Reconciliação histórica
+
+Data obrigatória em `America/Sao_Paulo`. O comando executa a marcação.
+
+```bash
+cd /opt/lowify/services/service-commerce-v2
+docker compose exec -T service-commerce-v2 \
+  php bin/hyperf.php sales-recovery:mark-rdc-from-whatsapp-reads \
+  --date=YYYY-MM-DD
+```
+
+Ele marca somente vendas com `rdc = 0` que tenham evento WhatsApp `read` de
+recuperação a partir da data.
 
 ## Validação pós-deploy
 
-Usar venda Pix e destinatário piloto autorizados; não registrar telefone,
-código Pix, payload Meta ou segredos.
-
-1. Deixar o fluxo normal enviar uma recuperação WhatsApp para uma venda
-   `pending`. Não clonar `whatsapp_meta`, injetar fila nem editar `rdc` por SQL.
-2. Abrir a mensagem no dispositivo autorizado e aguardar o webhook oficial
-   `read` da Meta.
-3. Conferir que a venda continua `pending`, passa a `rdc = 1` e há um único
-   evento `read` no dispatch:
-
-   ```sql
-   SELECT sale_id, status, rdc FROM sales WHERE sale_id = :sale_id;
-   SELECT event_type, provider_reference_type, provider_reference_id, occurred_at
-   FROM sale_recovery_dispatch_events
-   WHERE sale_recovery_dispatch_id = :dispatch_id
-   ORDER BY id;
-   ```
-
-4. Repetir o callback somente pelo mecanismo aprovado de homologação e
-   confirmar que não há novo evento. Para uma venda já paga, confirmar que uma
-   leitura tardia não modifica `rdc`.
+Confirmar uma leitura normal em venda `pending` e uma venda paga com `read`
+posterior processada pelo comando.
 
 ## Rollback
 
