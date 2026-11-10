@@ -14,23 +14,29 @@
 
 | Item | Resultado |
 | --- | --- |
-| Pré-checagem do repositório | Pendente de execução |
-| Branch/commit publicados | Pendente de execução |
-| Container saudável | Pendente de execução |
+| Pré-checagem do repositório | Limpa; branch anterior `feat/account-phase-one-migration`; origin oficial confirmado |
+| Branch/commit publicados | `feat/account-type-conversion` / `8c10b3ec9305b2ddbc275b550ae8f10a694fb2e8` |
+| Container saudável | Em execução após rebuild incremental |
 | Outros targets alterados | Não permitido |
 
 ## Resultado da amostra
 
 | Métrica | Resultado |
 | --- | --- |
-| Sellers selecionados | Pendente de execução |
-| Fase 1 selecionados | Deve ser 0 |
-| Prévias PF → PJ | Pendente de execução |
-| Prévias PJ → PF | Pendente de execução |
-| Prévia com sócio de mesmo CPF | Pendente de execução |
-| Erros de documento já associado | Pendente de execução |
-| Escritas por `--apply` | Deve ser 0 |
-| Filas/Redis manipulados | Deve ser 0 |
+| Sellers selecionados | 50 |
+| Fase 1 selecionados | 0 |
+| Fase 2 selecionados | 50 |
+| Fase 3 selecionados | 0; a amostra aleatória não sorteou os 7 sellers disponíveis nessa fase |
+| Prévias PF → PJ | 40 aprovadas |
+| Prévias PJ → PF | 10 aprovadas |
+| Prévia adicional PJ → PF com sócio de mesmo CPF | Aprovada para seller `814`, fase 2; `source_partner_found: true` |
+| Erros de documento já associado | 0 |
+| Escritas por `--apply` | 0 |
+| Filas/Redis manipulados | 0 |
+
+Cada prévia aprovada retornou `preview: true` e `applied: false`. A seleção e
+os resultados foram registrados somente com ID, fase, direção e status; CPF,
+CNPJ, e-mails e conteúdo cadastral não foram incluídos neste relatório.
 
 ## Critério de aprovação
 
@@ -41,4 +47,7 @@ documentos, tokens ou conteúdo de dados cadastrais.
 
 ## Resultado final
 
-Pendente de execução na VPS de homologação.
+Aprovado para a prévia administrativa nas fases 2 e 3: 50 de 50 prévias da
+amostra aleatória foram concluídas com sucesso, e a regra adicional de puxar
+dados de sócio da própria PJ foi confirmada em uma prévia direcionada. Não houve
+aplicação de conversão nem alteração nos demais repositórios da VPS.

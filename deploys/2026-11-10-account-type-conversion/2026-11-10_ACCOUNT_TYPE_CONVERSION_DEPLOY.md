@@ -121,7 +121,10 @@ reprovam a execução.
 
 ## Rollback
 
-Como a validação não usa `--apply`, não há dados para reverter. Para retirar o
-comando, no mesmo repositório, voltar à referência anterior conhecida com
-`git switch main`, `git pull --ff-only origin main` e `docker compose up --build -d`.
-Não apagar documentos, sócios, sessões, contas, Redis ou filas.
+Como a validação não usa `--apply`, não há dados para reverter. A referência
+anterior observada na VPS era `feat/account-phase-one-migration` no commit
+`96f393764478e983c5fda87d4f446de49c0136e6`. Para retirar o comando, no mesmo
+repositório, voltar a essa referência com `git switch
+feat/account-phase-one-migration`, `git pull --ff-only origin
+feat/account-phase-one-migration` e `docker compose up --build -d`. Não apagar
+documentos, sócios, sessões, contas, Redis ou filas.
