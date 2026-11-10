@@ -10,7 +10,7 @@ A taxa inicia desativada. Ela só deve ser ativada depois da validação por mei
 
 | Repositório | Branch de deploy | Commit mínimo | Papel |
 | --- | --- | --- | --- |
-| `services-commerce-v2` | `feat/end-customer-service-fee` | `c6944fb` | Calcula, persiste e cobra a taxa; controla reembolso, rateio, disputa, split e recuperação de pagamento. |
+| `services-commerce-v2` | `feat/end-customer-service-fee` | `2f6c9cb` | Calcula, persiste e cobra a taxa; controla reembolso, rateio, disputa, split e recuperação de pagamento. |
 | `front-checkout` | `feat/end-customer-service-fee` | `a3e3f82` | Exibe a composição no checkout, RDC e upsell; calcula parcelas sobre o total cobrado; inclui o gate de Cielo 3DS por valor. |
 | `front-member-area` | `feat/end-customer-service-fee` | `f152c24` | Obtém a cotação canônica e apresenta a taxa na compra Pix da Área de Membros. |
 | `dashboard-seller` | `feat/end-customer-service-fee` | `c7098f0` | Configura taxa global e override por seller; exibe valores no detalhe administrativo e no cashflow; inclui a `main` com a migração de contas e a correção da paginação do extrato. |
@@ -116,7 +116,7 @@ docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-Confirmar que o commit é `c6944fb` ou descendente aprovado e que o serviço iniciou sem erro de banco, Redis, fila ou injeção de dependências.
+Confirmar que o commit é `2f6c9cb` ou descendente aprovado e que o serviço iniciou sem erro de banco, Redis, fila ou injeção de dependências.
 
 ### 3. Front Checkout
 
