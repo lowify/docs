@@ -10,7 +10,7 @@ A taxa inicia desativada. Ela só deve ser ativada depois da validação por mei
 
 | Repositório | Branch de deploy | Commit mínimo | Papel |
 | --- | --- | --- | --- |
-| `services-commerce-v2` | `feat/end-customer-service-fee` | `9398b70` | Calcula, persiste e cobra a taxa; controla reembolso, rateio, disputa, split e recuperação de pagamento. |
+| `services-commerce-v2` | `feat/end-customer-service-fee` | `c6944fb` | Calcula, persiste e cobra a taxa; controla reembolso, rateio, disputa, split e recuperação de pagamento. |
 | `front-checkout` | `feat/end-customer-service-fee` | `a3e3f82` | Exibe a composição no checkout, RDC e upsell; calcula parcelas sobre o total cobrado; inclui o gate de Cielo 3DS por valor. |
 | `front-member-area` | `feat/end-customer-service-fee` | `f152c24` | Obtém a cotação canônica e apresenta a taxa na compra Pix da Área de Membros. |
 | `dashboard-seller` | `feat/end-customer-service-fee` | `c7098f0` | Configura taxa global e override por seller; exibe valores no detalhe administrativo e no cashflow; inclui a `main` com a migração de contas e a correção da paginação do extrato. |
@@ -62,6 +62,8 @@ O Admin pode alterar o valor global em **Configurações → Pagamentos → Chec
 - Cielo 3DS pode ser exigido a partir de `system_vars.cielo_3ds_minimum_amount`; a comparação usa o total efetivamente cobrado.
 - Reembolsos externos confirmados pela Cielo passam por fila confiável, refletem `sales_refund` e têm deduplicação por `banking_refund_id`.
 - Recuperação de venda passa a exigir código Pix apenas para Pix/Pix Automático e libera crédito/saldo reservado quando um envio é ignorado.
+- RDC por leitura de recuperação WhatsApp foi incorporado da `main`; o backfill seleciona a janela de confirmação em São Paulo convertida para UTC e só marca leitura anterior ao pagamento.
+- O build padrão do Commerce usa `composer install --no-dev -o`, preservando as versões do `composer.lock`.
 
 ## Banco de dados
 
@@ -114,7 +116,7 @@ docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-Confirmar que o commit é `9398b70` ou descendente aprovado e que o serviço iniciou sem erro de banco, Redis, fila ou injeção de dependências.
+Confirmar que o commit é `c6944fb` ou descendente aprovado e que o serviço iniciou sem erro de banco, Redis, fila ou injeção de dependências.
 
 ### 3. Front Checkout
 
