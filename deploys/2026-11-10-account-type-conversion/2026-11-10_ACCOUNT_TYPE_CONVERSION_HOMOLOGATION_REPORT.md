@@ -47,7 +47,9 @@ documentos, tokens ou conteúdo de dados cadastrais.
 
 ## Resultado final
 
-Aprovado para a prévia administrativa nas fases 2 e 3: 50 de 50 prévias da
-amostra aleatória foram concluídas com sucesso, e a regra adicional de puxar
+Aprovado para a prévia administrativa no escopo permitido (fases 2 e 3): 50 de
+50 prévias da amostra aleatória foram concluídas com sucesso, todas na fase 2.
+A amostra não sorteou nenhuma das 7 contas disponíveis na fase 3; esse recorte
+fica pendente para uma próxima execução direcionada. A regra adicional de puxar
 dados de sócio da própria PJ foi confirmada em uma prévia direcionada. Não houve
 aplicação de conversão nem alteração nos demais repositórios da VPS.
