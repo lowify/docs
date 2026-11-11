@@ -17,10 +17,10 @@ Commerce V2: sales:events:refunded (com triggered_at)
 
 | Componente | Host de produção | Diretório de produção | Branch de deploy | Commit | Papel nesta entrega |
 | --- | --- | --- | --- | --- | --- |
-| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Libera `refunded` na configuração de eventos da UTMify. |
-| `services-sale-integrations` | `147.93.180.183` | `/opt/lowify/services/services-sale-integrations` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Transforma o evento no payload aceito pela UTMify. |
+| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/utmify-refunded-events` | `1131c26` | Libera `refunded` na configuração de eventos da UTMify. |
+| `services-sale-integrations` | `147.93.180.183` | `/opt/lowify/services/services-sale-integrations` | `feat/utmify-refunded-events` | `e6a31b4` | Transforma o evento no payload aceito pela UTMify. |
 
-Os commits ainda não existem no remoto no momento da preparação deste documento. Não iniciar o deploy antes de criar os commits, enviar as duas branches a `origin` e registrar os SHAs aprovados nesta tabela.
+As duas branches e seus commits de referência estão publicados em `origin`.
 
 ## Alterações incluídas
 
@@ -34,11 +34,10 @@ O produtor do reembolso já inclui `triggered_at` em `sales:events:refunded`; n�
 
 ## Pré-requisitos
 
-1. Criar e publicar as duas branches indicadas na tabela, registrar seus commits e atualizar esta documentação com os SHAs antes da execução.
-2. Confirmar que as árvores Git na VPS estão limpas, que `origin` aponta para os repositórios oficiais e registrar os commits atualmente publicados para rollback.
-3. Preservar as variáveis atuais `SALES_INTEGRATION_UTMIFY_QUEUE`, `SALE_INTEGRATIONS_UTMIFY_QUEUE`, `SALE_INTEGRATIONS_UTMIFY_PROCESS_ENABLED`, `SALE_INTEGRATIONS_UTMIFY_ENDPOINT` e o token de cada integração. Não imprimir nem alterar valores de segredos.
-4. Confirmar que ambos os serviços usam o mesmo Redis configurado e que as duas variáveis de fila apontam para `sales:integration:utmify` (ou para o mesmo nome customizado aprovado).
-5. Confirmar que há uma venda de teste paga, com integração UTMify ativa, que possa ser reembolsada de forma controlada.
+1. Confirmar que as árvores Git na VPS estão limpas, que `origin` aponta para os repositórios oficiais e registrar os commits atualmente publicados para rollback.
+2. Preservar as variáveis atuais `SALES_INTEGRATION_UTMIFY_QUEUE`, `SALE_INTEGRATIONS_UTMIFY_QUEUE`, `SALE_INTEGRATIONS_UTMIFY_PROCESS_ENABLED`, `SALE_INTEGRATIONS_UTMIFY_ENDPOINT` e o token de cada integração. Não imprimir nem alterar valores de segredos.
+3. Confirmar que ambos os serviços usam o mesmo Redis configurado e que as duas variáveis de fila apontam para `sales:integration:utmify` (ou para o mesmo nome customizado aprovado).
+4. Confirmar que há uma venda de teste paga, com integração UTMify ativa, que possa ser reembolsada de forma controlada.
 
 ## Banco de dados
 
