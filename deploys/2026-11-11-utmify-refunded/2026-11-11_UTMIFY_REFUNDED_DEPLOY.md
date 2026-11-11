@@ -15,10 +15,10 @@ Commerce V2: sales:events:refunded (com triggered_at)
 
 ## Componentes e referências
 
-| Componente | Diretório de produção | Branch de deploy | Commit | Papel nesta entrega |
-| --- | --- | --- | --- | --- |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Libera `refunded` na configuração de eventos da UTMify. |
-| `services-sale-integrations` | `/opt/lowify/services/services-sale-integrations` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Transforma o evento no payload aceito pela UTMify. |
+| Componente | Host de produção | Diretório de produção | Branch de deploy | Commit | Papel nesta entrega |
+| --- | --- | --- | --- | --- | --- |
+| `services-commerce-v2` | `144.126.149.57` | `/opt/lowify/services/service-commerce-v2` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Libera `refunded` na configuração de eventos da UTMify. |
+| `services-sale-integrations` | `147.93.180.183` | `/opt/lowify/services/services-sale-integrations` | `feat/utmify-refunded-events` | Pendente de commit e publicação da branch | Transforma o evento no payload aceito pela UTMify. |
 
 Os commits ainda não existem no remoto no momento da preparação deste documento. Não iniciar o deploy antes de criar os commits, enviar as duas branches a `origin` e registrar os SHAs aprovados nesta tabela.
 
@@ -50,7 +50,7 @@ Modo de rebuild: incremental.
 
 Publicar primeiro o consumidor (`services-sale-integrations`) e, em seguida, o produtor/despachante (`services-commerce-v2`). Assim, quando o Commerce começar a liberar reembolsos para a fila UTMify, o consumidor já reconhecerá o evento.
 
-### 1. Atualizar `services-sale-integrations`
+### 1. Atualizar `services-sale-integrations` em `147.93.180.183`
 
 ```bash
 cd /opt/lowify/services/services-sale-integrations
@@ -65,7 +65,7 @@ docker compose ps
 
 Confirmar que o SHA exibido corresponde ao commit aprovado e que o processo `sale_integrations_utmify` iniciou sem erro. Não consumir, apagar, reordenar ou reenfileirar mensagens da fila durante esta etapa.
 
-### 2. Atualizar `services-commerce-v2`
+### 2. Atualizar `services-commerce-v2` em `144.126.149.57`
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
