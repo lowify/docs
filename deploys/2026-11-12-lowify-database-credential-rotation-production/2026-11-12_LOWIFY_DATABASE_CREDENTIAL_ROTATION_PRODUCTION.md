@@ -8,7 +8,7 @@ Este procedimento não contém nem deve produzir senha em tela, logs, histórico
 
 ## Componentes e referências
 
-Esta é uma operação de configuração; não há branch, commit ou imagem nova para publicar.
+Esta é uma operação de configuração; não há branch ou commit novo para publicar. A única imagem reconstruída é a dos projetos que embutem o `.env` no build (`build_projects`, etapa 4), com o mesmo código já em execução.
 
 A conta `app` é uma só, no mesmo servidor `data-layer-mariadb`, mas cada consumidor acessa um banco diferente. Os nomes `mariadb` e `data-layer-mariadb` são aliases do mesmo container na rede `data_net`. Por isso todos os consumidores precisam ser parados e recriados na mesma janela: quem ficar de fora perde acesso no momento do `ALTER USER`.
 
@@ -19,7 +19,7 @@ A conta `app` é uma só, no mesmo servidor `data-layer-mariadb`, mas cada consu
 | Webhook | `/opt/lowify/edge/edge-webhook` | `services-webhook` | Pausar e recriar se estiver ativo. |
 | Account | `/opt/lowify/services/services-account` | `lowify` | Pausar e recriar se estiver ativo. |
 | Auth | `/opt/lowify/services/services-auth` | `lowify` | Pausar e recriar se estiver ativo. |
-| Notifications | `/opt/lowify/services/services-notifications` | `services-notification` | Pausar e recriar se estiver ativo. |
+| Notifications | `/opt/lowify/services/services-notifications` | `services-notification` | Pausar e recriar **com `--build`** se estiver ativo: em homologação o `.env` fica dentro da imagem (ver seção 7 da auditoria). |
 | Commerce (+ workers) | `/opt/lowify/services/services-commerce` | `lowify` | Pausar e recriar se estiver ativo. |
 | Commerce V2 | `/opt/lowify/services/service-commerce-v2` | `lowify` | Pausar e recriar se estiver ativo. |
 | Wallet | `/opt/lowify/services/services-wallet` | `lowify` | Pausar e recriar se estiver ativo. |
@@ -38,6 +38,8 @@ Essa confirmação não substitui a auditoria da pré-checagem: ela é que detec
 ### Consumidores que a varredura de `.env` não encontra
 
 A etapa 2 atualiza todo `.env` sob `/opt` com `DB_USERNAME=app`. Isso **não cobre** containers cuja senha foi fixada no ambiente do container sem `.env` em disco. Em homologação foi o caso do `front-docs-app`: usava `app` no banco `lowify`, não constava em nenhuma lista e o `docker-compose.yml` dele já não existia, o que impede recriá-lo com a senha nova. Só as seções 3 e 4 da auditoria o revelaram.
+
+Também não cobre serviços cuja imagem copia o `.env` no build (`COPY . ...` sem `.env` no `.dockerignore`) e que não recebem `DB_PASSWORD` pelo ambiente do container. Para esses, atualizar o `.env` no host e recriar **não basta**: o container continua lendo a senha antiga dentro da imagem, e é preciso `docker compose up -d --build --force-recreate`. Em homologação é o caso do `services-notifications`; a seção 7 da auditoria lista esses containers como `ORIGEM=IMAGEM`.
 
 A varredura também pode alterar `.env` de diretórios que não são projetos ativos (em homologação, `services/.deploy/services-auth-jwt` e `services/.deploy/services-account-jwt`). Isso é esperado e inofensivo, mas deve ser conferido na seção 5 da auditoria.
 
@@ -114,6 +116,21 @@ find "$BASE" -type f -name .env -not -path '*/vendor/*' -not -path '*/node_modul
 
 echo; echo "== 6. Nomes de rede do $MARIADB_CONTAINER"
 docker inspect "$MARIADB_CONTAINER" -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}: {{$v.Aliases}}{{println}}{{end}}'
+
+echo; echo "== 7. Containers que leem o .env de dentro do container (sem DB_PASSWORD no ambiente)"
+printf '%-62s %-8s %s\n' CONTAINER ORIGEM SENHA_vs_MARIADB_PASSWORD
+for c in $(docker ps --format '{{.Names}}' | sort); do
+  wd="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$c")"
+  case "$wd" in "$BASE"/lowify/data_layer/*) continue ;; "$BASE"/lowify/*) ;; *) continue ;; esac
+  case "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$c")" in *DB_PASSWORD=*) continue ;; esac
+  cwd="$(docker inspect -f '{{.Config.WorkingDir}}' "$c")"
+  [ -n "$cwd" ] || continue
+  envtxt="$(docker exec "$c" cat "$cwd/.env" 2>/dev/null)" || continue
+  [ "$(printf '%s\n' "$envtxt" | env_get /dev/stdin DB_USERNAME)" = "$DB_USER" ] || continue
+  case " $(docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}' "$c")" in *" $wd "*) origem=bind ;; *) origem=IMAGEM ;; esac
+  printf '%-62s %-8s %s\n' "$c" "$origem" "$(cmp_secret "$(printf '%s\n' "$envtxt" | env_get /dev/stdin DB_PASSWORD)" "$DB_PASS")"
+done
+echo "(ORIGEM=IMAGEM: o .env foi copiado no build; esse projeto precisa de --build na etapa 4)"
 AUDIT
 ```
 
@@ -124,6 +141,20 @@ Critérios para seguir:
 3. **Container fora da tabela usando `app`:** não executar. Decidir explicitamente entre incluí-lo na parada e retomada (precisa ter `docker-compose.yml` e `.env` em disco) ou aceitá-lo fora, sabendo que perderá acesso ao banco após a rotação.
 4. **`DIFERENTE` antes da rotação:** o consumidor já está com senha divergente ou aponta para outro servidor; investigar antes de seguir.
 5. **Seção 5:** conferir a lista de `.env` que a etapa 2 vai alterar; arquivos fora dos 12 projetos devem ser compreendidos (ex.: diretórios `.deploy/`).
+6. **Seção 7:** todo projeto com `ORIGEM=IMAGEM` deve estar em `build_projects` na etapa 4 (o bloco já traz `services-notifications`; remover se em produção ele não aparecer, acrescentar outros que aparecerem). Para cada um, confirmar antes da janela que o rebuild só troca o `.env`, e não sobe código novo — o resultado deve ser `CODIGO IGUAL` e `git status` vazio:
+
+```bash
+project_dir=/opt/lowify/services/services-notifications
+container=services-notifications-services-notifications-1
+cd "$project_dir" && git status --porcelain
+image="$(docker inspect "$container" -f '{{.Image}}')"
+app_dir="$(docker image inspect "$image" -f '{{.Config.WorkingDir}}')"
+host_hash="$(find app config -type f | sort | xargs sha256sum | sha256sum | cut -c1-16)"
+image_hash="$(docker run --rm --entrypoint sh "$image" -c "cd $app_dir && find app config -type f | sort | xargs sha256sum | sha256sum | cut -c1-16")"
+[ "$host_hash" = "$image_hash" ] && echo "CODIGO IGUAL" || echo "CODIGO DIFERENTE"
+```
+
+   Com `CODIGO DIFERENTE` ou `git status` não vazio, o rebuild publicaria código que não está em execução: não executar até alinhar o diretório com o commit em produção.
 
 ## Sequência de execução
 
@@ -259,10 +290,15 @@ docker run --rm --network data_net -v "$client_config_file:/tmp/client.cnf:ro" m
 
 # ---------- 4. Retomar somente os componentes que estavam ativos ----------
 echo "=== ETAPA 4"
+# Projetos com ORIGEM=IMAGEM na seção 7 da pré-checagem (.env copiado no build).
+# Ajustar a lista ao resultado da pré-checagem de produção, separando por espaço.
+build_projects='/opt/lowify/services/services-notifications'
+
 restart_if_previously_active() {
-  local project_dir="$1"
+  local project_dir="$1" build_flag=""
   grep -Fxq "$project_dir" /tmp/lowify-rotation-active-projects || return 0
-  (cd "$project_dir" && docker compose up -d --force-recreate </dev/null)
+  case " $build_projects " in *" $project_dir "*) build_flag=--build ;; esac
+  (cd "$project_dir" && docker compose up -d $build_flag --force-recreate </dev/null)
 }
 
 restart_if_previously_active /opt/lowify/services/services-account
@@ -352,8 +388,10 @@ Executado em 2026-11-12 na VPS de homologação (caminhos em `/root/opt`), com o
 
 Segunda execução em homologação, no mesmo dia, com este documento: pré-checagem e etapas 1 a 4 sem desvios; a etapa 5 acusou falha falsa em `dashboard-seller` (todos os containers estavam em execução) por causa do `grep -q` com `pipefail`. A validação foi concluída manualmente com a checagem corrigida, o gateway foi reaberto (indisponibilidade de **251 segundos**) e a auditoria pós-execução ficou limpa, exceto `front-docs-app`. Depois disso: as checagens passaram a não usar `grep -q` em pipeline e a gravação dos `.env` passou de `mv` para `cat >`, preservando o arquivo original e seu dono (ex.: `www-data`).
 
+Terceira execução em homologação, no mesmo dia, com a versão corrigida: a etapa 5 detectou corretamente `Access denied` em `services-notifications`. Causa: a imagem (gerada em 2026-11-09) contém o `.env` copiado no build e o serviço não recebe `DB_PASSWORD` pelo ambiente; `--force-recreate` sem `--build` mantinha a senha antiga. **As duas execuções anteriores tinham deixado esse serviço sem acesso ao banco** — o erro foi escondido pelo `grep -q` com `pipefail`. Após confirmar que o código da imagem era idêntico ao do host, o serviço foi recriado com `--build`, a etapa 5 foi concluída, o gateway reaberto (indisponibilidade de **354 segundos**, inflada pela investigação) e a auditoria pós-execução ficou limpa, exceto `front-docs-app`. Dono, modo e inode dos 15 `.env` alterados permaneceram iguais. Depois disso: seção 7 na auditoria e `build_projects` na etapa 4.
+
 Achados que motivaram esta revisão: o `trap` da etapa 3 apagava o inventário ao fechar o shell, impedindo as etapas 4 e 5 em sessões separadas; `docker compose` dentro de `while read` podia consumir o inventário; a checagem de erro do gateway não interrompia a execução; e havia consumidores fora de qualquer lista, visíveis só pela auditoria.
 
 ## Rollback
 
-Não há rollback automático da senha. Se um consumidor falhar após a rotação, manter o gateway pausado, corrigir o `.env` desse consumidor para a senha nova e recriar somente esse componente com `docker compose up -d --force-recreate` (sem `--build`). Para confirmar qual `.env` diverge sem expor valores, usar a auditoria (seção 5). Não apagar volumes, dados, bancos, Redis, filas ou logs.
+Não há rollback automático da senha. Se um consumidor falhar após a rotação, manter o gateway pausado, corrigir o `.env` desse consumidor para a senha nova e recriar somente esse componente com `docker compose up -d --force-recreate` — com `--build` apenas se ele aparecer como `ORIGEM=IMAGEM` na seção 7 e o código da imagem tiver sido confirmado igual ao do host. Para confirmar qual `.env` diverge sem expor valores, usar a auditoria (seções 4, 5 e 7). Ao revalidar depois de uma correção, olhar só os logs posteriores à recriação (`docker compose logs --since 1m`), para não contar erros anteriores a ela. Não apagar volumes, dados, bancos, Redis, filas ou logs.
