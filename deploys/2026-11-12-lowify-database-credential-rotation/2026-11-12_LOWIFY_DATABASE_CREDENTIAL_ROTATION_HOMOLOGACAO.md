@@ -215,6 +215,21 @@ Executado em 12/11/2026.
 
 Não foi executado um fluxo autenticado de interface por não haver uma credencial de teste fornecida para este procedimento.
 
+## Segunda execução em homologação
+
+Executada em 12/11/2026 com nova senha aleatória para a conta `app`@`%`.
+
+- Foram atualizados os 13 arquivos de ambiente encontrados na VPS que usam a conta MariaDB `app`, além de `MARIADB_PASSWORD` na infraestrutura.
+- Foram coordenados os mesmos consumidores ativos da primeira execução: Account, Auth, Notifications, Webhook, Dashboard Seller e seus workers, Member Area e Gateway.
+- A conexão com a nova credencial foi validada antes de reiniciar consumidores.
+- Após a retomada, os consumidores e o gateway estavam em execução sem erros de autenticação MariaDB; a varredura de hashes confirmou que as configurações da conta `app` permanecem alinhadas.
+
+### Indisponibilidade medida
+
+A indisponibilidade do ingresso HTTP foi medida na VPS desde o instante imediatamente anterior a `docker compose stop` do Gateway até os containers web e worker do Gateway voltarem a `running` sem erro de autenticação: **190,618 segundos** (**3 minutos e 10,618 segundos**).
+
+O período inclui a parada coordenada, a rotação da senha, a validação MariaDB, a recriação dos consumidores ativos e a retomada final do Gateway.
+
 ## Rollback
 
 Não executar rollback automático. A rotação de senha revoga a credencial anterior e deve permanecer assim caso a nova conexão falhe. Para recuperar um componente, corrigir o `.env` dele para a senha nova e recriá-lo. Não apagar dados, volumes MariaDB, Redis, filas ou logs.
