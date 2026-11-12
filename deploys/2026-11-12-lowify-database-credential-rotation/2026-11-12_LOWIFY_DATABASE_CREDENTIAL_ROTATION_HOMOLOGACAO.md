@@ -12,15 +12,20 @@ Não há migration, DDL ou alteração de dados de negócio. A senha não deve s
 | --- | --- | --- |
 | MariaDB compartilhado | `/root/opt/lowify/data_layer/mariabd` | Atualizar `MARIADB_PASSWORD` e executar `ALTER USER`. |
 | edge-gateway | `/root/opt/lowify/edge/edge-gateway` | Pausar a entrada HTTP antes da rotação; iniciar por último. |
+| edge-webhook | `/root/opt/lowify/edge/edge-webhook` | Atualizar `DB_PASSWORD` e recriar se estava ativo. |
 | services-account | `/root/opt/lowify/services/services-account` | Atualizar `DB_PASSWORD` e recriar se estava ativo. |
 | services-auth | `/root/opt/lowify/services/services-auth` | Atualizar `DB_PASSWORD` e recriar se estava ativo. |
 | services-commerce | `/root/opt/lowify/services/services-commerce` | Atualizar `DB_PASSWORD`; preservar o estado prévio se já estava parado. |
 | services-commerce-v2 | `/root/opt/lowify/services/service-commerce-v2` | Atualizar `DB_PASSWORD`; preservar o estado prévio se já estava parado. |
 | services-wallet | `/root/opt/lowify/services/services-wallet` | Atualizar `DB_PASSWORD`; preservar o estado prévio se já estava parado. |
+| services-banking | `/root/opt/lowify/services/services-banking` | Atualizar a configuração parada para não reintroduzir a senha antiga futuramente. |
+| services-banking-v2 | `/root/opt/lowify/services/services-banking-v2` | Atualizar a configuração parada para não reintroduzir a senha antiga futuramente. |
+| services-notification | `/root/opt/lowify/services/services-notifications` | Atualizar `DB_PASSWORD` e recriar se estava ativo. |
 | dashboard-seller | `/root/opt/lowify/front/dashboard-seller` | Atualizar `DB_PASSWORD`, recriar web e workers se estavam ativos. |
 | front-member-area | `/root/opt/lowify/front/front-member-area` | Atualizar `DB_PASSWORD` e recriar se estava ativo. |
 | services-commerce-worker | `/root/opt/lowify/services/services-commerce-worker` | Atualizar a configuração parada para não reintroduzir a senha antiga futuramente. |
 | account JWT deploy | `/root/opt/lowify/services/.deploy/services-account-jwt` | Atualizar a configuração parada para não reintroduzir a senha antiga futuramente. |
+| auth JWT deploy | `/root/opt/lowify/services/.deploy/services-auth-jwt` | Atualizar a configuração parada para não reintroduzir a senha antiga futuramente. |
 
 `front-docs` está fora do escopo por decisão do solicitante. Não iniciar, parar nem alterar esse componente durante esta operação.
 
@@ -43,7 +48,7 @@ cd /root/opt/lowify/data_layer/mariabd
 set -a
 . ./.env
 set +a
-docker exec -e MARIADB_PWD="$MARIADB_ROOT_PASSWORD" data-layer-mariadb \
+docker exec -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" data-layer-mariadb \
   mariadb -uroot --batch --skip-column-names \
   -e "SELECT User, Host FROM mysql.user WHERE User = '${MARIADB_USER}';"
 ```
@@ -60,6 +65,8 @@ Parar primeiro o gateway. Em seguida, parar os consumidores que estavam ativos. 
 cd /root/opt/lowify/edge/edge-gateway && docker compose stop
 cd /root/opt/lowify/services/services-account && docker compose stop
 cd /root/opt/lowify/services/services-auth && docker compose stop
+cd /root/opt/lowify/services/services-notifications && docker compose stop
+cd /root/opt/lowify/edge/edge-webhook && docker compose stop
 cd /root/opt/lowify/front/dashboard-seller && docker compose stop
 cd /root/opt/lowify/front/front-member-area && docker compose stop
 ```
@@ -74,7 +81,7 @@ Gerar a senha em um arquivo temporário com permissões restritas. Atualizar as 
 umask 077
 rotation_secret_file="$(mktemp)"
 trap 'rm -f "$rotation_secret_file"' EXIT
-tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48 >"$rotation_secret_file"
+printf '%s' "$(openssl rand -hex 32)" >"$rotation_secret_file"
 
 update_env_password() {
   local env_file="$1"
@@ -110,10 +117,16 @@ update_env_password /root/opt/lowify/services/services-auth/.env DB_PASSWORD
 update_env_password /root/opt/lowify/services/services-commerce/.env DB_PASSWORD
 update_env_password /root/opt/lowify/services/service-commerce-v2/.env DB_PASSWORD
 update_env_password /root/opt/lowify/services/services-wallet/.env DB_PASSWORD
+update_env_password /root/opt/lowify/services/services-banking/.env DB_PASSWORD
+update_env_password /root/opt/lowify/services/services-banking-v2/.env DB_PASSWORD
+update_env_password /root/opt/lowify/services/services-notifications/.env DB_PASSWORD
 update_env_password /root/opt/lowify/front/dashboard-seller/.env DB_PASSWORD
 update_env_password /root/opt/lowify/front/front-member-area/.env DB_PASSWORD
 update_env_password /root/opt/lowify/services/services-commerce-worker/.env DB_PASSWORD
 update_env_password /root/opt/lowify/services/.deploy/services-account-jwt/.env DB_PASSWORD
+update_env_password /root/opt/lowify/services/.deploy/services-auth-jwt/.env DB_PASSWORD
+update_env_password /root/opt/lowify/edge/edge-gateway/.env DB_PASSWORD
+update_env_password /root/opt/lowify/edge/edge-webhook/.env DB_PASSWORD
 ```
 
 ### 3. Alterar a senha efetiva no MariaDB
@@ -130,7 +143,7 @@ set +a
   printf "ALTER USER '%s'@'%%' IDENTIFIED BY '" "$MARIADB_USER"
   cat "$rotation_secret_file"
   printf "';\n"
-} | docker exec -i -e MARIADB_PWD="$MARIADB_ROOT_PASSWORD" data-layer-mariadb mariadb -uroot
+} | docker exec -i -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" data-layer-mariadb mariadb -uroot
 ```
 
 Substituir somente o host (`'%'`) pelo host confirmado na pré-checagem, se necessário. Não reiniciar o container do MariaDB.
@@ -161,11 +174,13 @@ Não usar `--build`: as imagens não mudaram. Recriar os containers ativos para 
 ```bash
 cd /root/opt/lowify/services/services-account && docker compose up -d --force-recreate
 cd /root/opt/lowify/services/services-auth && docker compose up -d --force-recreate
+cd /root/opt/lowify/services/services-notifications && docker compose up -d --force-recreate
 cd /root/opt/lowify/front/dashboard-seller && docker compose up -d --force-recreate
 cd /root/opt/lowify/front/front-member-area && docker compose up -d --force-recreate
+cd /root/opt/lowify/edge/edge-webhook && docker compose up -d --force-recreate
 ```
 
-Incluir `services-commerce`, `service-commerce-v2` e `services-wallet` somente se estavam ativos antes da operação. Não iniciar `services-commerce-worker`, `services-account-jwt` ou `front-docs` como consequência da rotação.
+Incluir `services-commerce`, `service-commerce-v2` e `services-wallet` somente se estavam ativos antes da operação. Não iniciar `services-commerce-worker`, `services-account-jwt`, `services-auth-jwt`, `services-banking`, `services-banking-v2` ou `front-docs` como consequência da rotação.
 
 ### 6. Conferir e reabrir o gateway
 
@@ -185,6 +200,20 @@ cd /root/opt/lowify/edge/edge-gateway && docker compose up -d --force-recreate
 4. Confirmar que os logs recentes não têm `Access denied`, `authentication failed` ou falhas de conexão ao banco.
 
 Se qualquer validação falhar, parar o gateway novamente e manter os demais componentes em estado controlado até identificar o consumidor com configuração divergente.
+
+## Resultado da execução em homologação
+
+Executado em 12/11/2026.
+
+- A conta MariaDB rotacionada foi confirmada como `app`@`%`.
+- A descoberta durante a operação mostrou que a mesma conta também é usada pelos bancos `services-gateway`, `services-webhook`, `services-notification` e `services-banking`; por isso os respectivos arquivos de ambiente foram alinhados à nova senha.
+- Foram pausados e recriados os componentes ativos: `services-account`, `services-auth`, `services-notifications`, `dashboard-seller` (incluindo workers), `front-member-area`, `edge-webhook` e `edge-gateway` (por último).
+- `services-commerce`, `services-commerce-v2`, `services-wallet`, Banking e os artefatos de deploy que já estavam parados permaneceram parados.
+- A nova credencial foi validada por conexão MariaDB direta antes de subir os consumidores.
+- Uma varredura final confirmou que todas as configurações descobertas que usam a conta compartilhada `app` estão alinhadas à nova senha.
+- Os containers recriados estavam em execução e sem mensagens recentes de erro de autenticação MariaDB.
+
+Não foi executado um fluxo autenticado de interface por não haver uma credencial de teste fornecida para este procedimento.
 
 ## Rollback
 
