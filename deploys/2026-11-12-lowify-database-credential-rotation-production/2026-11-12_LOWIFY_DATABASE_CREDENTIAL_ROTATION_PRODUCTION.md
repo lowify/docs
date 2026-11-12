@@ -133,6 +133,8 @@ Registrar os Compose projects que efetivamente estavam ativos. O arquivo de inve
 
 Os comandos `docker compose` dentro de laços `while read` recebem `</dev/null`; sem isso, o `docker compose` pode consumir o restante do inventário pela entrada padrão e pular projetos.
 
+As checagens não usam `docker compose ... | grep -q`: com `pipefail`, o `grep -q` encerra na primeira linha, o `docker compose` recebe SIGPIPE e o pipeline falha de forma intermitente — tanto acusando falha inexistente quanto escondendo um erro de autenticação real.
+
 ```bash
 rotation_active_projects=/tmp/lowify-rotation-active-projects
 : >"$rotation_active_projects"
@@ -152,7 +154,7 @@ for project_dir in \
   /opt/lowify/front/front-member-area; do
   (
     cd "$project_dir"
-    if docker compose ps --status running -q </dev/null | grep -q .; then
+    if [ -n "$(docker compose ps --status running -q </dev/null)" ]; then
       printf '%s\n' "$project_dir" >>"$rotation_active_projects"
     fi
   )
@@ -216,9 +218,9 @@ update_password() {
       }
     }
   ' "$env_file" >"$temp_file"
-  chown --reference="$env_file" "$temp_file"
-  chmod --reference="$env_file" "$temp_file"
-  mv "$temp_file" "$env_file"
+  # Reescreve o conteúdo no próprio arquivo: mantém dono, grupo, modo, ACLs e
+  # inode (ex.: .env pertencente a www-data). Não usar mv aqui.
+  cat "$temp_file" >"$env_file" && rm -f "$temp_file"
 }
 
 echo "=== ETAPA 2"
@@ -283,10 +285,10 @@ auth_error_pattern='access denied|authentication failed|sqlstate\[hy000\] \[1045
 while IFS= read -r project_dir; do
   [ "$project_dir" = /opt/lowify/edge/edge-gateway ] && continue
   cd "$project_dir"
-  if ! docker compose ps --status running -q </dev/null | grep -q .; then
+  if [ -z "$(docker compose ps --status running -q </dev/null)" ]; then
     echo "FALHA: nada em execução em $project_dir — gateway permanece parado"; exit 1
   fi
-  if docker compose logs --since 5m </dev/null 2>&1 | grep -qiE "$auth_error_pattern"; then
+  if docker compose logs --since 5m </dev/null 2>&1 | grep -iE "$auth_error_pattern" >/dev/null; then
     echo "FALHA: erro de autenticação MariaDB em $project_dir — gateway permanece parado"; exit 1
   fi
   echo "ok: $project_dir"
@@ -296,10 +298,10 @@ if grep -Fxq /opt/lowify/edge/edge-gateway /tmp/lowify-rotation-active-projects;
   cd /opt/lowify/edge/edge-gateway
   docker compose up -d --force-recreate </dev/null
   sleep 10
-  if ! docker compose ps --status running -q </dev/null | grep -q .; then
+  if [ -z "$(docker compose ps --status running -q </dev/null)" ]; then
     echo "FALHA: gateway não está em execução"; exit 1
   fi
-  if docker compose logs --since 5m </dev/null 2>&1 | grep -qiE "$auth_error_pattern"; then
+  if docker compose logs --since 5m </dev/null 2>&1 | grep -iE "$auth_error_pattern" >/dev/null; then
     echo "FALHA: erro de autenticação MariaDB no gateway"; exit 1
   fi
   echo "ok: /opt/lowify/edge/edge-gateway"
@@ -347,6 +349,8 @@ Executado em 2026-11-12 na VPS de homologação (caminhos em `/root/opt`), com o
 - validação de login retornou `1`; nenhum erro de autenticação nos logs;
 - indisponibilidade do gateway: **224 segundos**;
 - `front-docs-app` foi deixado de fora por decisão explícita: usa `app` no banco `lowify`, mas não tem `docker-compose.yml` em disco e ficou com a senha antiga.
+
+Segunda execução em homologação, no mesmo dia, com este documento: pré-checagem e etapas 1 a 4 sem desvios; a etapa 5 acusou falha falsa em `dashboard-seller` (todos os containers estavam em execução) por causa do `grep -q` com `pipefail`. A validação foi concluída manualmente com a checagem corrigida, o gateway foi reaberto (indisponibilidade de **251 segundos**) e a auditoria pós-execução ficou limpa, exceto `front-docs-app`. Depois disso: as checagens passaram a não usar `grep -q` em pipeline e a gravação dos `.env` passou de `mv` para `cat >`, preservando o arquivo original e seu dono (ex.: `www-data`).
 
 Achados que motivaram esta revisão: o `trap` da etapa 3 apagava o inventário ao fechar o shell, impedindo as etapas 4 e 5 em sessões separadas; `docker compose` dentro de `while read` podia consumir o inventário; a checagem de erro do gateway não interrompia a execução; e havia consumidores fora de qualquer lista, visíveis só pela auditoria.
 
