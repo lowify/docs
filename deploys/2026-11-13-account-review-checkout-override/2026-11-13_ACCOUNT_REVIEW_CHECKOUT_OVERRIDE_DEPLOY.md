@@ -1,6 +1,6 @@
 # Deploy — override de checkout durante revisão de conversão de conta
 
-> Status: pronto para homologação; aplicar o DDL manual antes de iniciar o novo `services-account`.
+> Status: publicado e validado em homologação em 2026-11-13.
 
 ## Objetivo
 
@@ -10,14 +10,14 @@ Publicar a continuidade de checkout para sellers previamente aprovados que conve
 
 | Repositório | Diretório na VPS | Branch de deploy | Commit |
 | --- | --- | --- | --- |
-| `services-account` | `/opt/lowify/services/services-account` | `feat/account-review-checkout-override` | `e647dee` |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/account-review-checkout-override` | `c3b80cd` |
+| `services-account` | `/root/opt/lowify/services/services-account` | `feat/account-review-checkout-override` | `4e30375` |
+| `services-commerce-v2` | `/root/opt/lowify/services/service-commerce-v2` | `feat/account-review-checkout-override` | `1588873` |
 
 `dashboard-seller`, `edge-gateway` e `edge-public-api` não recebem alteração nesta entrega: a conversão já chega ao Account e o Commerce V2 consulta o Account diretamente pelo contrato interno existente.
 
 ## Composição da homologação
 
-Participantes: `services-account` e `services-commerce-v2`, nas branches declaradas acima. Todos os demais targets operáveis do mapa oficial de homologação devem ser sincronizados em `main`, em modo incremental. `data_layer` e `checkout-transparent-infra` permanecem como estão, pois são targets de infraestrutura protegidos pelo mapa. Os repositórios ausentes ou não mapeados também ficam fora da operação.
+Participantes: `services-account` e `services-commerce-v2`, nas branches declaradas acima. Nesta execução, por solicitação explícita, todos os demais targets foram mantidos como estavam; não receberam fetch, troca de branch, pull ou Docker adicional. `data_layer` e `checkout-transparent-infra` permanecem protegidos. Os repositórios ausentes ou não mapeados também ficam fora da operação.
 
 ## Alterações incluídas
 
@@ -52,13 +52,13 @@ Se o precheck retornar a coluna já no formato esperado, não executar o DDL. Qu
 Em cada repositório, confirmar árvore limpa, remoto correto e branch publicada antes de trocar qualquer container:
 
 ```bash
-cd /opt/lowify/services/services-account
+cd /root/opt/lowify/services/services-account
 git status --porcelain=v1
 git remote get-url origin
 git fetch origin --prune
 git show-ref --verify --quiet refs/remotes/origin/feat/account-review-checkout-override
 
-cd /opt/lowify/services/service-commerce-v2
+cd /root/opt/lowify/services/service-commerce-v2
 git status --porcelain=v1
 git remote get-url origin
 git fetch origin --prune
@@ -74,7 +74,7 @@ Executar o precheck, DDL quando aplicável e validação da seção Banco de dad
 ### 3. Publicar Account
 
 ```bash
-cd /opt/lowify/services/services-account
+cd /root/opt/lowify/services/services-account
 git switch feat/account-review-checkout-override
 git pull --ff-only origin feat/account-review-checkout-override
 git rev-parse --short HEAD
@@ -85,7 +85,7 @@ docker compose ps
 ### 4. Publicar Commerce V2
 
 ```bash
-cd /opt/lowify/services/service-commerce-v2
+cd /root/opt/lowify/services/service-commerce-v2
 git switch feat/account-review-checkout-override
 git pull --ff-only origin feat/account-review-checkout-override
 git rev-parse --short HEAD
@@ -113,6 +113,7 @@ Como conferência técnica opcional, verificar os logs normais dos dois containe
 ## Referências
 
 - [Plano da feature](../../plans/account-review-checkout-override/README.md)
+- [Validação de homologação](2026-11-13_ACCOUNT_REVIEW_CHECKOUT_OVERRIDE_VALIDATION.md)
 - [PRECHECK.sql](sql/lowify/PRECHECK.sql)
 - [DEPLOY.sql](sql/lowify/DEPLOY.sql)
 - [VALIDATE.sql](sql/lowify/VALIDATE.sql)
