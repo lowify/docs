@@ -96,19 +96,17 @@ Após o inventário, a política deve declarar origens por finalidade:
 
 `X-Frame-Options: DENY` ou `frame-ancestors 'none'` podem quebrar usos legítimos se algum checkout for incorporado por iframe. Da mesma forma, `form-action 'self'` exige confirmar que nenhum formulário de checkout faz POST diretamente para um domínio externo. Esses controles devem entrar após a verificação funcional em homologação e com exceções temporárias, documentadas e com prazo, para integrações legítimas ainda não migradas.
 
-## Plano de remediação gradual
+## Levantamento necessário antes do planejamento
 
-| Prioridade | Ação | Preserva checkouts existentes? |
+Ainda não há base suficiente para definir um plano de remediação fechado. Antes de escolher controles, allowlists, migrações ou prazos, a equipe deve levantar o uso real dos recursos e os registros já existentes. O planejamento será traçado a partir desse inventário, priorizando os achados confirmados e o impacto em checkouts ativos.
+
+| Etapa | Levantamento ou ação preparatória | Impacto esperado em checkouts existentes |
 | --- | --- | --- |
-| P0 | Publicar e validar a negação de arquivos operacionais expostos. | Sim. |
-| P0 | Inventariar produtos com `video_type=iframe`, URLs HTTP, imagens externas, banners externos e redirecionamentos externos. | Sim; somente leitura. |
-| P0 | Validar no backend de salvamento: imagens e banners devem ser caminhos internos ou URLs HTTPS emitidas pelo storage/CDN da Lowify; vídeos devem usar HTTPS. | Sim para fluxo normal de upload; requer tratamento dos registros legados fora da política. |
-| P0 | Substituir HTML bruto de embed por renderer controlado: extrair `src`, exigir HTTPS, limitar origens e gerar iframe com atributos permitidos. | Requer migração ou exceção temporária para embeds legados. |
-| P1 | Habilitar CSP em modo `Report-Only`, com endpoint de coleta, para levantar domínios usados sem bloquear recursos. | Sim. |
-| P1 | Criar política gradual de allowlist para `frame-src`, `img-src`, `media-src` e destinos de redirecionamento. | Sim durante a fase somente de relatório. |
-| P1 | Aplicar cabeçalhos efetivos após a análise dos relatórios e testes de checkout. | Depende da allowlist consolidada. |
-| P2 | Migrar o `DocumentRoot` para `public/`. | Requer teste de rotas, assets e entrypoints. |
-| P2 | Solicitar revisão aos fornecedores de reputação que efetivamente classificam o domínio, citando correções verificadas. | Sim. |
+| Imediata | Validar a negação de arquivos operacionais expostos. | Sem alteração de conteúdo de seller. |
+| Imediata | Inventariar produtos com `video_type=iframe`, URLs HTTP, imagens externas, banners externos e redirecionamentos externos. | Somente leitura. |
+| Imediata | Habilitar CSP em modo `Report-Only`, com endpoint de coleta, para levantar domínios usados sem bloquear recursos. | Sem bloqueio de recursos. |
+| Após o inventário | Definir quais URLs, domínios, players, pixels e fluxos externos são legítimos, legados ou indevidos. | Nenhum até a aprovação do planejamento. |
+| Após o inventário | Traçar plano de remediação, migração de registros legados, testes de compatibilidade e aplicação gradual de controles. | A ser definido com base na evidência. |
 
 ## Critérios de aceite
 
