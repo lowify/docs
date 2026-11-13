@@ -15,6 +15,10 @@ Publicar a continuidade de checkout para sellers previamente aprovados que conve
 
 `dashboard-seller`, `edge-gateway` e `edge-public-api` não recebem alteração nesta entrega: a conversão já chega ao Account e o Commerce V2 consulta o Account diretamente pelo contrato interno existente.
 
+## Composição da homologação
+
+Participantes: `services-account` e `services-commerce-v2`, nas branches declaradas acima. Todos os demais targets operáveis do mapa oficial de homologação devem ser sincronizados em `main`, em modo incremental. `data_layer` e `checkout-transparent-infra` permanecem como estão, pois são targets de infraestrutura protegidos pelo mapa. Os repositórios ausentes ou não mapeados também ficam fora da operação.
+
 ## Alterações incluídas
 
 - `services-account` adiciona `tbl_usuarios.checkout_review_approved_override`.
