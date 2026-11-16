@@ -1,3 +1,12 @@
+# Documento substituído
+
+O roteiro canônico de produção é
+[2026-11-06_CHECKOUT_APPLE_GOOGLE_PAY_DEPLOY.md](../2026-11-06-checkout-apple-google-pay/2026-11-06_CHECKOUT_APPLE_GOOGLE_PAY_DEPLOY.md).
+Ele contém os diretórios produtivos confirmados, os comandos operacionais e
+os SQLs manuais no padrão adotado para produção.
+
+---
+
 # Deploy — Apple Pay e Google Pay no Checkout (produção)
 
 ## Objetivo

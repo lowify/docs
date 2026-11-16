@@ -19,14 +19,16 @@ Não usar caminhos de desenvolvimento ou homologação neste roteiro.
 
 | Repositório | Diretório de produção | Branch de deploy | Commit mínimo | Papel |
 | --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/checkout-apple-google-pay` | `3c878af` | Recebe a instrução de cartão com autorização de carteira, preserva a classificação em `charges_card.wallet_card_id` e traduz a cobrança para Cielo ou Pagar.me. |
-| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/checkout-apple-google-pay` | `88e6907` | Resolve habilitação, valida a sessão Apple Pay no servidor, prepara Google Pay e encaminha a autorização transitória ao Banking. |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/checkout-apple-google-pay` | `6b03415` | Mostra as carteiras elegíveis, coleta os dados obrigatórios do comprador e envia o token, sem persistir dados de cartão. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-apple-google-pay` | `f1308348` | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. |
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/checkout-apple-google-pay` | `36913f0` | Recebe a instrução de cartão com autorização de carteira, preserva a classificação em `charges_card.wallet_card_id` e traduz a cobrança para Cielo ou Pagar.me. |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/checkout-apple-google-pay` | `a4e56bd` | Resolve habilitação, valida a sessão Apple Pay no servidor, prepara Google Pay e encaminha a autorização transitória ao Banking. |
+| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/checkout-apple-google-pay` | `acf8481` | Encaminha as rotas internas de checkout e wallet para os serviços. |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/checkout-apple-google-pay` | `b88d9fe` | Extrai e propaga JWT nas rotas públicas do fluxo. |
+| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/checkout-apple-google-pay` | `9c1af9e` | Mostra as carteiras elegíveis, coleta os dados obrigatórios do comprador e envia o token, sem persistir dados de cartão. |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-apple-google-pay` | `b415022c` | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. |
 
 `services-wallet` não participa deste deploy: ele é a carteira interna de
-saldo/extrato/saque e não é Apple Pay nem Google Pay. Edges não recebem código
-nesta entrega; mantêm seu papel normal de borda entre Checkout e Commerce.
+saldo/extrato/saque e não é Apple Pay nem Google Pay. Os dois edges participam
+para manter as rotas e o contrato de autenticação do fluxo atualizados.
 
 ## Alterações incluídas
 
@@ -58,7 +60,7 @@ webhooks públicos e regras de split existentes estão fora do escopo.
 
 ## Pré-requisitos e bloqueadores
 
-1. Registrar a revisão anterior aprovada dos quatro repositórios. Não usar
+1. Registrar a revisão anterior aprovada dos seis repositórios. Não usar
    `reset`, `clean`, `stash` nem checkout forçado para contornar árvore suja.
 2. Confirmar acesso ao host, Docker e às sessões administrativas aprovadas dos
    bancos do Commerce e Banking. Confirmar backup recuperável antes dos DDLs.
@@ -93,6 +95,18 @@ git fetch origin --prune
 git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
 
 cd /opt/lowify/services/service-commerce-v2
+test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
+git remote get-url origin
+git fetch origin --prune
+git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+
+cd /opt/lowify/edge/edge-gateway
+test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
+git remote get-url origin
+git fetch origin --prune
+git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+
+cd /opt/lowify/edge/edge-public-api
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
@@ -261,14 +275,14 @@ Não executar `php bin/hyperf.php migrate`, `migrate --force`,
 cd /opt/lowify/services/services-banking-v2
 git switch feat/checkout-apple-google-pay
 git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor 3c878af HEAD
+git merge-base --is-ancestor 36913f0 HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 services-banking-v2
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `3c878af`
+Prosseguir somente se `git merge-base` retornar zero, o commit for `36913f0`
 ou descendente aprovado, o serviço estiver `Up` e não houver erro de schema,
 conexão ou processo nos logs.
 
@@ -278,44 +292,80 @@ conexão ou processo nos logs.
 cd /opt/lowify/services/service-commerce-v2
 git switch feat/checkout-apple-google-pay
 git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor 88e6907 HEAD
+git merge-base --is-ancestor a4e56bd HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `88e6907`
+Prosseguir somente se `git merge-base` retornar zero, o commit for `a4e56bd`
 ou descendente aprovado, `service-commerce-v2` estiver `Up` e os logs não
 apontarem erro de schema, configuração de certificado, conexão ou processo.
 
-### 4. Atualizar Front Checkout
+### 4. Atualizar Edge Gateway
+
+```bash
+cd /opt/lowify/edge/edge-gateway
+git switch feat/checkout-apple-google-pay
+git pull --ff-only origin feat/checkout-apple-google-pay
+git merge-base --is-ancestor acf8481 HEAD
+git rev-parse --short HEAD
+docker compose up -d --build --force-recreate
+docker compose ps
+docker compose logs --tail=100 edge-gateway edge-gateway-worker
+```
+
+Prosseguir somente se `git merge-base` retornar zero, o commit for `acf8481`
+ou descendente aprovado e os dois processos estiverem `Up` sem erro de rota,
+autenticação ou processo nos logs.
+
+### 5. Atualizar Edge Public API
+
+```bash
+cd /opt/lowify/edge/edge-public-api
+git switch feat/checkout-apple-google-pay
+git pull --ff-only origin feat/checkout-apple-google-pay
+git merge-base --is-ancestor b88d9fe HEAD
+git rev-parse --short HEAD
+docker compose up -d --build --force-recreate
+docker compose ps
+docker compose logs --tail=100 edge-public-api
+```
+
+Prosseguir somente se `git merge-base` retornar zero, o commit for `b88d9fe`
+ou descendente aprovado e o processo estiver `Up` sem erro de rota ou JWT nos
+logs.
+
+### 6. Atualizar Front Checkout
 
 ```bash
 cd /opt/lowify/front/front-checkout
 git switch feat/checkout-apple-google-pay
 git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor 6b03415 HEAD
+git merge-base --is-ancestor 9c1af9e HEAD
 git rev-parse --short HEAD
 docker compose ps
 ```
 
-Prosseguir somente se `git merge-base` retornar zero e todos os serviços que
+Prosseguir somente se `git merge-base` retornar zero, o commit for `9c1af9e`
+ou descendente aprovado e todos os serviços que
 já estavam ativos continuarem `Up`. Não reiniciar container só por esta
 atualização de código montado.
 
-### 5. Atualizar Dashboard Seller
+### 7. Atualizar Dashboard Seller
 
 ```bash
 cd /opt/lowify/front/dashboard-seller
 git switch feat/checkout-apple-google-pay
 git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor f1308348 HEAD
+git merge-base --is-ancestor b415022c HEAD
 git rev-parse --short HEAD
 docker compose ps
 ```
 
-Prosseguir somente se `git merge-base` retornar zero e os serviços existentes
+Prosseguir somente se `git merge-base` retornar zero, o commit for `b415022c`
+ou descendente aprovado e os serviços existentes
 permanecerem `Up`. Não consumir ou reprocessar filas manualmente.
 
 ## Ativação controlada e validação pós-deploy
