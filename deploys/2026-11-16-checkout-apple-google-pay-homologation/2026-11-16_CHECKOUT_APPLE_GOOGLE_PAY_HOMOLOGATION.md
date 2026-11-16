@@ -6,7 +6,8 @@ Publicar a feature `feat/checkout-apple-google-pay` na VPS de homologação para
 validar a renderização, os contratos entre Checkout, edges, Commerce e Banking
 e as proteções de elegibilidade. Esta operação usa identificadores fictícios e
 certificado autoassinado de laboratório: não autoriza uma transação Apple Pay
-ou Google Pay real.
+ou Google Pay real. Somente os seis participantes abaixo recebem comandos;
+todos os demais targets da VPS permanecem exatamente como estão.
 
 As duas flags globais e as duas flags do seller `pradodolucas3@gmail.com` serão
 habilitadas. Os produtos permanecem desligados até uma seleção explícita no
@@ -16,7 +17,9 @@ Dashboard Seller.
 
 - VPS: `root@217.216.87.77`
 - Modo: incremental.
-- Targets mantidos como estão: `checkout-transparent-infra` e `data_layer`.
+- Targets mantidos como estão: todos os targets fora da tabela de componentes,
+  inclusive `checkout-transparent-infra` e `data_layer`. Não executar
+  pré-checagem, Git, Docker ou qualquer outro comando neles.
 - Certificado de laboratório: diretório externo
   `/root/opt/lowify/certs/commerce-v2-wallet-lab`, montado somente pelo
   override externo do Compose. Não criar certificado, chave ou override dentro
@@ -32,12 +35,12 @@ Dashboard Seller.
 | `edge-public-api` | `feat/checkout-apple-google-pay` | `b88d9fe` |
 | `services-commerce-v2` | `feat/checkout-apple-google-pay` | `a4e56bd` |
 | `services-banking-v2` | `feat/checkout-apple-google-pay` | `36913f0` |
-| `front-chat`, `front-idv`, `front-member-area`, `edge-webhook` | `main` | `origin/main` |
-| `services-account`, `services-auth`, `services-banking`, `services-commerce`, `services-notification`, `services-platform`, `services-wallet` | `main` | `origin/main` |
-| `checkout-transparent-api`, `checkout-transparent-billing`, `checkout-transparent-worker`, `ct-webhook` | `main` | `origin/main` |
 
-Não executar comandos nos targets mantidos como estão, nos itens ausentes da
-VPS ou nos repositórios sem mapeamento oficial.
+Não executar comandos em `front-chat`, `front-idv`, `front-member-area`,
+`edge-webhook`, `services-account`, `services-auth`, `services-banking`,
+`services-commerce`, `services-notification`, `services-platform`,
+`services-wallet`, Checkout Transparente, `ct-webhook`, `data_layer`, itens
+ausentes da VPS ou repositórios sem mapeamento oficial.
 
 ## Banco de dados
 
@@ -66,13 +69,12 @@ rollback de schema.
 
 ## Sequência de integração
 
-1. Executar a pré-checagem de todos os targets operáveis: `git status
+1. Executar a pré-checagem somente dos seis participantes: `git status
    --porcelain=v1`, branch e origin. Parar se houver alteração local.
-2. Executar `git fetch origin --prune` em todos; confirmar as seis branches da
-   feature e `origin/main` para os demais targets.
+2. Executar `git fetch origin --prune` somente nos participantes e confirmar
+   as seis branches da feature.
 3. Atualizar participantes com `git switch feat/checkout-apple-google-pay` e
-   `git pull --ff-only origin feat/checkout-apple-google-pay`; atualizar todos
-   os demais targets operáveis com `main` e `git pull --ff-only origin main`.
+   `git pull --ff-only origin feat/checkout-apple-google-pay`.
 4. Reconstruir somente os edges e serviços cuja branch/commit tenha mudado.
    Para Commerce V2, usar também o override externo do laboratório. Fronts
    recebem apenas atualização Git.
