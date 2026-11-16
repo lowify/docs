@@ -72,18 +72,22 @@ identidade JWT continua sendo extraída e validada no `edge-public-api`.
 
 ## Banco de dados
 
-Executar as migrations aditivas dos dois serviços por meio do procedimento
-padronizado de migrations da produção, uma única vez e antes de ativar flags.
-Elas devem resultar em:
+Executar os SQLs manuais que acompanham este documento, uma única vez e antes
+de ativar flags. Não executar migrations automáticas nesta entrega.
 
-- `tbl_produtos`: `apple_pay_enabled` e `google_pay_enabled`, com padrão `0`;
-- `system_vars`: `checkout_apple_pay_enabled` e
-  `checkout_google_pay_enabled`, inicialmente `0`;
-- Banking V2: `wallet_card_id` em `charges_card` e o índice
-  `idx_charges_card_wallet_id`.
+| Banco | Pré-check | Executar somente se o pré-check indicar ausência total | Validar depois |
+| --- | --- | --- | --- |
+| Commerce V2 | [PRECHECK.sql](sql/commerce-v2/PRECHECK.sql) | [DEPLOY.sql](sql/commerce-v2/DEPLOY.sql) | [VALIDATE.sql](sql/commerce-v2/VALIDATE.sql) |
+| Banking V2 | [PRECHECK.sql](sql/banking-v2/PRECHECK.sql) | [DEPLOY.sql](sql/banking-v2/DEPLOY.sql) | [VALIDATE.sql](sql/banking-v2/VALIDATE.sql) |
 
-Antes, verificar a existência de cada coluna, chave e índice. Se já existirem,
-não executar DDL manual nem backfill. Não remover essas estruturas em rollback.
+No Commerce V2, executar o `DEPLOY.sql` somente se o pré-check retornar zero
+linhas para as duas colunas e zero linhas para as duas `system_vars`. No
+Banking V2, executar somente se coluna e índice estiverem ambos ausentes.
+
+Se qualquer pré-check retornar estado parcial, tipo/default divergente ou uma
+única chave global, parar: não adaptar o DDL, não criar coluna/índice isolado e
+não fazer backfill. Após cada `DEPLOY.sql`, executar imediatamente o respectivo
+`VALIDATE.sql`. Não remover essas estruturas em rollback.
 
 ## Sequência de deploy
 
@@ -112,8 +116,8 @@ inferidos a partir da VPS de homologação.
    git pull --ff-only origin feat/checkout-apple-google-pay
    ```
 
-3. Aplicar as migrations aprovadas de Commerce V2 e Banking V2. Confirmar a
-   existência das estruturas descritas em **Banco de dados** antes de seguir.
+3. Executar os SQLs manuais de **Banco de dados**: pré-check, DDL somente se
+   aplicável e validação. Confirmar o resultado antes de seguir.
 
 4. Instalar o certificado e a chave Apple reais em volume externo, montar o
    volume como somente leitura no Commerce V2 e configurar as variáveis reais
