@@ -9,7 +9,7 @@ Foram atualizados somente os três participantes abaixo. Nenhum outro repositór
 
 | Repositório | Caminho em homologação | Branch | Commit final | Ação executada |
 | --- | --- | --- | --- | --- |
-| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `fix/hotfix-pack-2026-11-16` | `e862bb48` | `git switch` e `git pull --ff-only`; sem build ou restart |
+| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `fix/hotfix-pack-2026-11-16` | `6d4e5b3d` | `git switch` e `git pull --ff-only`; sem build ou restart |
 | `services-notifications` | `/root/opt/lowify/services/services-notifications` | `fix/hotfix-pack-2026-11-16` | `0dabab3` | `git switch`, `git pull --ff-only`, rebuild e recreate do serviço |
 | `services-checkout-transparent-api` | `/root/opt/lowify-ct/services-checkout-transparent-api` | `fix/hotfix-pack-2026-11-16` | `3fdd9eb` | `git switch`, `git pull --ff-only`, rebuild/recreate somente do `app` e desativação versionada da RisePay |
 
@@ -34,6 +34,18 @@ As três pré-checagens foram aprovadas.
 - Não houve build, restart ou recriação de container, conforme a regra do Dashboard Seller.
 - Os containers existentes permaneceram ativos após a atualização.
 
+### Sincronização posterior do Dashboard Seller
+
+- Após um rebase autorizado da branch do pacote, a homologação permaneceu na ponta anterior `e862bb48` e não podia avançar com `git pull --ff-only`.
+- Com a confirmação de que o repositório estava limpo e autorização explícita, ele foi sincronizado com `origin/fix/hotfix-pack-2026-11-16` para o commit `91ab0ed5`.
+- Não houve build, restart ou recriação de container; todos os containers do Dashboard Seller continuaram ativos.
+
+### Correção posterior em Vendas
+
+- Em 17/11/2026, o Dashboard Seller recebeu o commit `6d4e5b3d` (`fix(sales): complete sensitive data masking on load`) por `git pull --ff-only`.
+- A correção encerra o shimmer inicial de Vendas após a aplicação das máscaras, evitando que os dados ocultos permaneçam exibidos como barras.
+- Não houve build, restart ou recriação de container.
+
 ### Notifications
 
 - A branch anterior era `fix/quick-fixes-2026-11-09` no commit `0dabab3`.
@@ -54,13 +66,13 @@ docker compose exec -T app php bin/hyperf.php integration-gateways:disable-risep
 
 - Resultado observado: havia uma integração RisePay ativa registrada; o gateway já estava inativo e a execução confirmou `inactive -> inactive`. Registros históricos de integrações e cobranças foram preservados.
 
-## Validação ainda necessária na interface
+## Validações concluídas
 
-1. No Dashboard, ativar o ícone de olho e confirmar a ocultação de valores, clientes, pedidos, produtos e progresso; os gráficos devem preservar quantidades e mostrar estrelas nos nomes dos produtos.
-2. Em Vendas, testar o filtro Cartão e uma URL antiga com `gateway=cartao`.
-3. Em uma venda Pagar.me de teste elegível, abrir e submeter o modal de estorno conforme o fluxo de teste reversível aprovado.
-4. Em Configurações do sistema > WhatsApp Meta, salvar um template de recuperação e confirmar a persistência após recarregar a página.
-5. Em Checkout Transparente, confirmar que RisePay não aparece em Nova integração e que os demais gateways permanecem disponíveis.
+1. Dashboard e Vendas: o ícone de olho ocultou os dados esperados; em Vendas, a máscara final foi confirmada após a correção `6d4e5b3d`.
+2. Filtro Cartão: validado em uma conta com 173 vendas de cartão.
+3. WhatsApp Meta: o salvamento e a persistência dos templates de recuperação foram validados.
+4. Dashboard Seller: RisePay não é mais exibida em Nova integração.
+5. CT API: a execução idempotente de `integration-gateways:disable-risepay` confirmou `inactive -> inactive`, preservando uma integração histórica ativa.
 
 ## Referências
 
