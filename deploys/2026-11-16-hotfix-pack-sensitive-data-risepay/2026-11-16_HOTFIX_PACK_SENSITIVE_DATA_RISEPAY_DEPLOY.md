@@ -39,7 +39,7 @@ Não publicar Worker, CT Webhook, Edge Public API, Front Checkout, Commerce, ban
 
 ### CT API
 
-- A revisão `bbcf1b1` fornece o comando `integration-gateways:disable-risepay`, que registra a quantidade de integrações RisePay ativas e desativa somente o gateway global de novos usos.
+- A revisão `3fdd9eb` fornece o comando `integration-gateways:disable-risepay`, que registra a quantidade de integrações RisePay ativas e desativa somente o gateway global de novos usos.
 - O comando é idempotente e não exclui integrações, cobranças, webhooks, Redis ou filas históricas.
 
 ## Escopo confirmado da CT API
