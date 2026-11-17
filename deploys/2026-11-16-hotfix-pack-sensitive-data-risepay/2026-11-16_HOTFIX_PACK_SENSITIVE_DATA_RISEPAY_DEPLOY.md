@@ -17,7 +17,7 @@ Os hosts são separados: a CT API fica em `80.190.72.228`; Dashboard Seller e No
 
 | Repositório | Host | Diretório | Branch | Revisão | Ação |
 | --- | --- | --- | --- | --- | --- |
-| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `fix/hotfix-pack-2026-11-16` | `0944fc96` | atualizar arquivos via bind mount; sem build/restart |
+| `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `fix/hotfix-pack-2026-11-16` | `e862bb48` | atualizar arquivos via bind mount; sem build/restart |
 | `services-notifications` | `144.126.149.57` | `/opt/lowify/services/services-notifications` | `fix/hotfix-pack-2026-11-16` | `0dabab3` | rebuild e recreate do serviço |
 | `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `fix/quick-fixes-2026-11-09` | `bbcf1b1` | **não executar sem aprovação da decisão pendente** |
 
@@ -30,6 +30,7 @@ Não publicar Worker, CT Webhook, Edge Public API, Front Checkout, Commerce, ban
 - Oculta valores, pedidos, nomes, e-mails, produtos, progresso e detalhes de vendas ao usar o ícone de olho em Dashboard e Vendas.
 - Mantém os gráficos com dados reais; no gráfico e filtro de produtos, o nome passa a ser exibido como estrelas quando a ocultação está ativa.
 - Corrige o valor enviado pelo filtro Cartão para `card` e aceita `cartao` em URLs antigas.
+- Habilita o envio do modal de estorno para vendas Pagar.me ao associar o identificador `pagarme_psp` ao gateway.
 - Remove a RisePay das opções de nova integração do Checkout Transparente no Dashboard.
 
 ### Notifications
@@ -91,7 +92,7 @@ Se `git status --porcelain=v1` retornar qualquer linha, interromper este compone
 cd /opt/lowify/front/dashboard-seller
 git switch fix/hotfix-pack-2026-11-16
 git pull --ff-only origin fix/hotfix-pack-2026-11-16
-git merge-base --is-ancestor 0944fc96 HEAD
+git merge-base --is-ancestor e862bb48 HEAD
 git rev-parse --short HEAD
 docker compose ps
 ```
@@ -155,7 +156,8 @@ O resultado do último comando deve informar a transição `active -> inactive` 
 1. Abra Dashboard e clique no ícone de olho. Confirme que valores, progresso, pedidos, clientes e e-mails ficam ocultos; os gráficos continuam preenchidos e os nomes de produto aparecem como estrelas.
 2. Abra Vendas, escolha um período com uma venda de cartão, selecione Cartão e clique em Filtrar. A venda deve aparecer.
 3. Abra uma URL antiga com `gateway=cartao`. O mesmo filtro de Cartão deve funcionar.
-4. Abra Checkout Transparente, clique em Nova integração e confirme que RisePay não aparece entre as opções.
+4. Em uma venda Pagar.me de teste elegível para estorno, abra o modal de estorno e confirme que a ação pode ser submetida normalmente. Use somente uma venda de teste reversível e siga o fluxo de aprovação já autorizado para esse teste.
+5. Abra Checkout Transparente, clique em Nova integração e confirme que RisePay não aparece entre as opções.
 
 ### Notifications
 
