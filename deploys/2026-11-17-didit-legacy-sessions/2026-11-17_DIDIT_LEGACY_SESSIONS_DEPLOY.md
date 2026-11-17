@@ -12,8 +12,8 @@ Webhooks recebidos depois para uma sessão legada são reconhecidos e ignorados:
 
 | Repositório | Branch de deploy | Commit |
 | --- | --- | --- |
-| `services-account` | `feat/didit-legacy-sessions` | Pendente: as alterações locais precisam ser commitadas e enviadas antes da publicação. |
-| `dashboard-seller` | `feat/didit-legacy-sessions` | Pendente: o badge “Didit legado” precisa ser commitado e enviado antes da publicação. |
+| `services-account` | `feat/didit-legacy-sessions` | `0679364` |
+| `dashboard-seller` | `feat/didit-legacy-sessions` | `853be1b7` |
 
 Não há alteração em `edge-webhook`: ele continua publicando eventos Didit com provider `didit`; o bloqueio seguro do evento de uma sessão legada ocorre no consumidor do `services-account`.
 
@@ -79,11 +79,9 @@ git show-ref --verify --quiet refs/remotes/origin/feat/didit-legacy-sessions
 git switch feat/didit-legacy-sessions
 git pull --ff-only origin feat/didit-legacy-sessions
 git rev-parse --short HEAD
-docker compose up -d --build
-docker compose ps
 ```
 
-Se o badge não for parte da publicação imediata, omitir esta etapa sem afetar a segurança do `services-account`.
+`dashboard-seller` não usa `docker compose` neste fluxo: a publicação é concluída no `git pull`.
 
 ## Validação pós-deploy
 
@@ -97,7 +95,7 @@ Se o badge não for parte da publicação imediata, omitir esta etapa sem afetar
 ## Rollback
 
 1. Interromper novas migrações PF incompletas caso a validação falhe.
-2. Reverter o `dashboard-seller` e o `services-account` para os commits anteriores aprovados e reconstruir os respectivos containers.
+2. Reverter o `dashboard-seller` e o `services-account` para os commits anteriores aprovados. Reconstruir somente o container do `services-account`; o Dashboard é atualizado apenas via Git.
 3. Não remover `didit_legacy` do ENUM durante um rollback normal: podem existir sessões persistidas com esse valor, e removê-lo exigiria conversão explícita e revisada de dados.
 4. Não apagar documentos, sessões, eventos de webhook ou mensagens de fila. Sessões já marcadas como `didit_legacy` permanecem como histórico e devem ser tratadas caso a caso se for necessário reverter seu estado.
 

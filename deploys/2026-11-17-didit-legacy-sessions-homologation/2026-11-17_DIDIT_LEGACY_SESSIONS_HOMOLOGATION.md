@@ -77,9 +77,9 @@ O resultado esperado é `enum('didit','didit_legacy','local')`, `YES`, `NULL`. N
 1. Executar a pré-checagem completa exigida pelo fluxo de homologação em todos os targets operáveis. Para participantes, validar as branches declaradas; para os demais, validar `origin/main`.
 2. Aplicar e validar manualmente o DDL da seção Banco de dados.
 3. Atualizar `services-account` para `feat/didit-legacy-sessions` e reconstruí-lo somente se branch ou commit mudarem.
-4. Atualizar `dashboard-seller` para `feat/didit-legacy-sessions` e reconstruí-lo somente se branch ou commit mudarem.
+4. Atualizar `dashboard-seller` para `feat/didit-legacy-sessions` somente via Git; não executar Docker Compose nesse repositório.
 5. Atualizar os demais targets operáveis para `main`; reconstruir apenas aqueles cuja branch ou commit mudarem. Executar rebuilds sequencialmente.
-6. Confirmar saúde dos containers de Account e Dashboard antes de alterar contas de teste.
+6. Confirmar a saúde do container do Account e o acesso ao Dashboard atualizado antes de alterar contas de teste.
 
 ## Seleção e migração das 10 contas
 
@@ -110,7 +110,7 @@ Os comandos acima devem ser executados no container do `services-account`. Não 
 ## Rollback
 
 1. Interromper novas migrações antes de reverter código.
-2. Reverter `dashboard-seller` e `services-account` às revisões anteriores aprovadas e reconstruir os containers afetados.
+2. Reverter `dashboard-seller` e `services-account` às revisões anteriores aprovadas. Reconstruir somente o Account; o Dashboard é atualizado apenas via Git.
 3. Não remover `didit_legacy` do ENUM: sessões persistidas podem depender dele.
 4. Não apagar documentos, sessões nem eventos. As 10 contas migradas devem permanecer registradas para análise; qualquer reversão de fase exige decisão individual e documentada.
 
@@ -120,8 +120,8 @@ Os comandos acima devem ser executados no container do `services-account`. Não 
 
 - O DDL foi aplicado e validado: `provider` agora aceita `didit`, `didit_legacy` e `local`, preservando `NULL` e seu default.
 - `services-account` foi publicado em `feat/didit-legacy-sessions` no commit `0679364` e está ativo no container correspondente.
-- `dashboard-seller` foi publicado em `feat/didit-legacy-sessions` no commit `853be1b7` e está ativo no container correspondente.
-- Os demais targets operáveis foram sincronizados em `main`, mas somente Account e Dashboard foram reconstruídos por solicitação posterior. `services-commerce-v2` permaneceu inalterado.
+- `dashboard-seller` foi publicado em `feat/didit-legacy-sessions` no commit `853be1b7` via Git. Este repositório não exige Docker Compose para publicação.
+- Os demais targets operáveis foram sincronizados em `main`, mas somente o Account foi reconstruído por solicitação posterior. `services-commerce-v2` permaneceu inalterado.
 
 ### Migrações executadas
 
