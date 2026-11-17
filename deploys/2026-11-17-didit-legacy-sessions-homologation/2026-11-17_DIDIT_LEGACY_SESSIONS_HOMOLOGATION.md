@@ -1,6 +1,6 @@
 # Homologação — sessões Didit legadas na migração de fase 1
 
-> Status: planejado
+> Status: executado parcialmente em 2026-11-17
 > VPS: `root@217.216.87.77`
 > Modo de rebuild: incremental
 
@@ -116,4 +116,24 @@ Os comandos acima devem ser executados no container do `services-account`. Não 
 
 ## Resultado da execução
 
-Preencher após a homologação: commits publicados, targets reconstruídos, IDs das 10 contas, distribuição entre documentação completa/incompleta, novas solicitações Didit verificadas e desvios encontrados.
+### Publicação e ambiente
+
+- O DDL foi aplicado e validado: `provider` agora aceita `didit`, `didit_legacy` e `local`, preservando `NULL` e seu default.
+- `services-account` foi publicado em `feat/didit-legacy-sessions` no commit `0679364` e está ativo no container correspondente.
+- `dashboard-seller` foi publicado em `feat/didit-legacy-sessions` no commit `853be1b7` e está ativo no container correspondente.
+- Os demais targets operáveis foram sincronizados em `main`, mas somente Account e Dashboard foram reconstruídos por solicitação posterior. `services-commerce-v2` permaneceu inalterado.
+
+### Migrações executadas
+
+Foram migradas as 10 PFs planejadas: `455, 597, 1187, 1285, 1454, 1867, 2019, 3891, 4124, 4174`.
+
+| Grupo | IDs | Resultado |
+| --- | --- | --- |
+| Documentação completa | `455, 597, 1187, 1285, 1454, 4174` | Fase alterada para 2; sessões Didit existentes permaneceram ativas. |
+| Documentação incompleta/rejeitada | `1867, 2019, 3891, 4124` | Fase alterada para 2; identidade pendente quando aplicável; todas as sessões Didit anteriores foram movidas para `didit_legacy`. |
+
+Após a aplicação, os quatro casos incompletos não possuíam sessões com provider `didit` e preservaram respectivamente `14`, `12`, `9` e `8` sessões `didit_legacy`. Os documentos continuaram presentes; o caso `3891`, que já não tinha documentos, continuou sem documentos.
+
+### Nova solicitação Didit
+
+Uma tentativa direta e sem credenciais no endpoint de criação retornou `401`, como esperado para uma rota autenticada. Nenhuma autenticação foi contornada e nenhuma sessão foi criada por esse teste. A validação funcional pendente é acessar o Dashboard autenticado com uma das quatro contas incompletas e solicitar a nova verificação: o resultado esperado é um novo link Didit e uma nova sessão com provider `didit`, distinta das sessões legadas.
