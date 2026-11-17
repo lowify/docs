@@ -13,7 +13,7 @@ Webhooks recebidos depois para uma sessão legada são reconhecidos e ignorados:
 | Repositório | Branch de deploy | Commit |
 | --- | --- | --- |
 | `services-account` | `main` | Pendente: as alterações locais precisam ser commitadas e enviadas antes da publicação. |
-| `dashboard-seller` | `fix/hotfix-pack-2026-11-16` | Pendente: enviar o commit do badge para esta branch antes da publicação. |
+| `dashboard-seller` | `main` | Pendente: realizar merge do PR do badge “Didit legado” antes da publicação. |
 
 Não há alteração em `edge-webhook`: ele continua publicando eventos Didit com provider `didit`; o bloqueio seguro do evento de uma sessão legada ocorre no consumidor do `services-account`.
 
@@ -68,16 +68,16 @@ docker compose ps
 
 ### 3. Publicar `dashboard-seller`
 
-Após enviar o commit do badge “Didit legado” para `fix/hotfix-pack-2026-11-16`:
+Após o merge do PR do badge “Didit legado” na `main`:
 
 ```bash
 cd /root/opt/lowify/front/dashboard-seller
 git status --porcelain=v1
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/fix/hotfix-pack-2026-11-16
-git switch fix/hotfix-pack-2026-11-16
-git pull --ff-only origin fix/hotfix-pack-2026-11-16
+git show-ref --verify --quiet refs/remotes/origin/main
+git switch main
+git pull --ff-only origin main
 git rev-parse --short HEAD
 docker compose up -d --build
 docker compose ps
