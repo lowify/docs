@@ -17,7 +17,15 @@ Validar, em homologação, que a migração de uma PF da fase 1 com documentos p
 
 Todos os demais targets operáveis do mapa oficial de homologação devem ser sincronizados em `main`: `front-chat`, `front-checkout`, `front-idv`, `front-member-area`, `edge-gateway`, `edge-public-api`, `edge-webhook`, `services-auth`, `services-banking`, `services-banking-v2`, `services-commerce`, `services-commerce-v2`, `services-notification`, `services-platform`, `services-wallet`, `checkout-transparent-api`, `checkout-transparent-billing`, `checkout-transparent-worker` e `ct-webhook`.
 
-`data_layer` e `checkout-transparent-infra` permanecem como estão por serem targets protegidos. Os repositórios ausentes e não mapeados não participam.
+## Targets mantidos como estão
+
+| Target | Motivo |
+| --- | --- |
+| `services-commerce-v2` | Possui trabalho local de outro fluxo e foi explicitamente excluído desta homologação. Não receberá pré-checagem adicional, fetch, troca de branch, pull ou Docker. |
+| `data_layer` | Target protegido: banco e Redis compartilhados. |
+| `checkout-transparent-infra` | Target protegido: infraestrutura, banco e Redis do checkout transparente. |
+
+Os repositórios ausentes e não mapeados não participam.
 
 ## Alterações incluídas
 
