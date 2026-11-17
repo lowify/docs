@@ -24,11 +24,20 @@ Não usar caminhos de desenvolvimento ou homologação neste roteiro.
 | `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/checkout-apple-google-pay` | `acf8481` | Encaminha as rotas internas de checkout e wallet para os serviços. |
 | `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/checkout-apple-google-pay` | `b88d9fe` | Extrai e propaga JWT nas rotas públicas do fluxo. |
 | `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/checkout-apple-google-pay` | `9c1af9e` | Mostra as carteiras elegíveis, coleta os dados obrigatórios do comprador e envia o token, sem persistir dados de cartão. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-apple-google-pay` | `b415022c` | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-apple-google-pay` | `fb5c16f2` | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. Inclui a base de Didit Legacy Sessions. |
 
 `services-wallet` não participa deste deploy: ele é a carteira interna de
 saldo/extrato/saque e não é Apple Pay nem Google Pay. Os dois edges participam
 para manter as rotas e o contrato de autenticação do fluxo atualizados.
+
+### Dependência de sequência — Dashboard Seller
+
+O `dashboard-seller` desta entrega incorpora
+`origin/feat/didit-legacy-sessions` (commit `853be1b7`) pelo merge
+`fb5c16f2`. A publicação do Dashboard desta entrega deve ocorrer depois da
+entrega Didit Legacy Sessions. Não selecionar uma revisão anterior da branch de
+wallets para tentar separar as duas mudanças: o passo do Dashboard publica a
+referência integrada.
 
 ## Alterações incluídas
 
@@ -60,7 +69,9 @@ webhooks públicos e regras de split existentes estão fora do escopo.
 
 ## Pré-requisitos e bloqueadores
 
-1. Registrar a revisão anterior aprovada dos seis repositórios. Não usar
+1. Registrar a revisão anterior aprovada dos seis repositórios e confirmar que
+   Didit Legacy Sessions já foi publicado/aceito antes da etapa do Dashboard.
+   Não usar
    `reset`, `clean`, `stash` nem checkout forçado para contornar árvore suja.
 2. Confirmar acesso ao host, Docker e às sessões administrativas aprovadas dos
    bancos do Commerce e Banking. Confirmar backup recuperável antes dos DDLs.
@@ -359,12 +370,12 @@ atualização de código montado.
 cd /opt/lowify/front/dashboard-seller
 git switch feat/checkout-apple-google-pay
 git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor b415022c HEAD
+git merge-base --is-ancestor fb5c16f2 HEAD
 git rev-parse --short HEAD
 docker compose ps
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `b415022c`
+Prosseguir somente se `git merge-base` retornar zero, o commit for `fb5c16f2`
 ou descendente aprovado e os serviços existentes
 permanecerem `Up`. Não consumir ou reprocessar filas manualmente.
 
