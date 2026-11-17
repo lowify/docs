@@ -1,6 +1,6 @@
 # Deploy — pacote de hotfixes: privacidade, Vendas, WhatsApp e RisePay
 
-**Status:** pronto para os componentes Dashboard Seller e Notifications; bloqueado para a CT API até aprovação explícita da revisão descrita em [Decisão pendente da CT API](#decisão-pendente-da-ct-api).
+**Status:** pronto para execução, após as pré-checagens descritas neste documento.
 
 ## Objetivo
 
@@ -19,7 +19,7 @@ Os hosts são separados: a CT API fica em `80.190.72.228`; Dashboard Seller e No
 | --- | --- | --- | --- | --- | --- |
 | `dashboard-seller` | `144.126.149.57` | `/opt/lowify/front/dashboard-seller` | `fix/hotfix-pack-2026-11-16` | `e862bb48` | atualizar arquivos via bind mount; sem build/restart |
 | `services-notifications` | `144.126.149.57` | `/opt/lowify/services/services-notifications` | `fix/hotfix-pack-2026-11-16` | `0dabab3` | rebuild e recreate do serviço |
-| `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `fix/quick-fixes-2026-11-09` | `bbcf1b1` | **não executar sem aprovação da decisão pendente** |
+| `services-checkout-transparent-api` | `80.190.72.228` | `/opt/lowify-ct/services/services-checkout-transparent-api` | `fix/hotfix-pack-2026-11-16` | `3fdd9eb` | rebuild e recreate somente do `app`; executar a desativação versionada da RisePay |
 
 Não publicar Worker, CT Webhook, Edge Public API, Front Checkout, Commerce, banco, Redis ou filas como efeito colateral deste pacote.
 
@@ -42,11 +42,9 @@ Não publicar Worker, CT Webhook, Edge Public API, Front Checkout, Commerce, ban
 - A revisão `bbcf1b1` fornece o comando `integration-gateways:disable-risepay`, que registra a quantidade de integrações RisePay ativas e desativa somente o gateway global de novos usos.
 - O comando é idempotente e não exclui integrações, cobranças, webhooks, Redis ou filas históricas.
 
-## Decisão pendente da CT API
+## Escopo confirmado da CT API
 
-`fix/quick-fixes-2026-11-09` na CT API não é uma revisão isolada de RisePay: ela está 95 arquivos à frente de `main`, incluindo mudanças anteriores de checkout, assinatura, cartão, filas, migrations e dependências.
-
-Não publicar a CT API com este documento até uma pessoa responsável aprovar explicitamente essa revisão completa ou fornecer uma branch/SHA dedicado somente à remoção da RisePay. O Dashboard e Notifications podem ser publicados sem a CT API, mas a RisePay continuará globalmente ativa até a etapa da CT API ser aprovada e concluída.
+A CT API usa `fix/hotfix-pack-2026-11-16`, criada diretamente de `main`. Ela contém somente o cherry-pick do commit de desativação da RisePay: cinco arquivos, sem migrations, dependências, filas ou mudanças acumuladas de checkout, assinatura e cartão da branch antiga.
 
 ## Pré-requisitos
 
@@ -127,7 +125,7 @@ docker compose logs --tail=100 services-notifications
 
 Prosseguir somente se o serviço estiver ativo e não houver erro de inicialização, rota ou conexão.
 
-### 5. CT API — `80.190.72.228` — executar somente após aprovação explícita
+### 5. CT API — `80.190.72.228`
 
 ```bash
 ssh root@80.190.72.228
@@ -136,11 +134,11 @@ git status --porcelain=v1
 git branch --show-current
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/fix/quick-fixes-2026-11-09
+git show-ref --verify --quiet refs/remotes/origin/fix/hotfix-pack-2026-11-16
 docker compose config --quiet
-git switch fix/quick-fixes-2026-11-09
-git pull --ff-only origin fix/quick-fixes-2026-11-09
-git merge-base --is-ancestor bbcf1b1 HEAD
+git switch fix/hotfix-pack-2026-11-16
+git pull --ff-only origin fix/hotfix-pack-2026-11-16
+git merge-base --is-ancestor 3fdd9eb HEAD
 docker compose up -d --build --force-recreate app
 docker compose ps
 docker compose logs --tail=100 app
@@ -165,7 +163,7 @@ O resultado do último comando deve informar a transição `active -> inactive` 
 2. Altere um template principal ou reserva de recuperação, clique em Salvar e recarregue a página.
 3. Confirme que a seleção permanece e que não aparece a mensagem `1` nem erro de resposta inválida.
 
-### CT API — somente após aprovação
+### CT API
 
 1. Confirme que a consulta de banco mostra a RisePay com `status = inactive`.
 2. Execute novamente o comando de desativação; o resultado deve informar `inactive -> inactive`.
