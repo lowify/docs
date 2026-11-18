@@ -4,6 +4,11 @@
 >
 > Data: 2026-11-18
 
+## Documentos
+
+1. [Planejamento e decisões](README.md)
+2. [Tasks executáveis](02_TASKS.md)
+
 ## Objetivo
 
 Criar o `services-ai-mcp`, um serviço dedicado em **Hyperf/Swoole** que disponibiliza, via Model Context Protocol (MCP), consultas seguras e eficientes sobre a operação da Lowify para clientes de IA autorizados.
