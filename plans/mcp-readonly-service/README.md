@@ -2,7 +2,7 @@
 
 > Estado: planejamento. Nenhuma rota, serviço, migration, fila ou alteração de autenticação foi implementada por este documento.
 >
-> Data: 2026-11-11
+> Data: 2026-11-18
 
 ## Objetivo
 
@@ -120,7 +120,9 @@ services-ai-mcp → valida assinatura, expiração, issuer, audience, scopes e c
 services-ai-mcp → resolve actor e seller efetivo → executa policy por tool
 ```
 
-O servidor será um resource server OAuth. O Authorization Server pode evoluir a partir do stack de autenticação atual, mas essa decisão exige um contrato próprio: emissão OAuth, consentimento, refresh token, revogação, discovery e rotação de chaves não devem ser simulados com um JWT de front-end.
+O servidor MCP será um resource server OAuth. O Authorization Server será estendido no `services-auth`, aproveitando o banco próprio desse serviço. O controle de clientes, consentimentos, refresh tokens, revogações e auditoria OAuth permanece, assim, separado dos bancos de Commerce, Wallet, Banking e do banco operacional do MCP.
+
+Os refresh tokens serão persistidos somente como hash no banco do `services-auth`; o MCP não poderá lê-los. Access tokens terão vida curta e serão validados pelo MCP sem armazenar sua versão em texto puro. Emissão OAuth, consentimento, refresh token, revogação, discovery e rotação de chaves não devem ser simulados com o JWT de front-end atual.
 
 ### Claims e regras mínimas
 
@@ -345,7 +347,7 @@ Alertas devem se basear em erro/latência sustentados, saturação e lag de proj
 1. Criar o repositório e ler suas instruções locais, stack e padrões de DI/HTTP/Redis.
 2. Mapear, por domínio, rotas, controllers, use cases, modelos, queries, índices, variáveis, filas e consumidores que suportarão cada tool proposta.
 3. Classificar todos os campos como público ao seller, PII mascarada, PII restrita, financeiro restrito ou segredo.
-4. Definir o Authorization Server, claims, scopes, consentimento, client registration, revogação e estratégia de credencial interna.
+4. Estender `services-auth` como Authorization Server e definir claims, scopes, consentimento, client registration, revogação, rotação de refresh token e estratégia de credencial interna.
 5. Medir custo e índices das consultas candidatas; decidir por connector síncrono, cache ou projeção para cada uma.
 6. Versionar os contratos internos de leitura com os serviços donos dos dados.
 
@@ -384,7 +386,7 @@ Rollback é desabilitar a tool/feature flag ou revogar o client OAuth, preservan
 
 | Tema | Decisão necessária |
 | --- | --- |
-| Authorization Server | Estender `services-auth` ou operar componente OAuth dedicado; definir discovery, PKCE, client registration, consentimento e revogação. |
+| Authorization Server | Decidido: estender `services-auth` e usar seu banco próprio. Ainda definir discovery, PKCE, client registration, consentimento, expiração e revogação. |
 | Transporte público | Domínio, WAF/rate limit de borda, TLS/mTLS e política de `Origin`. |
 | Read store | Escolher banco/tecnologia, retenção, backup, custo e estratégia de rebuild. |
 | Eventos | Confirmar eventos de venda/produto/refund que podem alimentar projeções sem alterar contratos existentes. |
