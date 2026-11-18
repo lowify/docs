@@ -1,55 +1,68 @@
-# Plano — Webhooks por endpoint, evento e oferta
+# Plano — Webhooks por endpoint e oferta
 
 > Status: planejado
 > Última atualização: 2026-11-17
-> Confiança: modelo atual confirmado; modelo alvo pendente de implementação
+> Confiança: modelo atual confirmado; evolução de endpoint e segredo pendente
 
-## Objetivo
+## Decisão
 
-Evoluir a configuração de webhooks para separar o cadastro do endpoint da
-seleção de eventos, produtos e ofertas. O endpoint permanece auditável mesmo
-quando não possui eventos ativos.
+Manter product_webhooks como a configuração operacional e preservar uma linha
+por combinação de endpoint, evento, produto e oferta.
 
-O escopo também prevê um segredo único ativo por endpoint, usado para
-autenticar as entregas, e a interface de documentação do contrato.
+Não haverá, nesta evolução, uma tabela de vínculos múltiplos de ofertas nem
+uma tabela de eventos. A interface agrupa os registros por endpoint, mas cada
+oferta específica continua sendo um registro independente.
+
+~~~~text
+endpoint + event_type + product_id + offer_id? = 1 linha em product_webhooks
+~~~~
+
+offer_id NULL significa todas as ofertas do produto. offer_id preenchido
+restringe o webhook àquela oferta.
 
 ## Estado atual confirmado
 
-O modelo ativo usa product_webhooks, com uma linha por produto, URL e evento.
-Na branch feat/webhooks-by-offer, o escopo de oferta é adicionado por offer_id
-nullable:
+O deploy atual já adiciona offer_id nullable a product_webhooks e usa
+tbl_product_offers como fonte de verdade das ofertas:
 
 ~~~~text
 product_webhooks
   user_id + product_id + offer_id? + event_type + webhook_url
 ~~~~
 
-offer_id NULL significa todas as ofertas do produto. A referência de deploy e
-o DDL confirmado estão em
+No dashboard, uma oferta específica só pode ser escolhida após selecionar um
+único produto. O backend confirma que a oferta pertence ao produto e ao
+seller; uma configuração global pode continuar abrangendo mais de um produto.
+
+O dispatcher seleciona tanto a configuração global do produto quanto a
+configuração específica da oferta vendida. O contrato e o DDL atuais estão em
 deploys/2026-11-17-webhooks-by-offer/2026-11-17_WEBHOOKS_BY_OFFER_DEPLOY.md.
 
 ## Modelo alvo
 
 ~~~~text
 webhook_endpoints
-  ├─ webhook_endpoint_secrets
-  └─ webhook_events
-       └─ webhook_event_products
-            └─ webhook_event_product_offers
+  └─ webhook_endpoint_secrets
+
+product_webhooks
+  └─ endpoint_id + event_type + product_id + offer_id?
 ~~~~
 
 ### webhook_endpoints
+
+Esta tabela representa o endpoint lógico e permite que uma URL exista mesmo
+sem eventos ativos.
 
 | Campo | Regra |
 | --- | --- |
 | id | identificador interno |
 | user_id | dono do endpoint |
-| name | nome editável apresentado na interface |
-| url | URL de entrega |
+| webhook_url | URL de entrega |
 | status, deleted_at | exclusão lógica |
 | timestamps | auditoria de criação e alteração |
 
-Não há remoção física pela aplicação. Apagar o endpoint apenas o inativa.
+Não há nome editável de endpoint nesta etapa. A interface mostra a própria
+URL. Apagar o endpoint apenas o inativa.
 
 ### webhook_endpoint_secrets
 
@@ -58,50 +71,48 @@ Não há remoção física pela aplicação. Apagar o endpoint apenas o inativa.
 | id, endpoint_id | associação ao endpoint |
 | secret_encrypted | segredo cifrado; nunca texto puro no banco |
 | encryption_key_id | referência para rotação da chave de cifragem |
-| status | apenas um registro ativo por endpoint |
-| rotated_at, deleted_at | histórico |
+| status | apenas um segredo ativo por endpoint |
+| rotated_at, deleted_at | histórico de rotação |
 
-Rotacionar cria uma nova versão ativa e inativa a anterior. O segredo é
-usado para calcular a assinatura HMAC-SHA256 do corpo bruto.
+Rotacionar cria uma nova versão ativa e inativa a anterior. O segredo é usado
+para calcular a assinatura HMAC-SHA256 do corpo bruto.
 
-### webhook_events
+### product_webhooks
+
+Esta tabela continua contendo uma linha por escopo de entrega.
 
 | Campo | Regra |
 | --- | --- |
-| endpoint_id | endpoint pai |
+| endpoint_id | novo pai lógico; FK para webhook_endpoints |
 | event_type | sale.paid, sale.pending ou sale.refunded |
-| status, deleted_at | inativação lógica |
+| product_id | produto que qualifica a entrega |
+| offer_id | NULL para todas as ofertas; ID para uma oferta específica |
+| status, deleted_at | substituem DELETE físico |
+| timestamps | preservam auditoria do vínculo |
 
-Excluir um evento não exclui o endpoint.
+Uma oferta específica não é agrupada no banco. Por exemplo, duas ofertas para
+o mesmo produto e evento resultam em duas linhas de product_webhooks.
 
-### webhook_event_products
+Quando uma oferta for inativada ou removida pelo fluxo de produto, os
+webhooks específicos dela devem ser inativados. Eles não podem ser convertidos
+automaticamente para globais, pois isso alteraria o escopo de entrega.
 
-| Campo | Regra |
+## Exclusão lógica
+
+| Ação | Efeito |
 | --- | --- |
-| webhook_event_id | evento pai |
-| product_id | produto selecionado |
-| all_offers | true para todas as ofertas |
-| status, deleted_at | inativação lógica |
+| Remover produto de um evento | inativa a linha correspondente em product_webhooks |
+| Remover oferta específica | inativa somente a linha com aquele offer_id |
+| Remover evento | inativa as linhas ativas do endpoint com aquele event_type |
+| Apagar endpoint | inativa endpoint, segredo ativo e todas as linhas ativas do endpoint |
 
-Cada vínculo representa um produto por vez dentro de um evento.
+Todas as operações devem executar em transação e preservar timestamps.
 
-### webhook_event_product_offers
+## Auditoria e entregas
 
-| Campo | Regra |
-| --- | --- |
-| webhook_event_product_id | vínculo produto × evento |
-| offer_id | oferta específica |
-| status, deleted_at | inativação lógica |
-
-Esta tabela só é usada quando all_offers é false. Se uma oferta for apagada,
-os vínculos específicos correspondentes devem ser inativados, preservando o
-histórico.
-
-### Auditoria e entregas
-
-webhook_audit_logs registra alterações de endpoint, evento, produto, oferta e
-segredo. webhook_delivery_attempts registra entregas reais e de teste,
-incluindo order_id, is_test, código HTTP, duração e resposta truncada.
+webhook_audit_logs registra criação, atualização, inativação, revelação e
+rotação de segredo. webhook_delivery_attempts registra entregas reais e de
+teste, incluindo order_id, is_test, código HTTP, duração e resposta truncada.
 
 ## Contrato de autenticação planejado
 
@@ -113,32 +124,42 @@ X-Lowify-Signature: sha256=<HMAC_SHA256 do corpo bruto>
 ~~~~
 
 O consumidor recalcula o HMAC com o segredo ativo. O timestamp deve ser usado
-para rejeitar entregas fora da janela permitida. O contrato é planejado: o
-worker legado atual ainda envia apenas Content-Type e Idempotency-Key.
+para rejeitar entregas fora da janela permitida. Este contrato ainda é
+planejado: o worker legado envia Content-Type e Idempotency-Key, sem assinatura
+por segredo.
 
 ## Migração
 
-1. Criar endpoints únicos por user_id + webhook_url.
-2. Criar eventos únicos por endpoint_id + event_type.
-3. Migrar cada produto atual para webhook_event_products com all_offers true.
-4. Gerar um segredo cifrado ativo por endpoint.
-5. Manter product_webhooks em leitura durante a transição; só removê-la após
-   dupla escrita, validação de entregas e plano de rollback aprovado.
+1. Criar um endpoint único por user_id + webhook_url.
+2. Adicionar endpoint_id em product_webhooks e preencher cada linha com o
+   endpoint correspondente.
+3. Preservar offer_id existente; offer_id NULL continua significando todas as
+   ofertas.
+4. Adicionar status e deleted_at sem remover registros existentes.
+5. Gerar um segredo cifrado ativo por endpoint.
+6. Migrar o dispatcher para selecionar por endpoint_id e ignorar vínculos e
+   endpoints inativos.
+
+Durante a transição, webhook_url permanece em product_webhooks para
+compatibilidade de leitura. Sua remoção só pode ocorrer após dupla escrita,
+validação das entregas e um rollback aprovado.
 
 ## Interface planejada
 
-- **Webhook**: painel Endpoints, com nome, URL, badges dos eventos e uma ação
-  para abrir.
-- **Detalhes de endpoint**: visão geral com nome e segredo; painel de eventos
-  em abas, cada qual com produto, ofertas e ações.
-- **Documentação**: página corrida em Markdown, com contrato de payload e
-  autenticação, além de ação para copiar o prompt de integração.
+- **Webhook**: painel Endpoints, com URL, badges de eventos e uma ação para
+  abrir.
+- **Detalhes de endpoint**: visão geral com URL e segredo; painel de eventos
+  em abas, cada qual com produto, oferta e ações.
+- **Ofertas**: badge Todas quando offer_id for NULL; caso contrário, nome da
+  oferta.
+- **Documentação**: página corrida em Markdown, com payload, autenticação e
+  ação para copiar o prompt de integração.
 
 ## Pendências
 
-- Definir o serviço responsável pela entrega assinada e pela persistência de
-  tentativas.
-- Definir a política de revelação do segredo na interface.
+- Definir o serviço responsável pela entrega assinada e pelas tentativas.
 - Definir retenção de logs de entrega e resposta HTTP.
-- Planejar rollout sem coexistência ambígua entre o worker legado e o caminho
+- Definir o gancho transacional que inativa webhooks quando uma oferta é
+  removida.
+- Planejar o rollout sem coexistência ambígua entre o worker legado e o caminho
   de eventos ativo.
