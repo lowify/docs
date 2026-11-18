@@ -152,6 +152,8 @@ O escopo concede apenas a categoria. A policy ainda verifica propriedade do recu
 
 ### Fase 1 — MVP de baixo risco
 
+**Decisão registrada em 2026-11-18:** a versão inicial fica limitada às consultas comerciais abaixo. Wallet, Banking, dados de comprador e qualquer dado financeiro de disponibilidade/recebível permanecem fora desta fase.
+
 | Tool | Perguntas atendidas | Fonte/estratégia | Dados retornados | Limites iniciais |
 | --- | --- | --- | --- | --- |
 | `get_business_overview` | “Como está meu negócio hoje/esta semana?” | Contrato de overview do Commerce ou snapshot agregado. | totais de vendas, receita definida pelo contrato, status e comparação curta. | períodos pré-definidos: hoje, 7, 30 dias; cache 60 s. |
@@ -172,6 +174,22 @@ As respostas precisam retornar campos canônicos e metadados de frescor, por exe
 ```
 
 `source` e `freshness_seconds` são importantes para que a IA informe corretamente que dados de analytics podem ter pequena defasagem.
+
+### Cobertura no Commerce V2 da versão inicial
+
+O Commerce V2 é a fonte de domínio de todas as consultas comerciais do MVP, mas **não há ainda um contrato MCP pronto para nenhuma delas**. Os endpoints e casos de uso atuais servem de evidência e ponto de partida; o MCP não deve chamá-los diretamente nem reproduzir respostas mais amplas que o necessário.
+
+| Consulta MCP | Cobertura atual no Commerce V2 | Lacuna para o MCP | Decisão de implementação |
+| --- | --- | --- | --- |
+| `get_business_overview` | `GetDashboardOverviewUseCase` e `GET /dashboard/overview` já calculam cards, séries, topo e método de pagamento. | A rota recebe `user_id`; o caso de uso faz consultas e agregações síncronas sobre vendas/itens e usa cache Redis do Commerce. Não há limite MCP de período nem política OAuth. | Criar read API interna que derive seller da identidade serviço-a-serviço; para períodos/rankings pesados, ler o read store do MCP. |
+| `list_products` | `ProductRepository::listByUserId()` já recupera produtos do seller. | Não há use case/rota de listagem paginada e a coleção atual traz o modelo inteiro. | Criar query paginada, DTO mínimo e cursor, com filtro/ordenação em allowlist. |
+| `get_product_summary` | `GetProductFormDataUseCase` valida propriedade; há `CalculateProductPaidSalesCountUseCase` e repositório de produto. | Form-data contém configuração operacional e consulta Account; não é resumo público ao MCP nem agrega desempenho no período. | Criar projeção/DTO de resumo com ownership, oferta permitida e métricas agregadas. |
+| `get_sales_summary` | O dashboard já calcula totais, série, ranking e divisão por método. | O cálculo atual lê vendas e itens na requisição; pode ser caro em períodos grandes e não é um contrato limitado ao MCP. | Disponibilizar apenas janelas/buckets permitidos; preferir snapshot/read model para histórico e ranking. |
+| `list_sales` | Existe `SearchSalesUseCase` e `GET /sales/search`. | É uma busca para console administrativo, não está limitada ao seller e retorna nome, e-mail, CPF e WhatsApp de comprador, além de dados do seller. | Não reutilizar. Criar consulta exclusiva por seller, cursorizada e sem PII. |
+| `get_sale_summary` | `GetSaleDetailOverviewUseCase` e `GET /sales/by-order/{orderId}/overview` já aplicam ownership de seller/afiliado. | A resposta inclui comprador, tracking (IP/user-agent), campanhas e comunicações. O controller aceita ator por request. | Criar projeção sanitizada, vinculando ator/seller à chamada interna assinada e omitindo campos proibidos. |
+| `list_subscriptions` | `SubscriptionRepository::listBySellerId()` existe; `ShowSubscriptionUseCase` e `GET /subscriptions/{id}` consultam um item com filtro opcional por seller. | Não existe rota/use case de listagem paginada. O detalhe atual retorna cliente com e-mail, WhatsApp e CPF/CNPJ. | Criar lista e detalhe MCP sanitizados, por seller, com cursor e sem dados do cliente. |
+
+Em consequência, **não é necessário incluir Wallet, Banking ou Account como fonte de dados de negócio na fase 1**. Account participa somente da identidade/autorização; o Commerce V2 continua dono dos dados consultados. O MCP e/ou Commerce V2 terão de receber novos contratos internos de leitura antes do desenvolvimento das tools.
 
 ### Fase 2 — após validação operacional
 
