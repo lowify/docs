@@ -58,7 +58,8 @@ Fatos importantes para o desenho:
 ```text
 Cliente MCP / IA
   └─ HTTPS + OAuth 2.1 / Bearer token
-       └─ services-ai-mcp (Hyperf/Swoole, pool isolado)
+       └─ edge-gateway (TLS, WAF, rate limit de borda e roteamento)
+            └─ services-ai-mcp (Hyperf/Swoole, pool isolado)
             ├─ autenticação, escopos e policy de seller
             ├─ parser/validador MCP + registry de tools
             ├─ quota, rate limit, timeout, cache e auditoria
@@ -75,7 +76,7 @@ Serviços de domínio
        └─ worker MCP/projeções → read store agregado (assíncrono)
 ```
 
-O MCP é uma camada de adaptação, não um agregador que consulta bancos alheios. Toda consulta deve usar um contrato de leitura explícito do dono dos dados ou um read model próprio alimentado assincronamente.
+O MCP é uma camada de adaptação, não um agregador que consulta bancos alheios. Toda consulta deve usar um contrato de leitura explícito do dono dos dados ou um read model próprio alimentado assincronamente. O `edge-gateway` encaminha o tráfego MCP diretamente para `services-ai-mcp`; o `edge-public-api` não participa desse caminho, pois seus contratos e autenticação JWT atendem aos fronts convencionais, não ao protocolo MCP/OAuth.
 
 ### Decisão de isolamento
 
@@ -122,15 +123,17 @@ services-ai-mcp → resolve actor e seller efetivo → executa policy por tool
 
 O servidor MCP será um resource server OAuth. O Authorization Server será estendido no `services-auth`, aproveitando o banco próprio desse serviço. O controle de clientes, consentimentos, refresh tokens, revogações e auditoria OAuth permanece, assim, separado dos bancos de Commerce, Wallet, Banking e do banco operacional do MCP.
 
-Os refresh tokens serão persistidos somente como hash no banco do `services-auth`; o MCP não poderá lê-los. Access tokens terão vida curta e serão validados pelo MCP sem armazenar sua versão em texto puro. Emissão OAuth, consentimento, refresh token, revogação, discovery e rotação de chaves não devem ser simulados com o JWT de front-end atual.
+Os refresh tokens serão persistidos somente como hash no banco do `services-auth`; o MCP não poderá lê-los. **Decisão inicial:** cada refresh token terá validade máxima de 30 dias e rotação a cada renovação. Access tokens terão vida curta e serão validados pelo MCP sem armazenar sua versão em texto puro. Emissão OAuth, consentimento, refresh token, revogação, discovery e rotação de chaves não devem ser simulados com o JWT de front-end atual.
+
+Revogar uma conexão no Dashboard, detectar reutilização de refresh token ou suspender a conta invalida o grant e impede tanto novas renovações quanto chamadas MCP subsequentes. A propagação de revogação ao MCP será assíncrona e de baixa latência; a validade curta do access token limita o impacto caso a propagação falhe temporariamente.
 
 ### Claims e regras mínimas
 
 | Item | Regra |
 | --- | --- |
 | `sub` | Identidade autenticada; nunca aceita do argumento de uma tool. |
-| `seller_id` | Seller efetivo, obtido de claim assinada ou resolução segura. Para colaborador, respeita o owner e as permissões já definidas para ele. |
-| `actor_type` | Diferencia usuário, colaborador e futuro service account; deny-by-default para tipo desconhecido. |
+| `seller_id` | Seller efetivo, obtido de claim assinada ou resolução segura; nunca aceito do argumento de uma tool. |
+| identidade do MVP | Somente login do seller proprietário. Colaborador e service account não fazem parte da primeira versão. |
 | `scope` | Autoriza capacidade granular; não usar uma permissão genérica de “logado”. |
 | `aud` | Deve ser o recurso MCP; tokens emitidos para outro edge/API são rejeitados. |
 | tempo | Access token curto, validação de `exp`, `nbf`, `iss`, `jti` e revogação quando aplicável. |
@@ -365,7 +368,7 @@ Alertas devem se basear em erro/latência sustentados, saturação e lag de proj
 1. Criar o repositório e ler suas instruções locais, stack e padrões de DI/HTTP/Redis.
 2. Mapear, por domínio, rotas, controllers, use cases, modelos, queries, índices, variáveis, filas e consumidores que suportarão cada tool proposta.
 3. Classificar todos os campos como público ao seller, PII mascarada, PII restrita, financeiro restrito ou segredo.
-4. Estender `services-auth` como Authorization Server e definir claims, scopes, consentimento, client registration, revogação, rotação de refresh token e estratégia de credencial interna.
+4. Estender `services-auth` como Authorization Server e definir claims, scopes, consentimento, client registration para Codex, Claude e Gemini, revogação, rotação de refresh token e estratégia de credencial interna.
 5. Medir custo e índices das consultas candidatas; decidir por connector síncrono, cache ou projeção para cada uma.
 6. Versionar os contratos internos de leitura com os serviços donos dos dados.
 
@@ -405,12 +408,12 @@ Rollback é desabilitar a tool/feature flag ou revogar o client OAuth, preservan
 | Tema | Decisão necessária |
 | --- | --- |
 | Authorization Server | Decidido: estender `services-auth` e usar seu banco próprio. Ainda definir discovery, PKCE, client registration, consentimento, expiração e revogação. |
-| Transporte público | Domínio, WAF/rate limit de borda, TLS/mTLS e política de `Origin`. |
+| Transporte público | Decidido: clientes MCP entram pelo `edge-gateway`, que encaminha diretamente a `services-ai-mcp`. Ainda definir domínio, WAF/rate limit de borda, TLS/mTLS e política de `Origin`. |
 | Read store | Escolher banco/tecnologia, retenção, backup, custo e estratégia de rebuild. |
 | Eventos | Confirmar eventos de venda/produto/refund que podem alimentar projeções sem alterar contratos existentes. |
 | Receita e saldo | Definir terminologia financeira canônica (bruta, líquida, disponível, reservada) e quem é fonte de verdade. |
 | PII | Aprovar matriz de campos e eventual escopo futuro para dados de comprador; padrão inicial é omitir. |
-| Colaboradores | Mapear permission keys atuais para scopes MCP e confirmar quais consultas cada papel pode fazer. |
+| Colaboradores | Fora do MVP: a primeira versão aceita somente login do seller proprietário. Mapear permission keys atuais antes de incluí-los em fase posterior. |
 | Limites de produção | Definir quotas, TTL, SLO, capacidade de workers e orçamento de latência a partir de baseline em homologação. |
 
 ## Referências de descoberta
