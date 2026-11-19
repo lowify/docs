@@ -34,7 +34,7 @@ Solicitações aprovadas para criação são persistidas em `tbl_saques`. Quando
 
 ## Operação e validação
 
-A suspensão é controlada em `withdrawalRequestsAreTemporarilyDisabled()` e deve ser revertida para `false` ao normalizar a operação. A interface mostra a indisponibilidade e o servidor aplica a mesma regra, evitando que uma chamada direta contorne o bloqueio.
+A suspensão é controlada em `withdrawalRequestsAreTemporarilyDisabled()` e deve ser revertida para `false` ao normalizar a operação. Enquanto estiver ativa, a comunicação exibida é: “Os saques estão temporariamente indisponíveis. Previsão de retorno: 19/11 às 09h00.” A interface mostra a indisponibilidade e o servidor aplica a mesma regra, evitando que uma chamada direta contorne o bloqueio.
 
 ## Limitações e pendências
 
