@@ -121,3 +121,18 @@ validar consentimento OAuth, refresh, consultas e revogação.
 - `POST /mcp` sem credencial respondeu `401`, JSON-RPC `Unauthorized` e o
   cabeçalho `WWW-Authenticate` apontando para a metadata protegida.
 - Nenhum outro repositório, container, banco, Redis ou migration foi alterado.
+
+## Atualização de contrato MCP — 2026-11-19
+
+- `services-ai-mcp` foi atualizado incrementalmente na VPS para o commit
+  `3ffd994` da branch `feat/mcp-readonly-service`.
+- Apenas o container `services-ai-mcp` foi reconstruído. Auth, Gateway,
+  Commerce V2, Dashboard, banco, Redis e os demais repositórios foram mantidos
+  como estavam.
+- `GET https://mcp.statuslive.site/health` respondeu `200` após a atualização.
+- O handshake `initialize` do MCP passou a declarar instruções globais e a
+  capability `resources`.
+- `resources/list` expôs `lowify://docs/data-contract/v1` e
+  `resources/read` retornou o dicionário de dados versionado.
+- A validação não executou ferramentas de vendas, não leu dados de seller e não
+  alterou dados de negócio.
