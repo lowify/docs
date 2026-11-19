@@ -1,12 +1,12 @@
 # Feature — saques de sellers
 
-> Status: ativo, temporariamente indisponível para novas solicitações
-> Última atualização: 2026-11-18
+> Status: ativo
+> Última atualização: 2026-11-19
 > Confiança: confirmada no código
 
 ## Objetivo
 
-Permite que sellers solicitem saque do saldo disponível para uma conta cadastrada. A suspensão temporária interrompe apenas a criação de novas solicitações; não altera solicitações já registradas nem os fluxos administrativos.
+Permite que sellers solicitem saque do saldo disponível para uma conta cadastrada. Quando acionada, a suspensão temporária interrompe apenas a criação de novas solicitações; não altera solicitações já registradas nem os fluxos administrativos.
 
 ## Fluxo principal
 
@@ -34,7 +34,7 @@ Solicitações aprovadas para criação são persistidas em `tbl_saques`. Quando
 
 ## Operação e validação
 
-A suspensão é controlada em `withdrawalRequestsAreTemporarilyDisabled()` e deve ser revertida para `false` ao normalizar a operação. Enquanto estiver ativa, a comunicação exibida é: “Os saques estão temporariamente indisponíveis. Previsão de retorno: 19/11 às 09h00.” A interface mostra a indisponibilidade e o servidor aplica a mesma regra, evitando que uma chamada direta contorne o bloqueio.
+A suspensão é controlada em `withdrawalRequestsAreTemporarilyDisabled()` e está desativada. Quando ativada, a interface mostra a indisponibilidade e o servidor aplica a mesma regra, evitando que uma chamada direta contorne o bloqueio.
 
 ## Limitações e pendências
 
