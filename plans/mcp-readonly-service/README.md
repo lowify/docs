@@ -8,6 +8,7 @@
 
 1. [Planejamento e decisões](README.md)
 2. [Tasks executáveis](02_TASKS.md)
+3. [Autenticação de clientes e compatibilidade](03_CLIENT_AUTHENTICATION_COMPATIBILITY.md)
 
 ## Objetivo
 
