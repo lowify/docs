@@ -1,125 +1,118 @@
-# Deploy — webhooks por oferta
+# Deploy — webhooks por oferta e assinatura automática em novos endpoints
 
 ## Objetivo
 
-Permitir que um único produto tenha destinos de webhook globais e destinos
-restritos a cada oferta. Uma configuração com `offer_id = NULL` continua
-recebendo eventos de qualquer oferta do produto; uma configuração com
-`offer_id` preenchido recebe somente o item vendido com aquela oferta.
+Permitir destinos globais por produto e destinos restritos por oferta, sem duplicar produto. Configuração com offer_id nulo recebe qualquer oferta do produto; com offer_id preenchido, recebe somente o item daquela oferta.
 
-O payload publicado pelo caminho ativo passa a identificar a oferta em
-`product.offer.id` e `product.offer.name`. O comportamento vale tanto para o
-checkout convencional quanto para o Checkout Transparente, pois ambos chegam
-à mesma venda persistida no Commerce V2.
+Cada URL passa a ser um endpoint lógico. Ao salvar ou editar um endpoint pelo
+Dashboard, a plataforma gera automaticamente um segredo `whsec_…`; o POST é
+assinado com HMAC-SHA256. O seller não informa esse valor no formulário.
+Endpoints existentes permanecem sem segredo após o backfill e, portanto,
+continuam recebendo o formato legado sem headers de assinatura até serem
+salvos ou terem o segredo rotacionado.
 
-```text
+~~~text
 front-checkout / Checkout Transparente
   -> Commerce V2 (sale + sale item + id_product_offer)
   -> sales:events:pending|paid|refunded
   -> DispatchSaleEventIntegrationsUseCase
-  -> sales:integration:webhook
-  -> consumidor HTTP externo
-```
+  -> Redis sales:integration:webhook
+  -> services-sale-integrations / WebhookIntegrationProcess
+  -> WebhookSender
+  -> POST ao endpoint do seller
+~~~
 
-O consumidor HTTP não recebe código novo nesta publicação. Ele permanece
-responsável apenas por entregar a mensagem que já foi selecionada pelo
-Commerce V2.
+O payload identifica a oferta em product.offer.id e product.offer.name. Para endpoints protegidos, a assinatura é calculada sobre os mesmos bytes JSON enviados no corpo:
+
+~~~text
+Content-Type: application/json
+Idempotency-Key: <chave por webhook e item vendido>
+X-Lowify-Event: sale.paid
+X-Lowify-Timestamp: <ISO-8601 UTC>
+X-Lowify-Signature: sha256=<HMAC-SHA256 do corpo bruto>
+~~~
+
+Os headers X-Lowify existem somente quando há segredo ativo.
 
 ## Componentes e referências
 
-| Componente | Diretório de produção | Branch | Commit esperado | Ação |
-| --- | --- | --- | --- | --- |
-| `services-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/webhooks-by-offer` | `d23ef62` | schema, seleção e publicação na fila ativa |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/webhooks-by-offer` | `65c0e7ff` | cadastro, edição e listagem por oferta |
+| Componente | Diretório de produção | Branch | Ação |
+| --- | --- | --- | --- |
+| services-commerce-v2 | /opt/lowify/services/service-commerce-v2 | feat/webhooks-by-offer-security | schema, seleção por oferta/endpoint e publicação na fila |
+| dashboard-seller | /opt/lowify/front/dashboard-seller | feat/webhooks-by-offer-security | seleção de ofertas por produto e segredo gerado/cifrado |
+| services-sale-integrations | /opt/lowify/services/services-sale-integrations | feat/webhooks-by-offer-security | resolução do segredo, assinatura HTTP e histórico de tentativa |
 
-Não publicar, reiniciar, trocar branch ou aplicar migration em `front-checkout`,
-`edge-gateway`, `edge-public-api`, Checkout Transparente, `edge-webhook`,
-`services-commerce-worker` ou worker/filas legadas por causa desta entrega.
-Em especial, `services-commerce-worker` e `webhook_queue` não participam do
-caminho ativo confirmado acima.
+Registrar a revisão exata liberada para cada branch antes da janela.
+
+Não publicar, reiniciar, trocar branch ou aplicar migration em front-checkout, edge-gateway, edge-public-api, Checkout Transparente, edge-webhook, services-commerce-worker ou workers/filas legadas. Em especial, services-commerce-worker e webhook_queue não fazem parte deste fluxo; o consumidor ativo é services-sale-integrations na fila sales:integration:webhook.
 
 ## Alterações incluídas
 
-- `product_webhooks` recebe `offer_id` nullable, índice de consulta e FK para
-  `tbl_product_offers(id)` com `ON UPDATE CASCADE` e `ON DELETE RESTRICT`.
-- O Commerce V2 inclui `sale_item_id` e a oferta de cada item nos dados de
-  venda e seleciona cada configuração pelo item que a qualificou.
-- A mensagem de `sales:integration:webhook` passa os metadados
-  `product_webhook_id`, `sale_item_id` e `offer_id`.
-- O Dashboard permite escolher opcionalmente uma oferta quando exatamente um
-  produto está selecionado; registros existentes continuam globais.
-
-Não há backfill: registros existentes permanecem com `offer_id = NULL`.
+- product_webhooks preserva offer_id nullable; NULL continua sendo o escopo global.
+- webhook_endpoints representa a URL e é referenciado por product_webhooks.endpoint_id.
+- webhook_endpoint_secrets guarda somente envelope cifrado; texto puro não entra no banco ou Redis.
+- webhook_audit_logs registra ações administrativas sem registrar o segredo.
+- webhook_delivery_attempts registra resultado, duração, código HTTP e resposta truncada.
+- Commerce publica endpoint_id, product_webhook_id, sale_item_id e offer_id na mensagem.
+- O serviço de integrações usa a conexão webhook_config para o banco operacional lowify, e não seu banco privado de tracking.
+- Para endpoint protegido, segredo ou chave indisponível é falha fechada: não há POST sem assinatura.
+- O Dashboard agrupa os vínculos por endpoint e evento; cada cartão de produto
+  pode manter todas as ofertas ou um subconjunto delas.
 
 ## Pré-requisitos e bloqueadores
 
-1. Registrar a revisão saudável atual dos dois componentes e confirmar que os
-   clones de produção estão limpos antes de trocar de branch.
-2. Ter backup aprovado do banco `lowify` e uma janela para o `ALTER TABLE`.
-   A alteração é aditiva, mas a tabela pode ser bloqueada durante a operação.
-3. Confirmar que o Commerce V2 usa o caminho de eventos:
+1. Confirmar clones limpos e registrar as revisões saudáveis dos três componentes. Não usar reset --hard para contornar alteração local.
+2. Ter backup aprovado do banco operacional lowify e janela para os ALTER TABLE.
+3. Guardar uma chave forte em cofre e configurar o mesmo WEBHOOK_SECRETS_ENCRYPTION_KEY somente no Dashboard e no serviço de integrações. Configurar também WEBHOOK_SECRETS_ENCRYPTION_KEY_ID no Dashboard.
+4. Preparar para services-sale-integrations uma credencial de menor privilégio no banco operacional, configurada por WEBHOOK_CONFIG_DB_*. Não apontá-la para o banco privado do serviço. Configurar também a autenticação Redis do ambiente.
+5. Confirmar no Commerce V2:
 
-   ```text
+   ~~~text
    SALE_EVENTS_QUEUE_ACTIVE=true
    USE_SALE_EVENTS_ONLY=true
-   ```
+   ~~~
 
-   A segunda variável é obrigatória. Com ela desligada, o dispatcher de
-   eventos filtra as plataformas `webhook` e `utmify`, portanto não publica em
-   `sales:integration:webhook` mesmo que a seleção por oferta esteja correta.
-4. O consumidor externo de `sales:integration:webhook` deve estar operacional
-   para a validação do POST final. A publicação do Commerce V2 pode ser
-   validada independentemente; não substituir essa fronteira pelo worker
-   legado.
-5. Não imprimir `.env`, senhas de banco/Redis, URLs de webhook com segredos,
-   dados de cliente ou payloads completos em tickets e logs de deploy.
+   Com a segunda flag desligada, o dispatcher filtra webhook e não publica na fila ativa.
+6. Não imprimir .env, senha, chave de cifragem, segredo de endpoint, URL com token, dados de cliente nem payload completo em tickets ou logs.
+7. Ter endpoint de captura controlado para a validação final, registrando somente headers e o hash do corpo necessários.
 
 ## Banco de dados
 
 ### Regra operacional
 
-Embora o repositório contenha a migration
-`20261117120000_add_offer_id_to_product_webhooks_table.php`, a imagem de
-runtime atual do Commerce V2 não expõe `php bin/hyperf.php migrate`. Para este
-serviço, aplicar somente o DDL abaixo pelo procedimento manual controlado do
-banco. Não executar um `migrate` amplo, não registrar migration manualmente na
-tabela de controle e não executar `down`.
+As migrations pertencem à revisão, mas a imagem atual do Commerce V2 não expõe php bin/hyperf.php migrate. Aplicar o DDL manual abaixo pelo procedimento controlado. Não executar migration ampla, não inserir registro manual no controle de migrations e não executar down.
 
-Antes de aplicar, conectar interativamente ao banco sem expor a senha:
+Conectar interativamente sem expor senha:
 
-```bash
+~~~bash
 cd /opt/lowify/data_layer/mariabd
 docker compose exec mariadb mariadb -u root -p lowify
-```
+~~~
 
-Executar a pré-checagem abaixo. Ela deve mostrar ausência da coluna, do índice
-e da FK. Se qualquer estrutura já existir parcialmente, parar e reconciliar o
-estado antes de executar o `ALTER TABLE`; não tentar compensar com DDL parcial.
+Pré-checagem: se qualquer objeto existir parcialmente, parar e reconciliar o estado antes de aplicar DDL.
 
-```sql
+~~~sql
+SELECT TABLE_NAME
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN (
+    'webhook_endpoints',
+    'webhook_endpoint_secrets',
+    'webhook_audit_logs',
+    'webhook_delivery_attempts'
+  );
+
 SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_NAME = 'product_webhooks'
-  AND COLUMN_NAME = 'offer_id';
+  AND COLUMN_NAME IN ('offer_id', 'endpoint_id', 'status', 'updated_at', 'deleted_at')
+ORDER BY COLUMN_NAME;
+~~~
 
-SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns_in_index
-FROM information_schema.STATISTICS
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME = 'product_webhooks'
-  AND INDEX_NAME = 'idx_product_webhooks_offer_lookup'
-GROUP BY INDEX_NAME;
+Em instalação que ainda não recebeu a parte por oferta, aplicar primeiro:
 
-SELECT CONSTRAINT_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
-FROM information_schema.KEY_COLUMN_USAGE
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME = 'product_webhooks'
-  AND CONSTRAINT_NAME = 'fk_product_webhooks_offer_id';
-```
-
-Com as três consultas vazias, aplicar exatamente uma vez:
-
-```sql
+~~~sql
 ALTER TABLE product_webhooks
   ADD COLUMN offer_id INT NULL AFTER product_id,
   ADD INDEX idx_product_webhooks_offer_lookup
@@ -127,145 +120,301 @@ ALTER TABLE product_webhooks
   ADD CONSTRAINT fk_product_webhooks_offer_id
     FOREIGN KEY (offer_id) REFERENCES tbl_product_offers(id)
     ON UPDATE CASCADE ON DELETE RESTRICT;
-```
+~~~
 
-Em seguida, repetir as consultas e confirmar: coluna `int` nullable, índice na
-ordem indicada e FK para `tbl_product_offers(id)`. Não alterar linhas
-existentes: `NULL` é precisamente a compatibilidade dos webhooks por produto.
+Depois, aplicar uma única vez o schema de endpoint e segurança. A collation explícita da URL é necessária para um backfill previsível, independente do padrão do servidor.
+
+~~~sql
+CREATE TABLE webhook_endpoints (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  webhook_url VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_webhook_endpoints_user_url (user_id, webhook_url),
+  KEY idx_webhook_endpoints_active (user_id, status, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE webhook_endpoint_secrets (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  endpoint_id INT UNSIGNED NOT NULL,
+  secret_encrypted MEDIUMTEXT NOT NULL,
+  encryption_key_id VARCHAR(100) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  rotated_at TIMESTAMP NULL DEFAULT NULL,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_webhook_endpoint_secrets_active (endpoint_id, status, deleted_at),
+  CONSTRAINT fk_webhook_endpoint_secrets_endpoint
+    FOREIGN KEY (endpoint_id) REFERENCES webhook_endpoints(id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE webhook_audit_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  endpoint_id INT UNSIGNED NULL,
+  action VARCHAR(50) NOT NULL,
+  metadata JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_webhook_audit_logs_user_created (user_id, created_at),
+  KEY idx_webhook_audit_logs_endpoint_created (endpoint_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE webhook_delivery_attempts (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  endpoint_id INT UNSIGNED NULL,
+  product_webhook_id INT UNSIGNED NULL,
+  sale_id INT UNSIGNED NULL,
+  sale_item_id INT UNSIGNED NULL,
+  event_type VARCHAR(50) NOT NULL,
+  is_test TINYINT(1) NOT NULL DEFAULT 0,
+  status VARCHAR(20) NOT NULL,
+  http_status INT NULL,
+  duration_ms INT NULL,
+  response_body TEXT NULL,
+  error_code VARCHAR(100) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_webhook_delivery_attempts_endpoint_created (endpoint_id, created_at),
+  KEY idx_webhook_delivery_attempts_sale_event (sale_id, event_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE product_webhooks
+  ADD COLUMN endpoint_id INT UNSIGNED NULL AFTER user_id,
+  ADD CONSTRAINT fk_product_webhooks_endpoint_id
+    FOREIGN KEY (endpoint_id) REFERENCES webhook_endpoints(id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER event_type,
+  ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL AFTER created_at,
+  ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER updated_at,
+  ADD KEY idx_product_webhooks_endpoint_status (endpoint_id, status),
+  ADD KEY idx_product_webhooks_active (user_id, status, deleted_at);
+~~~
+
+Fazer o backfill sem criar segredo. A collation explícita no JOIN evita comparação implícita entre tabelas com collations diferentes.
+
+~~~sql
+INSERT INTO webhook_endpoints (user_id, webhook_url, status, created_at)
+SELECT user_id, webhook_url, 'active', NOW()
+FROM product_webhooks
+WHERE webhook_url IS NOT NULL
+  AND TRIM(webhook_url) <> ''
+GROUP BY user_id, webhook_url
+ON DUPLICATE KEY UPDATE id = id;
+
+UPDATE product_webhooks AS product_webhook
+JOIN webhook_endpoints AS endpoint
+  ON endpoint.user_id = product_webhook.user_id
+ AND endpoint.webhook_url COLLATE utf8mb4_unicode_ci
+       = product_webhook.webhook_url COLLATE utf8mb4_unicode_ci
+SET product_webhook.endpoint_id = endpoint.id
+WHERE product_webhook.endpoint_id IS NULL
+  AND product_webhook.webhook_url IS NOT NULL
+  AND TRIM(product_webhook.webhook_url) <> '';
+~~~
+
+Validar antes de publicar código:
+
+~~~sql
+SELECT COUNT(*) AS active_bindings_without_endpoint
+FROM product_webhooks
+WHERE status = 'active'
+  AND deleted_at IS NULL
+  AND endpoint_id IS NULL;
+
+SELECT COUNT(*) AS legacy_secrets_created_by_backfill
+FROM webhook_endpoint_secrets;
+
+SELECT CONSTRAINT_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'product_webhooks'
+  AND CONSTRAINT_NAME IN (
+    'fk_product_webhooks_offer_id',
+    'fk_product_webhooks_endpoint_id'
+  );
+~~~
+
+As duas primeiras consultas devem retornar 0; a última deve apresentar as duas FKs. Não alterar offer_id nem criar segredo para endpoint legado.
 
 ## Sequência de deploy
 
 ### 1. Pré-checagem dos repositórios
 
-Em cada diretório, a primeira saída precisa estar vazia. Caso não esteja, parar
-e preservar a alteração local para análise; não usar `reset --hard`.
+A primeira saída em cada diretório deve ser vazia. Caso contrário, parar e preservar a alteração local.
 
-```bash
+~~~bash
 cd /opt/lowify/services/service-commerce-v2
 git status --porcelain=v1
 git fetch origin --prune
-git show --quiet --oneline d23ef62
+git show --quiet --oneline origin/feat/webhooks-by-offer-security
 
 cd /opt/lowify/front/dashboard-seller
 git status --porcelain=v1
 git fetch origin --prune
-git show --quiet --oneline 65c0e7ff
-```
+git show --quiet --oneline origin/feat/webhooks-by-offer-security
 
-Também registrar o valor anterior de `USE_SALE_EVENTS_ONLY`, sem revelar
-outros valores do arquivo de ambiente. Ele será necessário se houver rollback.
+cd /opt/lowify/services/services-sale-integrations
+git status --porcelain=v1
+git fetch origin --prune
+git show --quiet --oneline origin/feat/webhooks-by-offer-security
+~~~
 
-### 2. Preparar o Commerce V2 e aplicar o schema
+Registrar ainda o valor anterior de USE_SALE_EVENTS_ONLY e as revisões em execução, sem copiar arquivos de ambiente.
 
-Atualizar o código, confirmar a revisão e construir a imagem antes de mudar o
-tráfego. A construção não reinicia o container em execução.
+### 2. Preparar chave e conexão operacional
 
-```bash
+No ambiente de services-sale-integrations, configurar sem revelar valores:
+
+~~~text
+WEBHOOK_CONFIG_DB_DRIVER=mysql
+WEBHOOK_CONFIG_DB_HOST=<host do banco operacional>
+WEBHOOK_CONFIG_DB_PORT=3306
+WEBHOOK_CONFIG_DB_DATABASE=lowify
+WEBHOOK_CONFIG_DB_USERNAME=<credencial de menor privilégio>
+WEBHOOK_CONFIG_DB_PASSWORD=<segredo externo>
+WEBHOOK_CONFIG_DB_CHARSET=utf8mb4
+WEBHOOK_CONFIG_DB_COLLATION=utf8mb4_unicode_ci
+WEBHOOK_SECRETS_ENCRYPTION_KEY=<mesma chave do Dashboard>
+REDIS_HOST=<host Redis do ambiente>
+REDIS_PORT=6379
+REDIS_AUTH=<segredo externo>
+REDIS_DB=0
+SALE_INTEGRATIONS_WEBHOOK_PROCESS_ENABLED=true
+SALE_INTEGRATIONS_WEBHOOK_QUEUE=sales:integration:webhook
+~~~
+
+No Dashboard, configurar a mesma WEBHOOK_SECRETS_ENCRYPTION_KEY e um WEBHOOK_SECRETS_ENCRYPTION_KEY_ID não vazio. Não liberar o salvamento de endpoint antes de confirmar a chave nos dois processos: o Dashboard cifra o segredo gerado e o serviço de integrações o decifra para assinar a entrega.
+
+### 3. Aplicar e validar o schema
+
+Aplicar a seção **Banco de dados** depois do backup e antes de subir qualquer código novo. A revisão anterior do Commerce V2 ignora as colunas aditivas, portanto esse intervalo é compatível.
+
+### 4. Publicar o consumidor de integrações
+
+Publicar o consumidor antes de permitir que o Dashboard gere segredos. Ele mantém a entrega de mensagens legadas sem assinatura enquanto o Commerce ainda estiver na revisão anterior.
+
+~~~bash
+cd /opt/lowify/services/services-sale-integrations
+git switch feat/webhooks-by-offer-security
+git pull --ff-only origin feat/webhooks-by-offer-security
+docker compose config --quiet
+docker compose build service-sale-integrations
+docker compose up -d --no-deps --force-recreate service-sale-integrations
+docker compose ps
+docker compose logs --tail=200 service-sale-integrations
+docker compose exec -T service-sale-integrations sh -lc \
+  'test -n "$WEBHOOK_CONFIG_DB_HOST" && test -n "$WEBHOOK_CONFIG_DB_DATABASE" && test -n "$WEBHOOK_SECRETS_ENCRYPTION_KEY" && test -n "$REDIS_HOST" && test -n "$REDIS_AUTH"'
+docker compose exec -T service-sale-integrations sh -lc \
+  'curl -fsS http://127.0.0.1:9501/health/redis'
+~~~
+
+Não prossiga se o healthcheck Redis falhar por DNS, autenticação ou conexão: o
+consumidor não deve ficar em execução acumulando falhas de fila.
+
+### 5. Publicar o Commerce V2
+
+No .env, manter SALE_EVENTS_QUEUE_ACTIVE=true e definir USE_SALE_EVENTS_ONLY=true. Depois:
+
+~~~bash
 cd /opt/lowify/services/service-commerce-v2
-git switch feat/webhooks-by-offer
-git pull --ff-only origin feat/webhooks-by-offer
-git merge-base --is-ancestor d23ef62 HEAD
-git rev-parse --short HEAD
+git switch feat/webhooks-by-offer-security
+git pull --ff-only origin feat/webhooks-by-offer-security
 docker compose build service-commerce-v2
-```
-
-Aplicar e validar o DDL da seção **Banco de dados** depois do build e antes de
-subir o novo processo. A versão anterior ignora a coluna nova, portanto esse
-intervalo é compatível.
-
-### 3. Ativar o caminho de eventos e publicar o Commerce V2
-
-No `.env` do Commerce V2, manter `SALE_EVENTS_QUEUE_ACTIVE=true` e definir
-`USE_SALE_EVENTS_ONLY=true`. Não substituir o arquivo inteiro nem copiar seu
-conteúdo para o terminal. Depois, recriar somente o serviço alterado:
-
-```bash
-cd /opt/lowify/services/service-commerce-v2
 docker compose up -d --no-deps --force-recreate service-commerce-v2
 docker compose ps
 docker compose logs --tail=200 service-commerce-v2
-docker compose exec -T service-commerce-v2 sh -lc 'test "$SALE_EVENTS_QUEUE_ACTIVE" = true && test "$USE_SALE_EVENTS_ONLY" = true'
-docker compose exec -T service-commerce-v2 sh -lc 'curl -fsS http://127.0.0.1:9501/'
-```
+docker compose exec -T service-commerce-v2 sh -lc \
+  'test "$SALE_EVENTS_QUEUE_ACTIVE" = true && test "$USE_SALE_EVENTS_ONLY" = true'
+docker compose exec -T service-commerce-v2 sh -lc \
+  'curl -fsS http://127.0.0.1:9501/'
+~~~
 
-O último comando deve retornar a resposta HTTP saudável do Hyperf. Se a
-checagem das flags falhar, não liberar o Dashboard: corrigir o ambiente e
-recriar o container antes de continuar.
+Se a checagem falhar, não publicar o Dashboard.
 
-### 4. Publicar o Dashboard Seller
+### 6. Publicar o Dashboard Seller
 
-Publicar a interface somente depois de o schema e o Commerce V2 estarem
-saudáveis:
+Publicar somente depois de schema, consumidor e Commerce V2 estarem saudáveis.
+Como esta entrega introduz WEBHOOK_SECRETS_ENCRYPTION_KEY no ambiente do
+Dashboard, recriar somente o container web para que ele leia a variável nova:
 
-```bash
+~~~bash
 cd /opt/lowify/front/dashboard-seller
-git switch feat/webhooks-by-offer
-git pull --ff-only origin feat/webhooks-by-offer
-git merge-base --is-ancestor 65c0e7ff HEAD
+git switch feat/webhooks-by-offer-security
+git pull --ff-only origin feat/webhooks-by-offer-security
 git rev-parse --short HEAD
-```
+docker compose up -d --no-deps --force-recreate front-dashboard-seller
+docker compose ps front-dashboard-seller
+~~~
 
-O Dashboard usa o diretório do projeto montado como volume. Não há build nem
-restart de container nesta etapa, salvo se a operação detectar uma configuração
-local diferente desse modelo.
+O Dashboard usa o diretório do projeto montado como volume; não há build nesta
+etapa. A recriação acima é necessária apenas para carregar a variável de
+ambiente nova.
 
 ## Validação pós-deploy
 
-1. Conferir novamente o schema e as duas flags sem revelar segredos.
-2. No Dashboard, criar dados de teste exclusivos: um produto, as ofertas A e
-   B, uma configuração global e pelo menos uma configuração para cada oferta.
-   Confirmar que a oferta só aparece para um produto selecionado e que ela
-   pertence ao seller e produto escolhidos.
-3. Processar uma venda normal de teste com a oferta A. Sem consumir a fila,
-   verificar que a mensagem em `sales:integration:webhook` contém somente o
-   webhook global e o da oferta A; a outra oferta não pode aparecer. Confirmar
-   `product.offer` e os metadados `product_webhook_id`, `sale_item_id` e
-   `offer_id`.
-4. Repetir com uma venda de Checkout Transparente para outra oferta. O mesmo
-   critério deve valer porque a origem é `tbl_sale_items.id_product_offer`.
-5. Confirmar vários endpoints para uma mesma oferta e os casos de venda sem
-   oferta, que deve selecionar somente configurações globais.
-6. Consultar somente o tamanho da fila, usando a autenticação Redis do
-   ambiente e `--askpass`; não executar `LPOP`, `RPOP`, `BLPOP`, limpeza de
-   chave ou qualquer consumo durante a verificação:
+1. Conferir schema, flags do Commerce e presença não vazia da chave no Dashboard e no serviço de integrações, sem revelar valor.
+2. Criar um produto de teste com ofertas A e B. No mesmo cartão, salvar um
+   endpoint global e, em outro endpoint, selecionar somente a oferta A.
+   Confirmar que “Ofertas: Todas” é o padrão, que produto com uma única oferta
+   não mostra esse filtro, e que o backend rejeita oferta de outro seller ou
+   produto.
+3. Confirmar que cada endpoint salvo recebe segredo gerado automaticamente,
+   exibido apenas mascarado em “Meus endpoints”. Revelar e copiar devem
+   funcionar somente para o dono autenticado; a rotação deve exigir a
+   confirmação financeira, substituir a versão ativa e invalidar a anterior.
+   Conferir no banco somente envelope cifrado e identificador da chave.
+4. Processar venda normal com oferta A. Confirmar entrega global e da oferta
+   A, sem entrega da oferta B, e presença dos headers X-Lowify no endpoint
+   criado pelo Dashboard.
+5. Processar venda de Checkout Transparente com oferta B para endpoint
+   protegido. Confirmar product.offer.id, product.offer.name,
+   product_webhook_id, sale_item_id e endpoint_id; endpoint da oferta A não
+   pode ser selecionado.
+6. No capturador controlado, recalcular HMAC-SHA256 do corpo bruto com o
+   segredo revelado ao dono. O resultado deve coincidir com
+   X-Lowify-Signature; X-Lowify-Event e X-Lowify-Timestamp devem existir. Não
+   registrar segredo ou corpo completo.
+7. Configurar dois endpoints para a mesma oferta e confirmar um POST por
+   vínculo elegível. Idempotência e tentativa devem distinguir
+   product_webhook_id e sale_item_id.
+8. Preservar ao menos um endpoint legado sem segredo e confirmar sua entrega
+   sem X-Lowify, mantendo a compatibilidade até que ele seja salvo ou tenha o
+   segredo rotacionado.
+9. Consultar webhook_delivery_attempts para status, duração e HTTP. A falha de persistir histórico não pode mascarar o resultado do POST.
+10. Consultar somente o tamanho da fila; nunca executar LPOP, RPOP, BLPOP ou limpeza de chave:
 
-   ```bash
-   redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" --user default --askpass LLEN sales:integration:webhook
-   ```
+   ~~~bash
+   redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" --user default --askpass \
+     LLEN sales:integration:webhook
+   ~~~
 
-7. Quando o consumidor externo estiver disponível, usar endpoint de captura
-   controlado e confirmar um POST por configuração elegível, com a oferta
-   correta. A entrega final e a chave de idempotência devem distinguir
-   `product_webhook_id` e `sale_item_id`.
-8. Remover somente as configurações e vendas de teste pelo fluxo permitido;
-   não apagar mensagens operacionais nem as estruturas de schema.
+11. Remover somente dados de teste pelo fluxo permitido. Não apagar mensagens operacionais, segredos reais ou schema.
 
 ## Rollback
 
-1. Interromper a criação de novos webhooks específicos retornando primeiro o
-   `dashboard-seller` à revisão saudável registrada antes da janela.
-2. Se o problema estiver no produtor, retornar `services-commerce-v2` à
-   revisão saudável registrada, reconstruir e recriar somente esse serviço.
-3. Restaurar `USE_SALE_EVENTS_ONLY` ao valor anotado na pré-checagem somente
-   após o código ter voltado; validar o comportamento de integrações existente
-   antes de encerrar a janela.
-4. Não executar `down`, não remover `offer_id`, índice ou FK, não converter
-   webhooks específicos em globais e não limpar `sales:integration:webhook`.
-   O schema é aditivo e a versão anterior o ignora.
-5. Preservar e analisar mensagens já publicadas e configurações criadas durante
-   a janela. Não há compensação automática de entrega.
+1. Impedir criação de endpoints protegidos retornando primeiro o dashboard-seller à revisão saudável.
+2. Se a falha for de seleção/publicação, retornar services-commerce-v2, reconstruir e recriar somente esse serviço. A revisão anterior ignora as colunas novas.
+3. Se a falha for na entrega, retornar services-sale-integrations somente depois de avaliar mensagens em sales:integration:webhook. Não substituir o consumidor por services-commerce-worker.
+4. Restaurar USE_SALE_EVENTS_ONLY ao valor anterior somente após reverter o Commerce e validar integrações existentes.
+5. Não executar down, não remover colunas, índices, FKs, endpoints, envelopes de segredo, tentativas ou mensagens Redis. A reversão é por código/configuração, não por perda de dados.
 
 ## Evidência de homologação deste roteiro
 
-No ambiente de teste, as referências remotas foram confirmadas em `d23ef62`
-(Commerce V2) e `65c0e7ff` (Dashboard). O schema final foi conferido com a
-coluna, índice e FK previstos; o Commerce respondeu ao health check. O teste
-manual isolado do dispatcher, com fila exclusiva e dados temporários, publicou
-os destinos global e da oferta correspondente para `pending`, `paid` e
-`refunded`, excluindo a oferta diferente, e foi limpo ao final.
+No ambiente de teste, schema aditivo e backfill foram verificados: as configurações existentes receberam endpoint e nenhum segredo foi criado para elas. A seleção do Commerce V2 foi exercitada em imagem descartável e confirmou metadados de endpoint do vínculo escolhido.
 
-A checagem atual de ambiente encontrou `SALE_EVENTS_QUEUE_ACTIVE=true`, mas
-`USE_SALE_EVENTS_ONLY` ausente. Isso é um bloqueador deliberadamente exposto
-neste roteiro: esta homologação comprovou o dispatcher com a flag ativada no
-teste isolado, porém o ambiente não deve ser considerado publicado até que a
-variável seja configurada e a validação pós-deploy seja executada.
+O consumidor services-sale-integrations foi exercitado contra endpoint de captura controlado em dois cenários: endpoint protegido produziu assinatura HMAC válida sobre o corpo bruto; endpoint sem segredo realizou POST sem X-Lowify. Endpoints e tentativas temporários foram removidos ao fim do teste. Os arquivos PHP alterados passaram em verificação de sintaxe e as imagens novas foram construídas; isto não representa publicação de produção.
+
+Na revisão visual posterior, o Dashboard foi conferido estaticamente contra o
+mockup aprovado: seleção múltipla de ofertas dentro do cartão, segredo fora do
+formulário, máscara, revelar, copiar e rotação. No ambiente de teste, seis
+segredos ativos de endpoints foram verificados cifrados e decifráveis sem
+expor seus valores. A execução do POST final continua condicionada ao
+healthcheck Redis e às credenciais WEBHOOK_CONFIG_DB_* do consumidor descritos
+acima; sem eles, o serviço deve permanecer parado em vez de acumular falhas.
