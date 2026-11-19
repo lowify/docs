@@ -109,3 +109,15 @@ Não remover a rede `data_net`, não limpar Redis compartilhado, não usar
 Após este smoke test, publicar as branches de `services-auth`, `edge-gateway`,
 `services-commerce-v2` e `dashboard-seller`, aplicar a migration do Auth e
 validar consentimento OAuth, refresh, consultas e revogação.
+
+## Execução em homologação — 2026-11-18
+
+- Serviço clonado e publicado em `/root/opt/lowify/services/services-ai-mcp` no
+  commit `ac0c41a`, branch `feat/mcp-readonly-service`.
+- Imagem construída e container `services-ai-mcp` iniciado na rede `data_net`.
+- `GET https://mcp.statuslive.site/health` respondeu `200` com status saudável.
+- `GET https://mcp.statuslive.site/.well-known/oauth-protected-resource`
+  respondeu com o recurso canônico e escopos de leitura.
+- `POST /mcp` sem credencial respondeu `401`, JSON-RPC `Unauthorized` e o
+  cabeçalho `WWW-Authenticate` apontando para a metadata protegida.
+- Nenhum outro repositório, container, banco, Redis ou migration foi alterado.
