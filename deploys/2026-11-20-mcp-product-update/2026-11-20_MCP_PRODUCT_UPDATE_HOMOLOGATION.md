@@ -153,3 +153,17 @@ chaves Redis como parte do rollback.
   ferramenta, em vez de reportá-los como indisponibilidade temporária.
 - Não houve alteração de produto durante esta correção. O health público do MCP
   respondeu `200` e o container do Commerce V2 iniciou normalmente.
+
+## Upload de imagem pelo MCP — 2026-11-20
+
+- O MCP foi atualizado para `2dc265c` e reconstruído. Foi configurado somente
+  na VPS para reutilizar as credenciais S3/R2 já aprovadas no `services-account`;
+  nenhum valor de storage foi exibido ou versionado.
+- A ferramenta `upload_product_image` é anunciada apenas para clientes que
+  declaram suporte à extensão experimental `io.modelcontextprotocol/files`.
+  Ela aceita JPEG, PNG e WebP de até 10 MB, valida bytes e dimensões, limita a
+  imagem a 20 milhões de pixels, redimensiona o maior lado para 1600 px e salva
+  o resultado em WebP no prefixo isolado `mcp/products`.
+- Clientes sem suporte continuam usando `thumbnail_url` como fallback. O upload
+  exige `mcp.products.write` e OAuth; a verificação sem token respondeu `401`.
+- Nenhum arquivo real, produto ou dado de seller foi criado durante a validação.
