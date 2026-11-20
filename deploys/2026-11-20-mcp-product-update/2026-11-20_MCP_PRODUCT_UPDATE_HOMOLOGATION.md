@@ -105,3 +105,21 @@ Reverter somente os três repositórios para os commits anteriores da mesma
 branch e reconstruir apenas os containers que forem alterados. A tabela de
 idempotência é aditiva e deve permanecer; não apagar produtos, PDFs, tokens ou
 chaves Redis como parte do rollback.
+
+## Execução em homologação — 2026-11-20
+
+- Os três participantes estavam limpos e foram atualizados por fast-forward
+  para os commits documentados. Os demais targets foram mantidos como estavam.
+- Um backup temporário de configuração criado em operação anterior no diretório
+  do MCP foi removido antes da pré-checagem; ele não era configuração ativa nem
+  fazia parte do repositório.
+- O DDL aditivo da tabela `mcp_product_update_idempotency` foi aplicado no
+  banco do Commerce V2. A tabela foi confirmada como InnoDB e a chave única
+  `mcp_product_update_idempotency_seller_key_unique` foi validada.
+- MCP e Commerce V2 foram reconstruídos incrementalmente e iniciaram com os
+  workers HTTP e de fila normais. O Dashboard recebeu somente o pull da branch,
+  conforme orientação anterior para esse frontend.
+- `https://mcp.statuslive.site/health` respondeu `200`; `tools/list` expôs
+  `preview_update_product` e `update_product`; a rota interna do Commerce
+  respondeu `401` sem assinatura, comportamento esperado para a verificação
+  sem credenciais.
