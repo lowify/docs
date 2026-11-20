@@ -198,3 +198,12 @@ chaves Redis como parte do rollback.
   suportar transferência de arquivos MCP, o agente deve atribuir a limitação ao
   cliente, nunca à API ou ao MCP da Lowify. O health respondeu `200` após o
   restart.
+
+## Diagnóstico de capacidade do conector — 2026-11-20
+
+- O MCP foi atualizado para `55ed11a` e reconstruído. A ferramenta
+  `get_connection_capabilities` informa somente se o cliente conectado declara
+  suporte a upload de arquivos MCP, sem acessar dados do seller.
+- Ela permite distinguir objetivamente uma limitação do cliente de uma falha
+  do servidor: `false` significa que o cliente não ofereceu o anexo ao MCP;
+  `true` com falha de upload exige investigação do fluxo do servidor.
