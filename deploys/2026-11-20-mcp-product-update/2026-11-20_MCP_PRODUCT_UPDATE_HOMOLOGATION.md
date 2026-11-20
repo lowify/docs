@@ -167,3 +167,13 @@ chaves Redis como parte do rollback.
 - Clientes sem suporte continuam usando `thumbnail_url` como fallback. O upload
   exige `mcp.products.write` e OAuth; a verificação sem token respondeu `401`.
 - Nenhum arquivo real, produto ou dado de seller foi criado durante a validação.
+
+## Correção de rota de upload — 2026-11-20
+
+- O MCP foi atualizado para `65cd907` e reconstruído. O caminho devolvido ao
+  cliente passou a ser relativo ao endpoint MCP, como requer a extensão de
+  arquivos. O servidor também aceita a forma absoluta anterior para tolerar
+  clientes que resolvam o caminho de modo diferente.
+- As duas rotas públicas de upload foram verificadas sem credencial e ambas
+  responderam `401`, confirmando que chegam ao serviço e permanecem protegidas
+  por OAuth.
