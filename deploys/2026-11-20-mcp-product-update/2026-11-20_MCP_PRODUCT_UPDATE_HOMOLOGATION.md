@@ -188,3 +188,13 @@ chaves Redis como parte do rollback.
   containers foram mantidos como estavam.
 - Uma solicitação OAuth de validação para a URL pública passou a responder
   `302` para `/login.php`, comportamento esperado para seller sem sessão.
+
+## Correção de instruções sobre anexos — 2026-11-20
+
+- O MCP foi atualizado para `890db75` e reconstruído. As instruções globais
+  agora descrevem o serviço como analytics e operações autorizadas de produto,
+  em vez de somente leitura.
+- Quando o cliente de IA não disponibilizar a ferramenta de upload por não
+  suportar transferência de arquivos MCP, o agente deve atribuir a limitação ao
+  cliente, nunca à API ou ao MCP da Lowify. O health respondeu `200` após o
+  restart.
