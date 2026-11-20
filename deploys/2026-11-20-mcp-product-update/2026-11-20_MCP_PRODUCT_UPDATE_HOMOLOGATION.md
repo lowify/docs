@@ -207,3 +207,12 @@ chaves Redis como parte do rollback.
 - Ela permite distinguir objetivamente uma limitação do cliente de uma falha
   do servidor: `false` significa que o cliente não ofereceu o anexo ao MCP;
   `true` com falha de upload exige investigação do fluxo do servidor.
+
+## Correção de schema para atualização do app — 2026-11-20
+
+- O MCP foi atualizado para `ddc4f2b` e reconstruído. A ferramenta diagnóstica
+  sem parâmetros era publicada com `inputSchema.properties` como lista JSON;
+  o schema foi corrigido para objeto JSON, formato exigido por validadores de
+  ferramentas MCP.
+- A lista pública e o health foram conferidos após o restart: a ferramenta está
+  presente, o schema vazio é válido e o health respondeu `200`.
