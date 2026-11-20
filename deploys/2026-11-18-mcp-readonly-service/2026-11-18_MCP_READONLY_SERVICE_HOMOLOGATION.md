@@ -169,8 +169,11 @@ monitoramento, mantendo buckets/prefixos separados para imagens e e-books.
   foram registrados neste documento.
 - O health público do MCP respondeu `200` e `tools/list` continuou respondendo
   corretamente após o restart.
-- A migration `20261119120000_create_mcp_product_idempotency_table.php` ainda
-  **não foi aplicada**: o container atual de Commerce V2 não expõe o comando
-  de migrations (`php bin/hyperf.php migrate`). Nenhum SQL manual foi executado.
-  A criação de produto via MCP permanece bloqueada até aplicar essa migration
-  pelo procedimento oficial do banco/serviço.
+- Como o container atual de Commerce V2 não expõe o comando de migrations,
+  o DDL aditivo equivalente a
+  `20261119120000_create_mcp_product_idempotency_table.php` foi aplicado uma
+  vez pelo procedimento manual controlado no banco de homologação. A tabela
+  `mcp_product_idempotency` e a chave única
+  `mcp_product_idempotency_seller_key_unique (seller_id, idempotency_key)`
+  foram verificadas após a execução. Não foi inserido registro manual de
+  migration e nenhuma tabela de produto, venda, fila ou Redis foi alterada.
