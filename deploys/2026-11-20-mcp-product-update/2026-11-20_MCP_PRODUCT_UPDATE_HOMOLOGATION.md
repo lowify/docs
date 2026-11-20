@@ -1,0 +1,107 @@
+# Homologação — edição básica de produtos via MCP
+
+## Objetivo
+
+Publicar a edição confirmada de produtos pelo MCP. O seller poderá alterar
+somente título, preço, imagem principal e entregáveis de um produto próprio,
+sempre passando por prévia, confirmação explícita e idempotência.
+
+## Componentes e referências
+
+| Repositório | Diretório na VPS | Branch | Commit |
+| --- | --- | --- | --- |
+| `services-ai-mcp` | `/root/opt/lowify/services/services-ai-mcp` | `feat/mcp-readonly-service` | `82ff896` |
+| `services-commerce-v2` | `/root/opt/lowify/services/service-commerce-v2` | `feat/mcp-readonly-service` | `28a6c55` |
+| `dashboard-seller` | `/root/opt/lowify/front/dashboard-seller` | `feat/mcp-readonly-service` | `02d07877` |
+
+Modo de rebuild: incremental. Todos os demais targets operáveis, incluindo
+Auth, Account e Gateway, devem ser mantidos exatamente como estão por
+instrução explícita; não executar Git, Docker ou migrations neles.
+
+## Alterações incluídas
+
+- MCP: ferramentas `preview_update_product` e `update_product`, protegidas por
+  `mcp.products.write` e confirmação com validade de cinco minutos.
+- Commerce V2: endpoints internos assinados para prévia e atualização, com
+  verificação de propriedade pelo seller e substituição transacional dos PDFs
+  quando a entrega for alterada.
+- Dashboard: consentimento OAuth redesenhado com componentes base e descrição
+  clara da permissão de criar e editar produtos.
+
+## Pré-requisitos
+
+1. Os serviços MCP e Commerce V2 já possuem as autorizações internas e a
+   assinatura HMAC usadas pela criação de produtos MCP.
+2. O usuário de banco do Commerce V2 pode criar uma tabela aditiva.
+3. Não registrar nem exibir valores de `.env`, tokens ou segredos.
+
+## Banco de dados
+
+Aplicar somente a migration aditiva
+`20261120120000_create_mcp_product_update_idempotency_table.php` no banco do
+Commerce V2. Ela cria `mcp_product_update_idempotency` com chave única por
+seller e chave de idempotência. Não apagar a tabela anterior de criação de
+produtos e não limpar dados de produto ou Redis.
+
+Como o container atual não disponibiliza o executor de migrations, aplicar o
+DDL equivalente por procedimento manual controlado e confirmar a existência
+da tabela e da chave única antes do rebuild.
+
+## Sequência de deploy
+
+1. Fazer a pré-checagem, sem alterar estado, nos três diretórios da tabela:
+
+   ```bash
+   git status --porcelain=v1
+   git branch --show-current
+   git remote get-url origin
+   ```
+
+   Se houver mudanças locais em qualquer participante, parar o deploy.
+
+2. Em cada participante, buscar referências e confirmar a branch remota:
+
+   ```bash
+   git fetch origin --prune
+   git show-ref --verify --quiet refs/remotes/origin/feat/mcp-readonly-service
+   ```
+
+3. Atualizar sequencialmente MCP, Commerce V2 e Dashboard:
+
+   ```bash
+   git switch feat/mcp-readonly-service
+   git pull --ff-only origin feat/mcp-readonly-service
+   ```
+
+4. Aplicar a migration aditiva do Commerce V2 pelo procedimento manual
+   controlado e validar a tabela e sua chave única.
+
+5. Somente para participantes cujo commit mudou, executar, um por vez:
+
+   ```bash
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+## Validação pós-deploy
+
+1. Abra o Dashboard de homologação, conecte o cliente de IA e confira a tela
+   de autorização: ela deve usar o logo da Lowify e informar a permissão de
+   criar e editar produtos.
+2. Em uma conversa conectada a um seller de teste, peça para alterar somente o
+   título de um produto de teste. A IA deve primeiro mostrar a prévia e pedir
+   confirmação.
+3. Confirme a alteração. O título deve aparecer atualizado no Dashboard e o
+   produto deve continuar pertencendo ao mesmo seller.
+4. Repita com uma entrega de e-book e confira que os entregáveis mostrados no
+   Dashboard foram substituídos. Não use produto de cliente real.
+
+Como conferência técnica complementar, o health público do MCP deve responder
+normalmente e os logs não devem apresentar erros de assinatura ou migração.
+
+## Rollback
+
+Reverter somente os três repositórios para os commits anteriores da mesma
+branch e reconstruir apenas os containers que forem alterados. A tabela de
+idempotência é aditiva e deve permanecer; não apagar produtos, PDFs, tokens ou
+chaves Redis como parte do rollback.
