@@ -136,3 +136,24 @@ validar consentimento OAuth, refresh, consultas e revogação.
   `resources/read` retornou o dicionário de dados versionado.
 - A validação não executou ferramentas de vendas, não leu dados de seller e não
   alterou dados de negócio.
+
+## Atualização coordenada — criação de produtos MCP
+
+Participantes desta atualização de homologação: `services-ai-mcp`,
+`services-commerce-v2`, `services-account` e `services-auth`, todos na branch
+`feat/mcp-readonly-service`. Todos os demais repositórios e containers devem
+ser mantidos como estão.
+
+| Repositório | Commit esperado |
+| --- | --- |
+| `services-ai-mcp` | `b2e3db6` |
+| `services-commerce-v2` | `55e4492` |
+| `services-account` | `d87bb42` |
+| `services-auth` | `2ad2b0f` |
+
+Antes do rebuild, aplicar a migration de idempotência do Commerce V2 pelo
+procedimento de migration já utilizado pelo serviço. Não executar migrations
+em outros bancos. Configurar somente na VPS, sem versionar segredos, as URLs e
+autorizações internas entre MCP, Account e Commerce. Para o futuro upload de
+assets, reaproveitar as credenciais de storage já existentes no ambiente de
+monitoramento, mantendo buckets/prefixos separados para imagens e e-books.
