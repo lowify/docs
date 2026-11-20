@@ -12,32 +12,46 @@ O lançamento de código não autoriza a habilitação global. A publicação de
 começar com as duas chaves globais desligadas e só pode avançar depois do
 provisionamento externo, da homologação por PSP e do aceite operacional.
 
+## Gate de código — auditoria de 20/11/2026
+
+O destino de publicação é `main`, após revisão e merge aprovados; não publicar
+uma combinação improvisada entre `main` e branches de feature.
+
+Na auditoria de 20/11/2026, Commerce V2, Front Checkout e Dashboard Seller
+já continham o código de wallet em `main`. O `main` de Banking V2 ainda não
+continha o tratamento de autorização de wallet, e os dois Edges ainda não
+continham as rotas correspondentes. Portanto, **não é seguro executar este
+deploy somente com o estado atual de `main`**.
+
+Antes do deploy, incorporar em `main` por PR/revisão aprovada, no mínimo:
+
+- Banking V2: `f6d4ed23c2cad24ac6a22a703b3bdea53a81f2f9`,
+  `7a19ec0a9763ac3fbdbd0cff47614348ba6964d5` e
+  `3c878afa7eb7baac931a904cf182aa6dff0e9564`;
+- Edge Gateway: `8ba4b321f7f9d9fd0dd33c5c27e88da2fea8e689`;
+- Edge Public API: `420deac2130f6c339fc4c74497850c35016c6e2b`.
+
+Atualizar os SHAs aprovados nesta seção se a revisão usar commits equivalentes
+ou uma resolução diferente. Enquanto este gate não estiver satisfeito, manter
+as duas chaves globais em `0` e não iniciar a etapa de ativação.
+
 ## Componentes e referências
 
 Todos os diretórios abaixo são de produção no host principal `144.126.149.57`.
 Não usar caminhos de desenvolvimento ou homologação neste roteiro.
 
-| Repositório | Diretório de produção | Branch de deploy | Commit mínimo | Papel |
+| Repositório | Diretório de produção | Branch de deploy | Revisão mínima | Papel |
 | --- | --- | --- | --- | --- |
-| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `feat/checkout-apple-google-pay` | `36913f0` | Recebe a instrução de cartão com autorização de carteira, preserva a classificação em `charges_card.wallet_card_id` e traduz a cobrança para Cielo ou Pagar.me. |
-| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `feat/checkout-apple-google-pay` | `a4e56bd` | Resolve habilitação, valida a sessão Apple Pay no servidor, prepara Google Pay e encaminha a autorização transitória ao Banking. |
-| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `feat/checkout-apple-google-pay` | `acf8481` | Encaminha as rotas internas de checkout e wallet para os serviços. |
-| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `feat/checkout-apple-google-pay` | `b88d9fe` | Extrai e propaga JWT nas rotas públicas do fluxo. |
-| `front-checkout` | `/opt/lowify/front/front-checkout` | `feat/checkout-apple-google-pay` | `9c1af9e` | Mostra as carteiras elegíveis, coleta os dados obrigatórios do comprador e envia o token, sem persistir dados de cartão. |
-| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `feat/checkout-apple-google-pay` | `fb5c16f2` | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. Inclui a base de Didit Legacy Sessions. |
+| `services-banking-v2` | `/opt/lowify/services/services-banking-v2` | `main` | Gate de código desta página satisfeito e SHA aprovado | Recebe a instrução de cartão com autorização de carteira, preserva a classificação em `charges_card.wallet_card_id` e traduz a cobrança para Cielo ou Pagar.me. |
+| `service-commerce-v2` | `/opt/lowify/services/service-commerce-v2` | `main` | SHA aprovado após revisão | Resolve habilitação, valida a sessão Apple Pay no servidor, prepara Google Pay e encaminha a autorização transitória ao Banking. |
+| `edge-gateway` | `/opt/lowify/edge/edge-gateway` | `main` | Gate de código desta página satisfeito e SHA aprovado | Encaminha as rotas internas de checkout e wallet para os serviços. |
+| `edge-public-api` | `/opt/lowify/edge/edge-public-api` | `main` | Gate de código desta página satisfeito e SHA aprovado | Extrai e propaga JWT nas rotas públicas do fluxo. |
+| `front-checkout` | `/opt/lowify/front/front-checkout` | `main` | SHA aprovado após revisão | Mostra as carteiras elegíveis, coleta os dados obrigatórios do comprador e envia o token, sem persistir dados de cartão. |
+| `dashboard-seller` | `/opt/lowify/front/dashboard-seller` | `main` | SHA aprovado após revisão | Permite ao seller habilitar Apple Pay/Google Pay por produto, subordinadas ao cartão de crédito. Inclui a base de Didit Legacy Sessions. |
 
 `services-wallet` não participa deste deploy: ele é a carteira interna de
 saldo/extrato/saque e não é Apple Pay nem Google Pay. Os dois edges participam
 para manter as rotas e o contrato de autenticação do fluxo atualizados.
-
-### Dependência de sequência — Dashboard Seller
-
-O `dashboard-seller` desta entrega incorpora
-`origin/feat/didit-legacy-sessions` (commit `853be1b7`) pelo merge
-`fb5c16f2`. A publicação do Dashboard desta entrega deve ocorrer depois da
-entrega Didit Legacy Sessions. Não selecionar uma revisão anterior da branch de
-wallets para tentar separar as duas mudanças: o passo do Dashboard publica a
-referência integrada.
 
 ## Alterações incluídas
 
@@ -103,37 +117,37 @@ cd /opt/lowify/services/services-banking-v2
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 
 cd /opt/lowify/services/service-commerce-v2
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 
 cd /opt/lowify/edge/edge-gateway
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 
 cd /opt/lowify/edge/edge-public-api
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 
 cd /opt/lowify/front/front-checkout
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 
 cd /opt/lowify/front/dashboard-seller
 test -z "$(git status --porcelain=v1)" || { echo 'Há alterações locais; interrompendo.' >&2; exit 1; }
 git remote get-url origin
 git fetch origin --prune
-git show-ref --verify --quiet refs/remotes/origin/feat/checkout-apple-google-pay
+git show-ref --verify --quiet refs/remotes/origin/main
 ```
 
 Checkout e Dashboard usam o diretório como bind mount em `/var/www/html`.
@@ -239,32 +253,145 @@ Reexecutar ambas as consultas. Registros históricos devem permanecer com
 ## Configuração segura de produção
 
 Configurar os valores exclusivamente pelo cofre de segredos e pelos volumes
-privados aprovados. Não copiar nem exibir os valores no terminal, no Git ou em
-evidências.
+privados aprovados. A versão de produção usa validação Apple com certificado
+de identidade e chave privada, além da configuração oficial de Google Pay.
+O roteiro abaixo é a fonte única para obter e posicionar cada variável.
 
-| Configuração do Commerce V2 | Regra |
-| --- | --- |
-| `APPLE_PAY_MERCHANT_IDENTIFIER` | Merchant Identifier definitivo da Apple. |
-| `APPLE_PAY_MERCHANT_CERTIFICATE_PATH` | Caminho privado, legível pelo processo, do Merchant Identity Certificate. |
-| `APPLE_PAY_MERCHANT_PRIVATE_KEY_PATH` | Caminho privado da chave que corresponde ao certificado de identidade. |
-| `GOOGLE_PAY_MERCHANT_ID` | Merchant ID aprovado no Google Pay & Wallet Console. |
-| `CIELO_GOOGLE_PAY_GATEWAY_MERCHANT_ID` | Identificador fornecido pela Cielo para Google Pay. |
-| `PAGARME_GOOGLE_PAY_GATEWAY_MERCHANT_ID` | Identificador Pagar.me/Stone aplicável. |
-| `GOOGLE_PAY_TEST_MODE` | Deve ser explicitamente `false` em produção. |
+### Preenchimento das novas variáveis — roteiro operacional
 
-O código final não possui o mock de sessão Apple Pay usado na homologação. Não
-adicionar host de mock, permissão HTTP, extensão de navegador ou flag que
-desvie validação Apple. Certificado de identidade Apple e certificado de
-processamento do PSP têm finalidades diferentes; não os trocar.
+As variáveis novas são configuradas no arquivo de produção
+`/opt/lowify/services/service-commerce-v2/.env`: o
+`docker-compose.yml` desse serviço declara exatamente `env_file: .env`. O cofre
+de segredos aprovado deve escrever esses valores nesse arquivo durante o deploy;
+os certificados Apple ficam em volume privado e o `.env` guarda apenas os
+caminhos internos. Esta seção segue a ordem real de obtenção e já informa onde
+cada valor deve ser colocado.
 
-Conferir apenas a chave booleana autorizada, sem imprimir o restante do `.env`:
+#### 1. Google Pay — Merchant ID, domínio e modo de produção
+
+1. Abrir [Google Pay & Wallet Console](https://pay.google.com/) usando a conta
+   corporativa proprietária da Lowify.
+2. No menu esquerdo, abrir **Google Pay API**. Se o Console mostrar
+   **Get started**, clicar nele; completar o **Business Profile** com tipo
+   **Merchant** e aceitar os termos apresentados.
+3. Na página **Google Pay API**, localizar o **Merchant ID** no canto superior
+   direito. Copiar esse valor e gravar no cofre como
+   `GOOGLE_PAY_MERCHANT_ID`. No arquivo final do Commerce V2, a linha fica:
+
+   ```dotenv
+   GOOGLE_PAY_MERCHANT_ID=<Merchant ID copiado do Console>
+   ```
+
+4. Ainda em **Google Pay API**, abrir **Integrations** e, na área
+   **Integrate with your website**, clicar em **Add website**. Informar
+   `pay.statuslive.site` se ele exibirá o botão em produção; repetir para
+   `checkout.statuslive.site` somente se esse host também servir o Checkout.
+5. Na tela seguinte, selecionar **Gateway**, escolher o provedor aplicável,
+   anexar capturas reais do Checkout e clicar em **Save**; depois clicar em
+   **Submit for approval**. A página de integrações deve mostrar o status de
+   aprovação do domínio antes da ativação produtiva.
+6. Depois da aprovação do domínio e da ativação do PSP correspondente, gravar
+   a linha abaixo no mesmo `.env` do Commerce V2:
+
+   ```dotenv
+   GOOGLE_PAY_TEST_MODE=false
+   ```
+
+   Esse valor faz o Checkout usar `PaymentsClient` com ambiente `PRODUCTION`.
+   O request já envia `currencyCode=BRL` e `countryCode=BR`; essas duas
+   propriedades são de código e não exigem variável adicional.
+
+#### 2. Google Pay com Cielo — identificador do gateway
+
+1. Confirmar qual EC/loja Cielo será usado pelos checkouts produtivos.
+2. Pelo canal de suporte ou gerente Cielo da conta, solicitar o
+   **`gatewayMerchantId` de Google Pay da loja/EC produtivo**. A documentação
+   pública da Cielo informa que esse dado é fornecido pelo gateway e aparece no
+   formato GUID de 36 caracteres, como
+   `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
+3. No portal Cielo da mesma loja/EC, confirmar com o suporte que Google Pay foi
+   habilitado para produção. O caminho público de ativação não é documentado
+   pela Cielo; por isso, a confirmação deve vir do canal Cielo responsável pela
+   conta.
+4. Com o GUID recebido, adicionar ao cofre e ao `.env` do Commerce V2:
+
+   ```dotenv
+   CIELO_GOOGLE_PAY_GATEWAY_MERCHANT_ID=<GUID produtivo informado pela Cielo>
+   ```
+
+   Quando o checkout selecionar Cielo, o código envia `gateway=cielo` e usa
+   precisamente esse valor como `gatewayMerchantId` para o Google Pay.
+
+#### 3. Google Pay com Pagar.me/Stone — identificador do gateway
+
+1. Confirmar a conta Pagar.me/Stone que receberá as vendas produtivas.
+2. Pelo suporte ou gerente dessa conta, solicitar o valor que deve ser enviado
+   como **`gatewayMerchantId` para Google Pay com `gateway=pagarme`**. A
+   documentação pública da Pagar.me descreve a ativação da conta Stone e a
+   aprovação prévia do Merchant ID Google, mas não publica uma tela universal
+   para extrair esse valor; o suporte da conta é a fonte correta.
+3. Após a confirmação da ativação produtiva, adicionar ao cofre e ao `.env` do
+   Commerce V2:
+
+   ```dotenv
+   PAGARME_GOOGLE_PAY_GATEWAY_MERCHANT_ID=<identificador produtivo confirmado pela Pagar.me/Stone>
+   ```
+
+   Quando o checkout selecionar Pagar.me, o código envia `gateway=pagarme` e
+   usa essa linha como `gatewayMerchantId`.
+
+#### 4. Apple Pay — Merchant ID, domínio, certificado e chave
+
+1. Abrir [Apple Developer — Certificates, Identifiers & Profiles](https://developer.apple.com/account/)
+   com usuário **Account Holder** ou **Admin**.
+2. No menu lateral, abrir **Identifiers**. No seletor superior direito, escolher
+   **Merchant IDs**; criar o Merchant ID definitivo ou abrir o que já existe.
+   Copiar o campo **Identifier** e gravar no cofre e no `.env`:
+
+   ```dotenv
+   APPLE_PAY_MERCHANT_IDENTIFIER=<Identifier do Merchant ID Apple>
+   ```
+
+3. Na página desse Merchant ID, localizar **Merchant Domains**, clicar em
+   **Add Domain**, digitar o host do Checkout e salvar. Baixar o arquivo de
+   associação oferecido pela Apple, publicá-lo no caminho `.well-known` que a
+   própria tela indicar e clicar em **Verify**. Repetir para cada host que
+   mostre o botão; o resultado precisa exibir **Verified**.
+4. Na mesma página, localizar **Apple Pay Merchant Identity Certificate** e
+   clicar em **Create Certificate**. Enviar o CSR solicitado e baixar o
+   certificado gerado. Exportar o certificado e sua chave correspondente em
+   PEM separado, usando o procedimento seguro aprovado pela infraestrutura.
+5. Montar esses dois arquivos em volume privado do container Commerce V2. Após
+   definir os caminhos internos reais, gravar no `.env`:
+
+   ```dotenv
+   APPLE_PAY_MERCHANT_CERTIFICATE_PATH=/caminho/interno/merchant-identity.pem
+   APPLE_PAY_MERCHANT_PRIVATE_KEY_PATH=/caminho/interno/merchant-identity-key.pem
+   ```
+
+   Esses dois caminhos são usados na validação mTLS da sessão Apple Pay.
+6. Na área **Payment Processing Certificate** do mesmo Merchant ID, criar ou
+   manter o certificado de processamento acordado com o PSP. Esse certificado
+   atende ao processamento do token; a identidade de merchant criada no passo
+   anterior atende à validação da sessão web.
+
+#### 5. Conferência segura antes de liberar sellers
+
+Após a injeção, recriar o Commerce V2 conforme a seção **Sequência de deploy**
+e executar, dentro dele, a verificação abaixo. Ela confere os caminhos Apple e
+o modo Google sem exibir IDs, certificados, chaves ou tokens:
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
-grep -n '^GOOGLE_PAY_TEST_MODE=false$' .env
+docker compose exec -T service-commerce-v2 sh -lc '\
+  test -r "$APPLE_PAY_MERCHANT_CERTIFICATE_PATH" && \
+  test -r "$APPLE_PAY_MERCHANT_PRIVATE_KEY_PATH" && \
+  test "$GOOGLE_PAY_TEST_MODE" = false'
 ```
 
-Se esse comando não retornar exatamente uma linha, interromper a ativação.
+O comando retorna zero sem exibir IDs, certificados, chaves ou tokens. Se
+falhar, corrigir o segredo, o volume ou a permissão antes de disponibilizar
+Apple Pay/Google Pay para qualquer seller.
 
 ## Sequência de deploy
 
@@ -284,83 +411,82 @@ Não executar `php bin/hyperf.php migrate`, `migrate --force`,
 
 ```bash
 cd /opt/lowify/services/services-banking-v2
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor 36913f0 HEAD
+git switch main
+git pull --ff-only origin main
+git merge-base --is-ancestor f6d4ed23c2cad24ac6a22a703b3bdea53a81f2f9 HEAD
+git merge-base --is-ancestor 7a19ec0a9763ac3fbdbd0cff47614348ba6964d5 HEAD
+git merge-base --is-ancestor 3c878afa7eb7baac931a904cf182aa6dff0e9564 HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 services-banking-v2
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `36913f0`
-ou descendente aprovado, o serviço estiver `Up` e não houver erro de schema,
+Prosseguir somente se os três `git merge-base` retornarem zero, o SHA de
+`main` for o aprovado, o serviço estiver `Up` e não houver erro de schema,
 conexão ou processo nos logs.
 
 ### 3. Atualizar Commerce V2
 
 ```bash
 cd /opt/lowify/services/service-commerce-v2
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor a4e56bd HEAD
+git switch main
+git pull --ff-only origin main
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 service-commerce-v2
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `a4e56bd`
-ou descendente aprovado, `service-commerce-v2` estiver `Up` e os logs não
+Prosseguir somente se o SHA de `main` for o aprovado,
+`service-commerce-v2` estiver `Up` e os logs não
 apontarem erro de schema, configuração de certificado, conexão ou processo.
 
 ### 4. Atualizar Edge Gateway
 
 ```bash
 cd /opt/lowify/edge/edge-gateway
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor acf8481 HEAD
+git switch main
+git pull --ff-only origin main
+git merge-base --is-ancestor 8ba4b321f7f9d9fd0dd33c5c27e88da2fea8e689 HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 edge-gateway edge-gateway-worker
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `acf8481`
-ou descendente aprovado e os dois processos estiverem `Up` sem erro de rota,
+Prosseguir somente se `git merge-base` retornar zero, o SHA de `main` for o
+aprovado e os dois processos estiverem `Up` sem erro de rota,
 autenticação ou processo nos logs.
 
 ### 5. Atualizar Edge Public API
 
 ```bash
 cd /opt/lowify/edge/edge-public-api
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor b88d9fe HEAD
+git switch main
+git pull --ff-only origin main
+git merge-base --is-ancestor 420deac2130f6c339fc4c74497850c35016c6e2b HEAD
 git rev-parse --short HEAD
 docker compose up -d --build --force-recreate
 docker compose ps
 docker compose logs --tail=100 edge-public-api
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `b88d9fe`
-ou descendente aprovado e o processo estiver `Up` sem erro de rota ou JWT nos
+Prosseguir somente se `git merge-base` retornar zero, o SHA de `main` for o
+aprovado e o processo estiver `Up` sem erro de rota ou JWT nos
 logs.
 
 ### 6. Atualizar Front Checkout
 
 ```bash
 cd /opt/lowify/front/front-checkout
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor 9c1af9e HEAD
+git switch main
+git pull --ff-only origin main
 git rev-parse --short HEAD
 docker compose ps
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `9c1af9e`
-ou descendente aprovado e todos os serviços que
+Prosseguir somente se o SHA de `main` for o aprovado e todos os serviços que
 já estavam ativos continuarem `Up`. Não reiniciar container só por esta
 atualização de código montado.
 
@@ -368,15 +494,13 @@ atualização de código montado.
 
 ```bash
 cd /opt/lowify/front/dashboard-seller
-git switch feat/checkout-apple-google-pay
-git pull --ff-only origin feat/checkout-apple-google-pay
-git merge-base --is-ancestor fb5c16f2 HEAD
+git switch main
+git pull --ff-only origin main
 git rev-parse --short HEAD
 docker compose ps
 ```
 
-Prosseguir somente se `git merge-base` retornar zero, o commit for `fb5c16f2`
-ou descendente aprovado e os serviços existentes
+Prosseguir somente se o SHA de `main` for o aprovado e os serviços existentes
 permanecerem `Up`. Não consumir ou reprocessar filas manualmente.
 
 ## Ativação controlada e validação pós-deploy
@@ -401,7 +525,9 @@ produtos devem iniciar desligados.
    de cada comando, conferir a chave exata; depois, reler os dois valores.
 4. Executar compra controlada por Cielo/Apple, Cielo/Google, Pagar.me/Apple e
    Pagar.me/Google, usando dispositivos e contas de sandbox/produção aprovados
-   para o ambiente. Registrar apenas IDs técnicos, horário, valores e estado.
+   para o ambiente. Para Google em produção, executar somente depois de a
+   aprovação do domínio constar no Console; registrar apenas IDs técnicos,
+   horário, valores e estado.
 5. Em cada aprovação, conferir venda, `charges_card.wallet_card_id`, referência
    externa, split, taxa e entrega. O token não pode surgir em banco ou logs.
 6. Testar cancelamento de wallet, recusa do PSP e envio duplicado; não deve
@@ -448,4 +574,8 @@ produtos devem iniciar desligados.
 - [Implementação, rollout e aceite](../../plans/checkout-apple-google-pay/03_IMPLEMENTACAO_ROLLOUT_E_ACEITE.md)
 - [Contrato técnico de teste](../../plans/checkout-apple-google-pay/04_CONTRATO_TECNICO_DE_TESTE.md)
 - [Provisionamento de produção](../../plans/checkout-apple-google-pay/05_PROVISIONAMENTO_PRODUCAO_WALLETS.md)
-- [Checklist de execução](../../plans/checkout-apple-google-pay/CHECKLIST_EXECUCAO.txt)
+- [Google Pay — publicar uma integração web](https://developers.google.com/pay/api/web/guides/test-and-deploy/publish-your-integration)
+- [Google Pay — checklist de integração](https://developers.google.com/pay/api/web/guides/test-and-deploy/integration-checklist)
+- [Cielo — Google Pay e dados produtivos](https://docs.cielo.com.br/gateway/docs/google-pay)
+- [Pagar.me — guia Google Pay](https://docs.pagar.me/docs/google-pay-tm-guide)
+- [Apple — configurar Apple Pay na web](https://developer.apple.com/help/account/capabilities/configure-apple-pay-on-the-web)
