@@ -177,3 +177,14 @@ chaves Redis como parte do rollback.
 - As duas rotas públicas de upload foram verificadas sem credencial e ambas
   responderam `401`, confirmando que chegam ao serviço e permanecem protegidas
   por OAuth.
+
+## Correção de autorização no Dashboard — 2026-11-20
+
+- O Dashboard de homologação havia sido movido para `main` no commit
+  `13aa85e1`, que não contém a página de consentimento OAuth MCP. Isso fazia o
+  redirecionamento do Auth para `oauth_mcp_authorize.php` responder `404`.
+- Com autorização explícita, somente o `dashboard-seller` foi restaurado para
+  `feat/mcp-readonly-service`, commit `4168de3b`; os demais repositórios e
+  containers foram mantidos como estavam.
+- Uma solicitação OAuth de validação para a URL pública passou a responder
+  `302` para `/login.php`, comportamento esperado para seller sem sessão.
