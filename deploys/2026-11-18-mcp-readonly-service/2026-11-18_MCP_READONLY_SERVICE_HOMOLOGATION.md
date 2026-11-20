@@ -157,3 +157,20 @@ em outros bancos. Configurar somente na VPS, sem versionar segredos, as URLs e
 autorizações internas entre MCP, Account e Commerce. Para o futuro upload de
 assets, reaproveitar as credenciais de storage já existentes no ambiente de
 monitoramento, mantendo buckets/prefixos separados para imagens e e-books.
+
+### Execução em homologação — 2026-11-19
+
+- Os quatro repositórios foram atualizados somente para a branch
+  `feat/mcp-readonly-service`, nos commits listados acima; os demais targets
+  foram mantidos como estavam.
+- Os containers de MCP, Commerce V2, Account e Auth foram reconstruídos e
+  iniciados. A configuração interna MCP → Account foi adicionada somente aos
+  arquivos `.env` da VPS, com autorização já usada pelo Commerce; valores não
+  foram registrados neste documento.
+- O health público do MCP respondeu `200` e `tools/list` continuou respondendo
+  corretamente após o restart.
+- A migration `20261119120000_create_mcp_product_idempotency_table.php` ainda
+  **não foi aplicada**: o container atual de Commerce V2 não expõe o comando
+  de migrations (`php bin/hyperf.php migrate`). Nenhum SQL manual foi executado.
+  A criação de produto via MCP permanece bloqueada até aplicar essa migration
+  pelo procedimento oficial do banco/serviço.
