@@ -123,3 +123,14 @@ chaves Redis como parte do rollback.
   `preview_update_product` e `update_product`; a rota interna do Commerce
   respondeu `401` sem assinatura, comportamento esperado para a verificação
   sem credenciais.
+
+## Correção de autorização — 2026-11-20
+
+- O Dashboard foi atualizado incrementalmente para o commit `4168de3b` da
+  mesma branch. Quando o cliente OAuth omitir o parâmetro `scope`, o
+  consentimento agora inclui também `mcp.products.write`.
+- O container do Dashboard não foi reconstruído, conforme a orientação vigente
+  para esse frontend; a atualização ocorreu somente por pull do código.
+- Conexões OAuth já autorizadas não são alteradas retroativamente: é necessário
+  desconectar e conectar novamente o cliente de IA para emitir um token com a
+  nova permissão.
