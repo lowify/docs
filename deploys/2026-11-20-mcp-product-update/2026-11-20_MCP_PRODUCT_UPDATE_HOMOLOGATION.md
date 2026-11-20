@@ -134,3 +134,12 @@ chaves Redis como parte do rollback.
 - Conexões OAuth já autorizadas não são alteradas retroativamente: é necessário
   desconectar e conectar novamente o cliente de IA para emitir um token com a
   nova permissão.
+
+## Correção de metadata OAuth — 2026-11-20
+
+- O MCP foi atualizado incrementalmente para o commit `5025837` e reconstruído.
+  O documento público de recurso protegido agora anuncia
+  `mcp.products.write`, além dos scopes de leitura.
+- A metadata pública e o health do MCP foram consultados após o restart e
+  responderam corretamente. Clientes que fazem descoberta OAuth passam a poder
+  solicitar a permissão de edição ao reconectar.
