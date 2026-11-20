@@ -143,3 +143,13 @@ chaves Redis como parte do rollback.
 - A metadata pública e o health do MCP foram consultados após o restart e
   responderam corretamente. Clientes que fazem descoberta OAuth passam a poder
   solicitar a permissão de edição ao reconectar.
+
+## Correção de validação de preço — 2026-11-20
+
+- O Commerce V2 foi atualizado para `8b939f3` e o MCP para `622a621`, ambos na
+  mesma branch e reconstruídos incrementalmente.
+- A prévia de edição passa a bloquear preço abaixo do mínimo aplicável antes da
+  confirmação. O MCP também devolve erros de validação do Commerce como erro de
+  ferramenta, em vez de reportá-los como indisponibilidade temporária.
+- Não houve alteração de produto durante esta correção. O health público do MCP
+  respondeu `200` e o container do Commerce V2 iniciou normalmente.
