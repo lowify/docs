@@ -150,44 +150,43 @@ Compose deste repositório.
 
 1. Interromper novas tentativas de pagamento se houver regressão confirmada e
    preservar a evidência da falha.
-2. Voltar primeiro o Front Checkout ao hash registrado na pré-checagem e
-   executar `docker compose up -d --build` para remover o router de allowlist
-   caso ele seja a causa da indisponibilidade. Substituir
-   `FRONT_CHECKOUT_COMMIT_ANTERIOR` pelo hash registrado no passo de
-   pré-checagem; não usar o hash de outra máquina ou de outro ambiente.
+2. Voltar primeiro o Front Checkout ao commit imediatamente anterior a esta
+   entrega (`50500906bd6fc80ae97bcd683191f60e385de980`) e executar
+   `docker compose up -d --build` para remover o router de allowlist caso ele
+   seja a causa da indisponibilidade. Antes disso, conferir na pré-checagem
+   que a produção estava no estado esperado para esta entrega.
 
    ```bash
    cd /opt/lowify/front/front-checkout
    git status --porcelain=v1
-   git cat-file -e FRONT_CHECKOUT_COMMIT_ANTERIOR^{commit}
-   git switch --detach FRONT_CHECKOUT_COMMIT_ANTERIOR
+   git cat-file -e 50500906bd6fc80ae97bcd683191f60e385de980^{commit}
+   git switch --detach 50500906bd6fc80ae97bcd683191f60e385de980
    git rev-parse HEAD
    docker compose up -d --build
    docker compose ps
    ```
 
    O `git status --porcelain=v1` deve estar vazio e o `git rev-parse HEAD`
-   deve retornar exatamente o hash informado. Caso não estejam, parar antes do
-   `git switch`.
+   deve retornar exatamente `50500906bd6fc80ae97bcd683191f60e385de980`.
+   Caso não estejam, parar antes do `git switch`.
 
-3. Voltar em seguida o Gateway ao hash registrado na pré-checagem e
-   reconstruir seus containers. O Gateway anterior permanece compatível com o
-   Front retornado. Substituir `EDGE_GATEWAY_COMMIT_ANTERIOR` pelo hash
-   registrado no passo de pré-checagem.
+3. Voltar em seguida o Gateway ao commit imediatamente anterior a esta entrega
+   (`acf84816ade3769901b2ae770e832a9062a849a8`) e reconstruir seus
+   containers. O Gateway anterior permanece compatível com o Front retornado.
 
    ```bash
    cd /opt/lowify/edge/edge-gateway
    git status --porcelain=v1
-   git cat-file -e EDGE_GATEWAY_COMMIT_ANTERIOR^{commit}
-   git switch --detach EDGE_GATEWAY_COMMIT_ANTERIOR
+   git cat-file -e acf84816ade3769901b2ae770e832a9062a849a8^{commit}
+   git switch --detach acf84816ade3769901b2ae770e832a9062a849a8
    git rev-parse HEAD
    docker compose up -d --build
    docker compose ps
    ```
 
    O `git status --porcelain=v1` deve estar vazio e o `git rev-parse HEAD`
-   deve retornar exatamente o hash informado. Caso não estejam, parar antes do
-   `git switch`.
+   deve retornar exatamente `acf84816ade3769901b2ae770e832a9062a849a8`.
+   Caso não estejam, parar antes do `git switch`.
 
 4. A recuperação definitiva deve ocorrer em seguida por commits de reversão
    revisados e publicados nas respectivas branches. Não usar `git reset`,
