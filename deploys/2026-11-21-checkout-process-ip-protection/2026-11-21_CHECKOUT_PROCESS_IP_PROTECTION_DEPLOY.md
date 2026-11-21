@@ -30,12 +30,12 @@ nesta entrega.
 - O router aplica allowlist dos ranges IPv4 e IPv6 públicos oficiais do
   Cloudflare. Uma conexão que não venha dessas redes é recusada antes de
   alcançar PHP ou o processamento do pagamento.
-- O Front Checkout encaminha somente os headers de IP reconhecidos
-  (`CF-Connecting-IP`, `X-Real-IP` e `X-Forwarded-For`), depois de validar que
-  contêm um endereço IP.
+- O Front Checkout encaminha somente `CF-Connecting-IP` e `X-Real-IP`, depois
+  de validar que contêm um endereço IP. `X-Forwarded-For` não é lido nem
+  encaminhado nesse fluxo.
 - No Gateway, a rota interna assinada `/internal/checkout/process` mantém a
   validação HMAC e, depois dela, substitui `data.ip` pela prioridade
-  `CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For` e `remote_addr`.
+  `CF-Connecting-IP`, `X-Real-IP` e `remote_addr`.
 - Não há alteração de JWT, contrato de fila, produtor, consumidor ou efeito
   em banco. A assinatura HMAC entre Front Checkout e Gateway permanece o
   mecanismo de autenticação da chamada interna.
