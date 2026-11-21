@@ -152,10 +152,43 @@ Compose deste repositório.
    preservar a evidência da falha.
 2. Voltar primeiro o Front Checkout ao hash registrado na pré-checagem e
    executar `docker compose up -d --build` para remover o router de allowlist
-   caso ele seja a causa da indisponibilidade.
+   caso ele seja a causa da indisponibilidade. Substituir
+   `FRONT_CHECKOUT_COMMIT_ANTERIOR` pelo hash registrado no passo de
+   pré-checagem; não usar o hash de outra máquina ou de outro ambiente.
+
+   ```bash
+   cd /opt/lowify/front/front-checkout
+   git status --porcelain=v1
+   git cat-file -e FRONT_CHECKOUT_COMMIT_ANTERIOR^{commit}
+   git switch --detach FRONT_CHECKOUT_COMMIT_ANTERIOR
+   git rev-parse HEAD
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+   O `git status --porcelain=v1` deve estar vazio e o `git rev-parse HEAD`
+   deve retornar exatamente o hash informado. Caso não estejam, parar antes do
+   `git switch`.
+
 3. Voltar em seguida o Gateway ao hash registrado na pré-checagem e
    reconstruir seus containers. O Gateway anterior permanece compatível com o
-   Front retornado.
+   Front retornado. Substituir `EDGE_GATEWAY_COMMIT_ANTERIOR` pelo hash
+   registrado no passo de pré-checagem.
+
+   ```bash
+   cd /opt/lowify/edge/edge-gateway
+   git status --porcelain=v1
+   git cat-file -e EDGE_GATEWAY_COMMIT_ANTERIOR^{commit}
+   git switch --detach EDGE_GATEWAY_COMMIT_ANTERIOR
+   git rev-parse HEAD
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+   O `git status --porcelain=v1` deve estar vazio e o `git rev-parse HEAD`
+   deve retornar exatamente o hash informado. Caso não estejam, parar antes do
+   `git switch`.
+
 4. A recuperação definitiva deve ocorrer em seguida por commits de reversão
    revisados e publicados nas respectivas branches. Não usar `git reset`,
    `push --force`, limpeza de Redis, exclusão de logs ou remoção de pedidos e
@@ -165,7 +198,12 @@ Compose deste repositório.
 
 - A allowlist usa uma fotografia das faixas públicas oficiais do Cloudflare na
   data deste documento. A alteração futura dessas faixas exige atualização
-  coordenada da configuração antes que afete o tráfego legítimo.
+  coordenada da configuração antes que afete o tráfego legítimo. Antes de
+  cada alteração nessa allowlist, comparar integralmente as labels com
+  `https://www.cloudflare.com/ips-v4` e
+  `https://www.cloudflare.com/ips-v6`; a lista desta entrega contém as 15
+  faixas IPv4 e as 7 faixas IPv6 retornadas por esses endpoints na revisão do
+  documento.
 - A proteção impede manipulação básica por acesso direto à origem somente se
   o tráfego público do Checkout realmente atravessar o Traefik configurado.
   Ela não substitui uma regra de firewall/origem privada para todos os demais
